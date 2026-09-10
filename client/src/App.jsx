@@ -7,6 +7,8 @@ import Sidebar from './components/Sidebar';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Unauthorized = lazy(() => import('./pages/Unauthorized'));
 const SuperadminDashboard = lazy(() => import('./pages/SuperadminDashboard'));
 const PharmacistDashboard = lazy(() => import('./pages/PharmacistDashboard'));
@@ -60,6 +62,9 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* Pharmacist Dashboard */}
       <Route

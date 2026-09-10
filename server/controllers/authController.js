@@ -1,11 +1,14 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 import {
   generateAccessToken,
   generateRefreshToken,
   sendRefreshTokenCookie,
 } from "../utils/generateToken.js";
+
+import { sendPasswordResetEmail } from "../utils/emailService.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -533,6 +536,157 @@ export const updateUserProfile = async (
       success: true,
       message: "Profile updated successfully",
       user: buildUserResponse(updatedUser),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
+| Forgot Password
+|--------------------------------------------------------------------------
+| POST /api/auth/forgot-password
+| Public
+|--------------------------------------------------------------------------
+*/
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your email address",
+      });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address",
+      });
+    }
+
+    // Generate token and 6-digit OTP
+    const { resetToken, resetOtp } = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
+
+    // Client URL (supports offline localhost)
+    const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+    const resetUrl = `${clientUrl.replace(/\/$/, "")}/reset-password/${resetToken}`;
+
+    // Attempt to dispatch email (works if SMTP configured)
+    const emailSent = await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetUrl,
+      resetOtp,
+    });
+
+    console.log(`[PASSWORD RESET] Generated reset request for: ${user.email}`);
+    console.log(`[PASSWORD RESET] 6-Digit OTP: ${resetOtp}`);
+    console.log(`[PASSWORD RESET] Reset URL: ${resetUrl}`);
+
+    return res.status(200).json({
+      success: true,
+      message: emailSent
+        ? "Password reset instructions have been sent to your email."
+        : "Reset code generated! Since offline mode is active, your recovery code is provided below.",
+      emailSent,
+      // Provide recovery info in response for offline/local usage without SMTP server
+      offlineInfo: !emailSent
+        ? {
+            code: resetOtp,
+            token: resetToken,
+            email: user.email,
+            resetUrl: `/reset-password/${resetToken}`,
+          }
+        : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/*
+|--------------------------------------------------------------------------
+| Reset Password
+|--------------------------------------------------------------------------
+| POST /api/auth/reset-password/:token
+| POST /api/auth/reset-password
+| Public
+|--------------------------------------------------------------------------
+*/
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const token = req.params.token || req.body.token;
+    const { otp, email, password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a new password",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    let user = null;
+
+    // 1. Direct token from URL link
+    if (token) {
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+      user = await User.findOne({
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: { $gt: Date.now() },
+      });
+    }
+
+    // 2. 6-digit OTP code with user's email
+    if (!user && otp && email) {
+      const normalizedEmail = normalizeEmail(email);
+      user = await User.findOne({
+        email: normalizedEmail,
+        resetPasswordOtp: String(otp).trim(),
+        resetPasswordExpire: { $gt: Date.now() },
+      });
+    }
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or expired reset code or link. Please request a new one.",
+      });
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    user.resetPasswordOtp = undefined;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Password has been reset successfully! You can now log in with your new password.",
     });
   } catch (error) {
     next(error);

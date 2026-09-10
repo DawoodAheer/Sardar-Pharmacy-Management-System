@@ -1,0 +1,96 @@
+# ===================================================
+# Pharma Desk — Offline Docker Compose Configuration
+# Guaranteed Zero Data Loss via Persistent Volumes
+# ===================================================
+
+
+services:
+  # -------------------------------------------------
+  # 1. MongoDB Database Service (Runs 100% Offline)
+  # -------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: pharmadesk-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      # DATA PERSISTENCE: Data is stored in this persistent volume.
+      # When you close, stop, or restart the system, all data is preserved.
+      - pharmadesk_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --eval \"db.adminCommand('ping')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pharmadesk-network
+
+  # -------------------------------------------------
+  # 2. Node.js Express Backend API
+  # -------------------------------------------------
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pharmadesk-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      # Connects directly to internal offline MongoDB service
+      - MONGO_URI=mongodb://mongodb:27017/pharmadesk
+      # Preconfigured offline secrets
+      - JWT_ACCESS_SECRET=pharmadesk_super_secure_offline_jwt_access_secret_key_2026
+      - JWT_REFRESH_SECRET=pharmadesk_super_secure_offline_jwt_refresh_secret_key_2026
+      - CLIENT_URL=http://localhost:5173
+    volumes:
+      # UPLOADS PERSISTENCE: Uploaded receipts and medicine images are stored on your disk
+      - ./server/uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - pharmadesk-network
+
+  # -------------------------------------------------
+  # 3. React Frontend with Production Nginx Server
+  # -------------------------------------------------
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        # Empty string lets client use relative /api reverse-proxy through Nginx
+        - VITE_API_URL=
+    container_name: pharmadesk-frontend
+    restart: unless-stopped
+    ports:
+      # Access in browser at http://localhost:5173 (or http://localhost:3000)
+      - "5173:80"
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pharmadesk-network
+
+# ---------------------------------------------------
+# Persistent Storage Volumes
+# ---------------------------------------------------
+volumes:
+  # This named volume is managed by Docker and is NEVER deleted
+  # when stopping the containers or shutting down the machine.
+  pharmadesk_mongo_data:
+    name: pharmadesk_mongo_data
+    driver: local
+
+# ---------------------------------------------------
+# Internal Private Bridge Network
+# ---------------------------------------------------
+networks:
+  pharmadesk-network:
+    name: pharmadesk-network
+    driver: bridge

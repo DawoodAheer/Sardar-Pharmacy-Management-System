@@ -3,6 +3,7 @@ import axios from 'axios';
 const DEFAULT_API_URL = 'http://localhost:5000';
 
 const normalizeBaseUrl = (url) => {
+  if (url === '') return '';
   const normalizedUrl = (url || DEFAULT_API_URL).trim();
 
   return normalizedUrl.endsWith('/')

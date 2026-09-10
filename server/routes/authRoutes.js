@@ -8,6 +8,8 @@ import {
   refreshAccessToken,
   getMe,
   updateUserProfile,
+  forgotPassword,
+  resetPassword,
 } from '../controllers/authController.js';
 
 import { protect } from '../middleware/authMiddleware.js';
@@ -21,6 +23,12 @@ router.post('/register-pharmacist', registerPharmacist);
 router.post('/login', loginUser);
 
 router.post('/logout', logoutUser);
+
+router.post('/forgot-password', forgotPassword);
+
+router.post('/reset-password/:token', resetPassword);
+
+router.post('/reset-password', resetPassword);
 
 router.post('/refresh', refreshAccessToken);
 
