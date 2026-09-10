@@ -1,30 +1,29 @@
-
-const StatCard = ({ title, icon: Icon, value, color = 'blue' }) => {
+const StatCard = ({ title, icon: Icon, value, color = 'teal' }) => {
   const getColorStyles = () => {
     switch (color) {
       case 'blue':
-        return 'bg-blue-50 dark:bg-white/5 text-[#1A56A0] dark:text-sky-400';
+        return 'bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-200';
       case 'red':
-        return 'bg-red-50 dark:bg-white/5 text-red-650 dark:text-red-405';
+        return 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-200';
       case 'orange':
-        return 'bg-orange-50 dark:bg-white/5 text-orange-600 dark:text-orange-400';
+        return 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200';
       case 'green':
-        return 'bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-450';
+        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200';
       default:
-        return 'bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-400';
+        return 'bg-teal-50 text-teal-700 dark:bg-teal-950/30 dark:text-teal-200';
     }
   };
 
   const colorClasses = getColorStyles();
 
   return (
-    <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm relative overflow-hidden flex items-center justify-between transition-colors duration-200">
+    <div className="relative flex items-center justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-colors duration-200 dark:border-slate-700 dark:bg-slate-900">
       <div>
-        <span className="text-slate-400 dark:text-slate-505 text-[10px] font-bold uppercase tracking-wider block">{title}</span>
-        <span className="text-xl font-bold text-slate-900 dark:text-white mt-1 block">{value}</span>
+        <span className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">{title}</span>
+        <span className="block text-2xl font-bold text-slate-900 dark:text-slate-50">{value}</span>
       </div>
-      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colorClasses}`}>
-        {Icon && <Icon className="w-4 h-4" />}
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${colorClasses}`}>
+        {Icon && <Icon className="h-5 w-5" />}
       </div>
     </div>
   );

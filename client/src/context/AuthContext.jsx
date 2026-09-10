@@ -611,11 +611,10 @@ export const AuthProvider = ({ children }) => {
           "Login successful",
       };
     } catch (error) {
-      const message =
-        error.response?.data
-          ?.message ||
-        error.message ||
-        "Login failed";
+      const message = error.response?.data?.message ||
+        (error.request && !error.response
+          ? "Unable to reach the server. Start the backend and make sure MongoDB is running."
+          : error.message || "Login failed");
 
       /*
        * Preserve original error as the cause.
@@ -684,55 +683,20 @@ export const AuthProvider = ({ children }) => {
         );
 
       const registeredUser =
-        response.data?.user;
+        response.data?.user ||
+        response.data?.request;
 
-      const newAccessToken =
-        registeredUser?.accessToken;
-
-      if (
-        !registeredUser ||
-        !newAccessToken
-      ) {
+      if (!registeredUser) {
         throw new Error(
           "Invalid registration response from server"
         );
       }
 
-      /*
-       * Save access token.
-       */
-      tokenRef.current =
-        newAccessToken;
-
-      setAccessToken(
-        newAccessToken
-      );
-
-      /*
-       * Store safe user information.
-       */
-      const safeUser = {
-        _id:
-          registeredUser._id,
-        name:
-          registeredUser.name,
-        email:
-          registeredUser.email,
-        phone:
-          registeredUser.phone || "",
-        role:
-          registeredUser.role,
-        createdAt:
-          registeredUser.createdAt,
-      };
-
-      setUser(safeUser);
-
       return {
-        user: safeUser,
+        user: registeredUser,
         message:
           response.data?.message ||
-          "Account created successfully",
+          "Account created. Please wait for approval.",
       };
     } catch (error) {
       const message =

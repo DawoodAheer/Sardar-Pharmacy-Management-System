@@ -28,6 +28,10 @@ const billItemSchema = new mongoose.Schema({
   expiryDate: {
     type: Date,
   },
+  rackLocation: {
+    type: String,
+    default: '',
+  },
 });
 
 const billSchema = new mongoose.Schema(

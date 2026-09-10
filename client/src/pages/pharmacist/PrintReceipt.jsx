@@ -140,13 +140,13 @@ const PrintReceipt = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--page-bg)]">
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/40">
-            <Loader2 className="h-7 w-7 animate-spin text-blue-600 dark:text-blue-400" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 ring-1 ring-teal-100 dark:bg-teal-950/30 dark:text-teal-300 dark:ring-teal-800/40">
+            <Loader2 className="h-7 w-7 animate-spin" />
           </div>
 
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
             Loading receipt...
           </p>
 
@@ -177,7 +177,7 @@ const PrintReceipt = () => {
           <button
             type="button"
             onClick={handleBack}
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-blue-700"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 px-4 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Billing
@@ -325,7 +325,7 @@ const PrintReceipt = () => {
 
                   <div>
                     <h1 className="text-2xl font-extrabold tracking-tight">
-                      PharmaDesk
+                      Sardar Pharmacy
                     </h1>
 
                     <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-blue-100 print:text-slate-500">
@@ -464,9 +464,9 @@ const PrintReceipt = () => {
                               {item.name || 'Unknown medicine'}
                             </p>
 
-                            {item.batchNumber && (
+                            {item.rackLocation && (
                               <p className="mt-0.5 text-[9px] text-slate-400">
-                                Batch: {item.batchNumber}
+                                Rack: {item.rackLocation}
                               </p>
                             )}
                           </td>

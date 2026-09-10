@@ -1,20 +1,31 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import useBrowserNotifications from './hooks/useBrowserNotifications';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Unauthorized from './pages/Unauthorized';
-import SuperadminDashboard from './pages/SuperadminDashboard';
-import PharmacistDashboard from './pages/PharmacistDashboard';
-import CustomerDashboard from './pages/CustomerDashboard';
-import CustomerShop from './pages/CustomerShop';
-import CustomerBills from './pages/CustomerBills';
-import CustomerReminders from './pages/CustomerReminders';
-import CustomerProfile from './pages/CustomerProfile';
-import LandingPage from './pages/LandingPage';
-import PrintReceipt from './pages/pharmacist/PrintReceipt';
+
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Unauthorized = lazy(() => import('./pages/Unauthorized'));
+const SuperadminDashboard = lazy(() => import('./pages/SuperadminDashboard'));
+const PharmacistDashboard = lazy(() => import('./pages/PharmacistDashboard'));
+const CustomerDashboard = lazy(() => import('./pages/CustomerDashboard'));
+const CustomerShop = lazy(() => import('./pages/CustomerShop'));
+const CustomerBills = lazy(() => import('./pages/CustomerBills'));
+const CustomerReminders = lazy(() => import('./pages/CustomerReminders'));
+const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const PrintReceipt = lazy(() => import('./pages/pharmacist/PrintReceipt'));
+
+const RouteFallback = () => (
+  <div className="flex min-h-[50vh] items-center justify-center bg-[var(--page-bg)] px-4">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600" />
+      Loading workspace...
+    </div>
+  </div>
+);
 
 // Browser notification activator — runs the reminder checker for customers
 const BrowserNotificationProvider = ({ children }) => {
@@ -26,13 +37,13 @@ const BrowserNotificationProvider = ({ children }) => {
 const DashboardLayout = () => {
   return (
     <BrowserNotificationProvider>
-      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-[#0C1628] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+      <div className="flex min-h-screen flex-col bg-[var(--page-bg)] font-sans text-[var(--text-body)] transition-colors duration-200">
         <Navbar />
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex flex-1 overflow-hidden">
           <Sidebar />
 
-          <main className="flex-1 overflow-y-auto pb-14 md:pb-0">
+          <main className="flex-1 overflow-y-auto bg-[var(--page-bg)] pb-14 md:pb-0">
             <Outlet />
           </main>
         </div>
@@ -43,7 +54,8 @@ const DashboardLayout = () => {
 
 function App() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
@@ -159,7 +171,8 @@ function App() {
 
       {/* Wildcard Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 

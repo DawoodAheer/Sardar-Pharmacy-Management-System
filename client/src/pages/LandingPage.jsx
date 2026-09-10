@@ -73,25 +73,25 @@ export default function LandingPage() {
     : medicineShowcase.filter(m => m.type === activeTab);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#080E1A] text-slate-900 dark:text-slate-100 transition-colors duration-300 font-sans selection:bg-cyan-500 selection:text-white">
+    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-heading)] transition-colors duration-300 font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* 1️⃣ NAVBAR */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? 'bg-white/90 dark:bg-[#080E1A]/90 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 shadow-lg shadow-black/5 py-3'
+          ? 'border-b border-slate-200/80 bg-white/90 shadow-lg shadow-slate-200/60 backdrop-blur-md dark:border-slate-700 dark:bg-slate-950/90 dark:shadow-slate-950/40 py-3'
           : 'bg-transparent py-4'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#1A56A0] to-[#0ea5e9] flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/25 group-hover:scale-105 transition-transform">
               <span className="text-base font-black text-white">⚕</span>
             </div>
             <div className="flex flex-col">
               <div className="flex items-center font-extrabold text-sm tracking-tight">
-                <span className="text-slate-900 dark:text-white">PHARMA</span>
-                <span className="text-[#1A56A0] dark:text-cyan-400 ml-1">DESK</span>
+                <span className="text-slate-900 dark:text-white">SARDAR</span>
+                <span className="ml-1 text-teal-700 dark:text-teal-300">PHARMACY</span>
                 <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded border border-cyan-500/20">AI</span>
               </div>
               <span className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5 font-medium">Quality & Management</span>
@@ -100,11 +100,11 @@ export default function LandingPage() {
 
           {/* Nav Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#hero" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors">Home</a>
-            <a href="#showcase" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors">Medicine Quality</a>
-            <a href="#features" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors">Core Features</a>
-            <a href="#roles" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors">For Users</a>
-            <a href="#how-it-works" className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors">Workflow</a>
+            <a href="#hero" className="text-xs font-semibold text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">Home</a>
+            <a href="#showcase" className="text-xs font-semibold text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">Medicine Quality</a>
+            <a href="#features" className="text-xs font-semibold text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">Core Features</a>
+            <a href="#roles" className="text-xs font-semibold text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">For Users</a>
+            <a href="#how-it-works" className="text-xs font-semibold text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300">Workflow</a>
           </div>
 
           {/* Right Actions */}
@@ -145,13 +145,13 @@ export default function LandingPage() {
               <div className="flex items-center gap-2">
                 <Link 
                   to="/login" 
-                  className="text-xs font-semibold px-3 py-2 text-slate-600 dark:text-slate-300 hover:text-[#1A56A0] dark:hover:text-cyan-400 transition-colors"
+                  className="text-xs font-semibold px-3 py-2 text-slate-600 transition-colors hover:text-teal-700 dark:text-slate-300 dark:hover:text-teal-300"
                 >
                   Sign In
                 </Link>
                 <Link 
                   to="/register" 
-                  className="text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-[#1A56A0] to-[#0ea5e9] hover:from-[#154682] hover:to-[#0284c7] text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 hover:-translate-y-0.5"
+                  className="text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 text-white transition-all shadow-md shadow-teal-500/20 hover:shadow-teal-500/35 hover:-translate-y-0.5"
                 >
                   Get Started
                 </Link>
@@ -171,13 +171,13 @@ export default function LandingPage() {
             
             {/* Left Content */}
             <div className="lg:col-span-6 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[#1A56A0] dark:text-cyan-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-teal-700 dark:border-teal-700/60 dark:bg-teal-950/40 dark:text-teal-200">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
                 <span className="text-xs font-bold uppercase tracking-wider">Next-Gen AI Medicine Quality & POS Platform</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.15]">
-                Intelligent Medicine Quality, <span className="bg-gradient-to-r from-[#1A56A0] via-cyan-500 to-emerald-500 bg-clip-text text-transparent">Zero Compromise</span> Healthcare.
+                Intelligent Medicine Quality, <span className="bg-gradient-to-r from-teal-700 via-emerald-500 to-teal-500 bg-clip-text text-transparent">Zero Compromise</span> Healthcare.
               </h1>
 
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
@@ -198,7 +198,7 @@ export default function LandingPage() {
                   <>
                     <Link
                       to="/register"
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#1A56A0] to-[#0ea5e9] text-white font-bold text-sm shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-bold text-sm shadow-xl shadow-teal-500/25 hover:shadow-teal-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
                     >
                       <span>Get Started Free</span>
                       <span>→</span>
@@ -405,7 +405,7 @@ export default function LandingPage() {
             Built for High-Precision Pharmacy Operations
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Discover the 3 integrated pillars of Pharmadesk: Quality Scanning, POS Dispensing, and Patient Adherence.
+                  Discover the 3 integrated pillars of Sardar Pharmacy: Quality Scanning, POS Dispensing, and Patient Adherence.
           </p>
         </div>
 

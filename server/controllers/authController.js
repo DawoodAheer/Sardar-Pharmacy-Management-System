@@ -88,22 +88,20 @@ export const registerUser = async (req, res, next) => {
       password,
       phone: phone?.trim() || "",
       role: "customer",
-      accountStatus: "approved",
+      accountStatus: "pending",
     });
-
-    const accessToken = generateAccessToken(
-      user._id,
-      user.role
-    );
-
-    const refreshToken = generateRefreshToken(user._id);
-
-    sendRefreshTokenCookie(res, refreshToken);
 
     return res.status(201).json({
       success: true,
-      message: "Account created successfully",
-      user: buildUserResponse(user, accessToken),
+      message: "Account created successfully. Please wait for pharmacist approval before logging in.",
+      request: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        accountStatus: user.accountStatus,
+      },
     });
   } catch (error) {
     next(error);
@@ -231,28 +229,24 @@ export const loginUser = async (req, res, next) => {
       });
     }
 
-    /*
-     * Pharmacist approval check
-     */
     if (
-      user.role === "pharmacist" &&
+      user.role !== "superadmin" &&
       user.accountStatus === "pending"
     ) {
       return res.status(403).json({
         success: false,
         message:
-          "Your pharmacist registration is waiting for Superadmin approval",
+          "Your account is waiting for Superadmin approval",
       });
     }
 
     if (
-      user.role === "pharmacist" &&
       user.accountStatus === "rejected"
     ) {
       return res.status(403).json({
         success: false,
         message:
-          "Your pharmacist registration request was rejected",
+          "Your account registration request was rejected",
       });
     }
 
@@ -357,15 +351,15 @@ export const refreshAccessToken = async (
       });
     }
 
-    // Do not refresh token for rejected/pending pharmacist
+    // Do not refresh token for rejected/pending non-admin accounts
     if (
-      user.role === "pharmacist" &&
+      user.role !== "superadmin" &&
       user.accountStatus !== "approved"
     ) {
       return res.status(403).json({
         success: false,
         message:
-          "Your pharmacist account is not approved",
+          "Your account is not approved",
       });
     }
 
@@ -389,10 +383,12 @@ export const refreshAccessToken = async (
       accessToken: newAccessToken,
     });
   } catch (error) {
-    console.error(
-      "Refresh token error:",
-      error.message
-    );
+    if (error.name !== "TokenExpiredError") {
+      console.error(
+        "Refresh token error:",
+        error.message
+      );
+    }
 
     res.cookie("refreshToken", "", {
       httpOnly: true,

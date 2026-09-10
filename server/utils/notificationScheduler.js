@@ -107,7 +107,7 @@ export const runExpiryReport = async () => {
         tableHtml += `
           <tr>
             <td><strong>${med.name}</strong><br><span style="font-size: 11px; color: #64748b;">${med.genericName}</span></td>
-            <td><code>${med.batchNumber}</code></td>
+            <td><code>${med.rackLocation || 'Not assigned'}</code></td>
             <td>${med.category}</td>
             <td>${med.quantity}</td>
             <td>${new Date(med.expiryDate).toLocaleDateString()}</td>
@@ -134,7 +134,7 @@ export const runExpiryReport = async () => {
       const status = checkExpiryStatus(m.expiryDate);
       const diffTime = new Date(m.expiryDate).getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / msInDay);
-      return `- ${m.name} (Batch: ${m.batchNumber}) [${status}]: ${diffDays} days remaining.`;
+      return `- ${m.name} (Rack: ${m.rackLocation || 'Not assigned'}) [${status}]: ${diffDays} days remaining.`;
     }).join('\n');
 
     const detailedMessage = `Daily Expiry Report:\n${medSummary}`;
@@ -225,7 +225,7 @@ export const runLowStockReport = async () => {
       htmlContent += `
         <tr>
           <td><strong>${med.name}</strong><br><span style="font-size: 11px; color: #64748b;">${med.genericName}</span></td>
-          <td><code>${med.batchNumber}</code></td>
+            <td><code>${med.rackLocation || 'Not assigned'}</code></td>
           <td>${med.category}</td>
           <td style="color: ${isDepleted ? '#ef4444' : '#f59e0b'}; font-weight: bold;">${med.quantity} units</td>
           <td>${med.reorderLevel} units</td>
@@ -246,7 +246,7 @@ export const runLowStockReport = async () => {
     const stockSummary = medicines.map((m) => {
       const isDepleted = m.quantity === 0;
       const statusStr = isDepleted ? 'DEPLETED' : 'LOW STOCK';
-      return `- ${m.name} (Batch: ${m.batchNumber}): ${m.quantity} units left (Reorder: ${m.reorderLevel}) [${statusStr}]`;
+      return `- ${m.name} (Rack: ${m.rackLocation || 'Not assigned'}): ${m.quantity} units left (Reorder: ${m.reorderLevel}) [${statusStr}]`;
     }).join('\n');
 
     const detailedMessage = `Low Stock Alert:\n${stockSummary}`;

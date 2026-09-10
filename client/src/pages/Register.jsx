@@ -180,11 +180,11 @@ const Register = () => {
         throw new Error('Registration completed but user data was not returned.');
       }
 
-      navigate('/customer/dashboard', {
+      navigate('/login', {
         replace: true,
         state: {
           message:
-            result.message || 'Account created successfully. Welcome to PharmaDesk!',
+            result.message || 'Account created. Please wait for pharmacist approval before logging in.',
         },
       });
     } catch (err) {
@@ -200,7 +200,7 @@ const Register = () => {
   const steps = [
     'Fill in your personal details',
     'Your customer account is created securely',
-    'Start using PharmaDesk',
+    'Start using Sardar Pharmacy',
   ];
 
   return (
@@ -244,13 +244,13 @@ const Register = () => {
 
         {/* Brand */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#1A56A0] flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
             <span className="text-xl font-bold text-white">⚕</span>
           </div>
 
           <div>
             <span className="block font-bold text-lg tracking-tight text-white">
-              Pharmadesk
+              Sardar Pharmacy
             </span>
 
             <span className="block text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-0.5">
@@ -303,7 +303,7 @@ const Register = () => {
         <div className="max-w-lg w-full mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <span className="block text-[10px] font-bold tracking-widest uppercase text-[#1A56A0] mb-1.5">
+            <span className="block text-[10px] font-bold tracking-widest uppercase text-teal-700 mb-1.5">
               New Account
             </span>
 
@@ -761,7 +761,7 @@ const Register = () => {
             Already have an account?{' '}
             <Link
               to="/login"
-              className="text-[#1A56A0] hover:underline font-bold"
+              className="text-teal-700 hover:underline font-bold"
             >
               Sign in
             </Link>

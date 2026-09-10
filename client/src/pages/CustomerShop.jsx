@@ -734,11 +734,11 @@ const CustomerShop = () => {
 
             <div className="leading-none">
               <span className="block text-[12px] font-extrabold uppercase tracking-tight text-slate-900 dark:text-white">
-                Pharma
+                Sardar
               </span>
 
               <span className="block text-[12px] font-extrabold uppercase tracking-tight text-blue-600 dark:text-blue-400">
-                Desk
+                Pharmacy
               </span>
             </div>
           </div>
@@ -1101,12 +1101,12 @@ const CustomerShop = () => {
 
                       <div className="flex justify-between gap-3">
                         <span className="text-slate-400">
-                          Batch
+                          Rack
                         </span>
 
                         <span className="font-semibold text-slate-700 dark:text-slate-300">
-                          {medicine.batchNumber ||
-                            'N/A'}
+                          {medicine.rackLocation ||
+                            'Not assigned'}
                         </span>
                       </div>
 

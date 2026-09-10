@@ -20,6 +20,7 @@ import {
   MapPin,
   CalendarDays,
   Receipt,
+  UserRound,
 } from 'lucide-react';
 
 const formatPKR = (amount = 0) =>
@@ -149,21 +150,19 @@ const CustomerDashboard = () => {
   const customerName = user?.name || 'Customer';
 
   return (
-    <div className="space-y-5 p-4 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="dashboard-shell mx-auto max-w-7xl space-y-5 p-4 transition-colors duration-200">
       {/* Welcome Banner */}
-      <section className="bg-white dark:bg-[#1a2438] p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm relative overflow-hidden transition-colors duration-200">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+      <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm">
+        <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-xl font-bold tracking-tight text-white">
               Welcome Back,{' '}
-              <span className="text-[#1A56A0] dark:text-sky-400">
-                {customerName}
-              </span>
+              <span className="text-emerald-50">{customerName}</span>
             </h1>
 
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+            <p className="mt-1 max-w-2xl text-sm text-emerald-50/90">
               Manage your medicines, purchases, reminders, profile details,
               and pharmacy orders from one place.
             </p>
@@ -171,7 +170,7 @@ const CustomerDashboard = () => {
 
           <Link
             to="/customer/shop"
-            className="w-fit px-4 py-2.5 bg-[#1A56A0] hover:bg-[#164b8c] text-white font-semibold rounded-xl shadow-sm transition-all text-sm flex items-center gap-2"
+            className="flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-teal-700 shadow-sm transition-all hover:bg-emerald-50"
           >
             <ShoppingBag className="w-4 h-4" />
             Browse Medicine Shop
@@ -242,6 +241,64 @@ const CustomerDashboard = () => {
               {user?.address || user?.location || 'Not provided'}
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Quick Actions */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700/50 dark:bg-[#1a2438]">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            Quick Actions
+          </h2>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Keep your pharmacy tasks one click away.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            to="/customer/shop"
+            className="group flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-[#1A56A0] transition hover:border-blue-200 hover:bg-blue-100 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-sky-300 dark:hover:bg-blue-500/20"
+          >
+            <span className="flex items-center gap-2">
+              <ShoppingBag className="h-4 w-4" />
+              Browse Shop
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+
+          <Link
+            to="/customer/bills"
+            className="group flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:border-emerald-200 hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+          >
+            <span className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              View Invoices
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+
+          <Link
+            to="/customer/reminders"
+            className="group flex items-center justify-between rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700 transition hover:border-amber-200 hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20"
+          >
+            <span className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Manage Reminders
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+
+          <Link
+            to="/customer/profile"
+            className="group flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 dark:border-slate-700 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+          >
+            <span className="flex items-center gap-2">
+              <UserRound className="h-4 w-4" />
+              Edit Profile
+            </span>
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </Link>
         </div>
       </section>
 

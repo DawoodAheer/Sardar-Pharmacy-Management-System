@@ -53,7 +53,12 @@ export const updateUserRole = async (req, res, next) => {
       }
     }
 
+    const previousRole = userToChange.role;
     userToChange.role = role;
+
+    if (role === 'customer' && previousRole !== 'customer') {
+      userToChange.accountStatus = 'pending';
+    }
 
     await userToChange.save();
 
@@ -123,6 +128,25 @@ export const getCustomers = async (req, res, next) => {
   try {
     const customers = await User.find({
       role: 'customer',
+      accountStatus: 'approved',
+    })
+      .select('-password')
+      .sort({ createdAt: -1 });
+
+    res.json(customers);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get customer accounts waiting for approval
+// @route   GET /api/users/pending-customers
+// @access  Private/Pharmacist,Superadmin
+export const getPendingCustomers = async (req, res, next) => {
+  try {
+    const customers = await User.find({
+      role: 'customer',
+      accountStatus: 'pending',
     })
       .select('-password')
       .sort({ createdAt: -1 });
@@ -300,6 +324,88 @@ export const rejectPharmacist = async (
     return res.status(200).json({
       success: true,
       message: 'Pharmacist request rejected successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        accountStatus: user.accountStatus,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Approve a customer account
+// @route   PUT /api/users/:id/approve-customer
+// @access  Private/Superadmin
+export const approveCustomer = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (user.role !== 'customer') {
+      return res.status(400).json({
+        success: false,
+        message: 'This user is not a customer',
+      });
+    }
+
+    user.accountStatus = 'approved';
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Customer approved successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        accountStatus: user.accountStatus,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reject a customer account
+// @route   PUT /api/users/:id/reject-customer
+// @access  Private/Superadmin
+export const rejectCustomer = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    if (user.role !== 'customer') {
+      return res.status(400).json({
+        success: false,
+        message: 'This user is not a customer',
+      });
+    }
+
+    user.accountStatus = 'rejected';
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Customer request rejected successfully',
       user: {
         _id: user._id,
         name: user.name,

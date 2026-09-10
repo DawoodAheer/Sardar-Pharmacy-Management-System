@@ -21,12 +21,14 @@ export const getAllMedicines = async (req, res, next) => {
   try {
     const query = {};
 
-    // 1. Search filter (name, genericName, manufacturer)
+    // 1. Search filter (name, genericName, manufacturer, batch and rack)
     if (search) {
+      const escapedSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { genericName: { $regex: search, $options: 'i' } },
-        { manufacturer: { $regex: search, $options: 'i' } },
+        { name: { $regex: escapedSearch, $options: 'i' } },
+        { genericName: { $regex: escapedSearch, $options: 'i' } },
+        { manufacturer: { $regex: escapedSearch, $options: 'i' } },
+        { rackLocation: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
@@ -88,36 +90,28 @@ export const createMedicine = async (req, res, next) => {
     name,
     genericName,
     manufacturer,
-    batchNumber,
     expiryDate,
-    manufactureDate,
     quantity,
     reorderLevel,
     price,
     category,
     barcode,
+    rackLocation,
     labelImageUrl,
   } = req.body;
 
   try {
-    const batchExists = await Medicine.findOne({ batchNumber });
-    if (batchExists) {
-      res.status(400);
-      throw new Error(`A medicine with batch number '${batchNumber}' already exists.`);
-    }
-
     const medicine = await Medicine.create({
       name,
       genericName,
       manufacturer,
-      batchNumber,
       expiryDate,
-      manufactureDate,
       quantity,
       reorderLevel,
       price,
       category,
       barcode,
+      rackLocation,
       labelImageUrl,
       createdBy: req.user._id,
     });
@@ -141,14 +135,13 @@ export const updateMedicine = async (req, res, next) => {
     name,
     genericName,
     manufacturer,
-    batchNumber,
     expiryDate,
-    manufactureDate,
     quantity,
     reorderLevel,
     price,
     category,
     barcode,
+    rackLocation,
     labelImageUrl,
   } = req.body;
 
@@ -160,25 +153,16 @@ export const updateMedicine = async (req, res, next) => {
       throw new Error('Medicine not found');
     }
 
-    if (batchNumber && batchNumber !== medicine.batchNumber) {
-      const batchExists = await Medicine.findOne({ batchNumber });
-      if (batchExists) {
-        res.status(400);
-        throw new Error(`A medicine with batch number '${batchNumber}' already exists.`);
-      }
-      medicine.batchNumber = batchNumber;
-    }
-
     medicine.name = name !== undefined ? name : medicine.name;
     medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
     medicine.manufacturer = manufacturer !== undefined ? manufacturer : medicine.manufacturer;
     medicine.expiryDate = expiryDate !== undefined ? expiryDate : medicine.expiryDate;
-    medicine.manufactureDate = manufactureDate !== undefined ? manufactureDate : medicine.manufactureDate;
     medicine.quantity = quantity !== undefined ? quantity : medicine.quantity;
     medicine.reorderLevel = reorderLevel !== undefined ? reorderLevel : medicine.reorderLevel;
     medicine.price = price !== undefined ? price : medicine.price;
     medicine.category = category !== undefined ? category : medicine.category;
     medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
+    medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
     medicine.labelImageUrl = labelImageUrl !== undefined ? labelImageUrl : medicine.labelImageUrl;
 
     const updatedMedicine = await medicine.save();
@@ -234,27 +218,19 @@ export const bulkImportMedicines = async (req, res, next) => {
         name,
         genericName,
         manufacturer,
-        batchNumber,
         expiryDate,
-        manufactureDate,
         quantity,
         reorderLevel,
         price,
         category,
         barcode,
+        rackLocation,
         labelImageUrl,
       } = med;
 
-      if (!name || !genericName || !manufacturer || !batchNumber || !expiryDate || !manufactureDate || price === undefined) {
+      if (!name || !genericName || !manufacturer || !expiryDate || price === undefined) {
         skippedCount++;
-        skippedBatches.push({ batchNumber: batchNumber || 'UNKNOWN', reason: 'Missing required fields' });
-        continue;
-      }
-
-      const batchExists = await Medicine.findOne({ batchNumber });
-      if (batchExists) {
-        skippedCount++;
-        skippedBatches.push({ batchNumber, reason: 'Duplicate batch number' });
+        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing required fields' });
         continue;
       }
 
@@ -262,14 +238,13 @@ export const bulkImportMedicines = async (req, res, next) => {
         name,
         genericName,
         manufacturer,
-        batchNumber,
         expiryDate,
-        manufactureDate,
         quantity: quantity || 0,
         reorderLevel: reorderLevel || 10,
         price,
         category,
         barcode,
+        rackLocation,
         labelImageUrl,
         createdBy: req.user._id,
       });
@@ -483,15 +458,7 @@ export const scanLabel = async (req, res, next) => {
       }
     }
 
-    // 4) Parse Batch Number
-    let batchNumber = '';
-    const batchRegex = /(?:batch\s+no|b\.no|lot\s+no)[:\s-]*([a-zA-Z0-9-]+)/i;
-    const batchMatch = rawText.match(batchRegex);
-    if (batchMatch) {
-      batchNumber = batchMatch[1].trim();
-    }
-
-    // 5) Heuristic fallback for Brand/Generic names
+    // 4) Heuristic fallback for Brand/Generic names
     const excludeKeywords = [
       'ltd', 'limited', 'labs', 'pharma', 'industries', 'corp', 'co', 'incorporated',
       'mfg', 'lic', 'no', 'dosage', 'directed', 'physician', 'store', 'dry', 'dark',
@@ -571,7 +538,7 @@ export const scanLabel = async (req, res, next) => {
     let foundCount = 0;
     if (medicineName && medicineName !== 'Unknown') foundCount++;
     if (expiryDate) foundCount++;
-    if (batchNumber) foundCount++;
+    if (genericName && genericName !== 'Unknown') foundCount++;
 
     let confidence = 'low';
     if (foundCount === 3) confidence = 'high';
@@ -604,7 +571,6 @@ export const scanLabel = async (req, res, next) => {
       genericName,
       manufacturer,
       expiryDate,
-      batchNumber,
       labelImageUrl,
       rawText,
       confidence,

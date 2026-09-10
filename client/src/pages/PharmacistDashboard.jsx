@@ -51,7 +51,6 @@ import {
   Package,
   Clock,
   Building2,
-  Hash,
   Tag,
   Layers,
   ClipboardList,
@@ -128,24 +127,24 @@ const safeText = (value) => {
 const getExpiryBadgeClass = (status) => {
   const classes = {
     EXPIRED:
-      'bg-red-50 text-red-700 border border-red-200',
+      'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-500/30',
 
     CRITICAL:
-      'bg-rose-50 text-rose-700 border border-rose-200',
+      'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-500/30',
 
     WARNING:
-      'bg-orange-50 text-orange-700 border border-orange-200',
+      'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-500/30',
 
     CAUTION:
-      'bg-yellow-50 text-yellow-700 border border-yellow-200',
+      'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-500/30',
 
     SAFE:
-      'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-500/30',
   };
 
   return (
     classes[status] ||
-    'bg-slate-50 text-slate-700 border border-slate-200'
+    'bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600'
   );
 };
 
@@ -221,7 +220,7 @@ const PharmacistDashboard = () => {
     updateProfile,
   } = useAuth();
 
-  const { theme, toggle } = useTheme();
+  const { resolvedTheme, toggle } = useTheme();
 
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -278,6 +277,9 @@ const PharmacistDashboard = () => {
   const [ocrLoading, setOcrLoading] =
     useState(false);
 
+  const [ocrPreview, setOcrPreview] =
+    useState(null);
+
   const [error, setError] =
     useState('');
 
@@ -290,11 +292,7 @@ const PharmacistDashboard = () => {
     useState('');
   const [manufacturer, setManufacturer] =
     useState('');
-  const [batchNumber, setBatchNumber] =
-    useState('');
   const [expiryDate, setExpiryDate] =
-    useState('');
-  const [manufactureDate, setManufactureDate] =
     useState('');
   const [quantity, setQuantity] =
     useState('');
@@ -305,6 +303,8 @@ const PharmacistDashboard = () => {
   const [category, setCategory] =
     useState('Antibiotic');
   const [barcode, setBarcode] =
+    useState('');
+  const [rackLocation, setRackLocation] =
     useState('');
   const [labelImageUrl, setLabelImageUrl] =
     useState('');
@@ -630,6 +630,46 @@ const PharmacistDashboard = () => {
     },
   });
 
+  const {
+    data: pendingCustomers = [],
+    isLoading: isPendingCustomersLoading,
+  } = useQuery({
+    queryKey: ['pendingCustomers'],
+    queryFn: async () => {
+      const response = await api.get(
+        '/users/pending-customers'
+      );
+
+      return Array.isArray(response.data)
+        ? response.data
+        : [];
+    },
+  });
+
+  const updateCustomerStatusMutation = useMutation({
+    mutationFn: async ({ customerId, action }) => {
+      const response = await api.put(
+        `/users/${customerId}/${action}-customer`
+      );
+
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['pendingCustomers'],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['customers'],
+      });
+    },
+    onError: (err) => {
+      setBillError(
+        err.response?.data?.message ||
+          'Unable to update customer approval'
+      );
+    },
+  });
+
   // ==========================================================================
   // SALES VALUES
   // ==========================================================================
@@ -803,15 +843,15 @@ const PharmacistDashboard = () => {
     setName('');
     setGenericName('');
     setManufacturer('');
-    setBatchNumber('');
     setExpiryDate('');
-    setManufactureDate('');
     setQuantity('');
     setReorderLevel('10');
     setPrice('');
     setCategory('Antibiotic');
     setBarcode('');
+    setRackLocation('');
     setLabelImageUrl('');
+    setOcrPreview(null);
     setError('');
 
     setMedModalOpen(true);
@@ -830,9 +870,6 @@ const PharmacistDashboard = () => {
       medicine?.manufacturer || ''
     );
 
-    setBatchNumber(
-      medicine?.batchNumber || ''
-    );
 
     setExpiryDate(
       medicine?.expiryDate
@@ -844,15 +881,6 @@ const PharmacistDashboard = () => {
         : ''
     );
 
-    setManufactureDate(
-      medicine?.manufactureDate
-        ? new Date(
-            medicine.manufactureDate
-          )
-            .toISOString()
-            .split('T')[0]
-        : ''
-    );
 
     setQuantity(
       medicine?.quantity ?? ''
@@ -872,6 +900,10 @@ const PharmacistDashboard = () => {
 
     setBarcode(
       medicine?.barcode || ''
+    );
+
+    setRackLocation(
+      medicine?.rackLocation || ''
     );
 
     setLabelImageUrl(
@@ -1055,9 +1087,7 @@ const PharmacistDashboard = () => {
       !name.trim() ||
       !genericName.trim() ||
       !manufacturer.trim() ||
-      !batchNumber.trim() ||
       !expiryDate ||
-      !manufactureDate ||
       price === '' ||
       quantity === ''
     ) {
@@ -1074,10 +1104,7 @@ const PharmacistDashboard = () => {
         genericName.trim(),
       manufacturer:
         manufacturer.trim(),
-      batchNumber:
-        batchNumber.trim(),
       expiryDate,
-      manufactureDate,
       quantity:
         Number(quantity),
       reorderLevel:
@@ -1088,6 +1115,8 @@ const PharmacistDashboard = () => {
       category,
       barcode:
         barcode.trim(),
+      rackLocation:
+        rackLocation.trim(),
       labelImageUrl:
         labelImageUrl.trim(),
     };
@@ -1145,6 +1174,13 @@ const PharmacistDashboard = () => {
         const data =
           response.data || {};
 
+        setOcrPreview({
+          medicineName: data.medicineName || '',
+          genericName: data.genericName || '',
+          expiryDate: data.expiryDate || '',
+          confidence: data.confidence || 'low',
+        });
+
         if (data.medicineName) {
           setName(
             data.medicineName
@@ -1163,27 +1199,21 @@ const PharmacistDashboard = () => {
           );
         }
 
-        if (data.batchNumber) {
-          setBatchNumber(
-            data.batchNumber
-          );
-        }
-
         if (data.expiryDate) {
           setExpiryDate(
             data.expiryDate
           );
         }
 
-        if (data.manufactureDate) {
-          setManufactureDate(
-            data.manufactureDate
-          );
-        }
-
         if (data.barcode) {
           setBarcode(
             data.barcode
+          );
+        }
+
+        if (data.rackLocation) {
+          setRackLocation(
+            data.rackLocation
           );
         }
 
@@ -1202,9 +1232,6 @@ const PharmacistDashboard = () => {
             'N/A'
           }\nManufacturer: ${
             data.manufacturer ||
-            'N/A'
-          }\nBatch: ${
-            data.batchNumber ||
             'N/A'
           }\nExpiry: ${
             data.expiryDate ||
@@ -1955,9 +1982,9 @@ const PharmacistDashboard = () => {
             medicine?.genericName
           ).toLowerCase();
 
-        const batch =
+        const rack =
           safeText(
-            medicine?.batchNumber
+            medicine?.rackLocation
           ).toLowerCase();
 
         const matchesSearch =
@@ -1968,7 +1995,7 @@ const PharmacistDashboard = () => {
           generic.includes(
             query
           ) ||
-          batch.includes(
+          rack.includes(
             query
           );
 
@@ -2038,7 +2065,7 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="pharmacist-dashboard min-h-screen bg-[var(--page-bg)] text-[var(--text-body)]">
 
       {/* MOBILE OVERLAY */}
 
@@ -2056,26 +2083,26 @@ const PharmacistDashboard = () => {
       {/* SIDEBAR */}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-[210px] bg-white border-r border-slate-200 transition-transform ${
+        className={`fixed inset-y-0 left-0 z-30 w-[210px] border-r border-slate-200 bg-white/95 shadow-sm transition-transform dark:border-slate-700 dark:bg-slate-900/95 ${
           isSidebarMobileOpen
             ? 'translate-x-0'
             : '-translate-x-full'
         } md:translate-x-0`}
       >
 
-        <div className="p-4 border-b flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-900">
 
-          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 text-lg font-bold text-white shadow-sm shadow-teal-500/20">
             Rx
           </div>
 
           <div>
 
-            <div className="font-bold text-lg text-slate-800">
+            <div className="text-lg font-bold text-slate-900 dark:text-slate-50">
               Sardar Pharmacy
             </div>
 
-            <div className="text-[10px] text-slate-400">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">
               Pharmacist Portal
             </div>
 
@@ -2083,7 +2110,7 @@ const PharmacistDashboard = () => {
 
         </div>
 
-        <nav className="p-3 space-y-1">
+        <nav className="space-y-1 p-3">
 
           {navItems.map(
             (item) => {
@@ -2108,10 +2135,10 @@ const PharmacistDashboard = () => {
                       false
                     );
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-all ${
                     active
-                      ? 'bg-blue-50 text-blue-700 font-bold'
-                      : 'text-slate-500 hover:bg-slate-50'
+                      ? 'bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-bold shadow-sm shadow-teal-500/20'
+                      : 'text-slate-600 hover:bg-teal-50 hover:text-teal-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -2170,7 +2197,7 @@ const PharmacistDashboard = () => {
 
         {/* HEADER */}
 
-        <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95">
 
           <div className="flex items-center gap-3">
 
@@ -2187,11 +2214,11 @@ const PharmacistDashboard = () => {
 
             <div>
 
-              <div className="text-[10px] uppercase tracking-wider text-slate-400">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 Sardar Pharmacy Operations
               </div>
 
-              <div className="text-sm font-bold capitalize">
+              <div className="text-sm font-bold capitalize text-slate-900 dark:text-slate-100">
                 {activeTab.replace(
                   '-',
                   ' '
@@ -2208,18 +2235,18 @@ const PharmacistDashboard = () => {
               onClick={
                 toggle
               }
-              className="p-2 bg-slate-100 rounded-lg"
+              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-slate-700"
               title="Toggle theme"
             >
-              {theme ===
+              {resolvedTheme ===
               'dark'
                 ? '☀'
                 : '◐'}
             </button>
 
-            <span>
+            <span className="text-slate-600 dark:text-slate-300">
               Server:{' '}
-              <strong className="text-emerald-600">
+              <strong className="text-emerald-600 dark:text-emerald-400">
                 Online
               </strong>
             </span>
@@ -2309,7 +2336,7 @@ const PharmacistDashboard = () => {
                     <div>
 
                       <div className="text-[10px] uppercase font-bold text-red-500">
-                        Expired Batches
+                        Expired Medicines
                       </div>
 
                       <div className="text-2xl font-bold text-red-600 mt-2">
@@ -2710,10 +2737,6 @@ const PharmacistDashboard = () => {
                         </th>
 
                         <th className="p-3">
-                          Batch
-                        </th>
-
-                        <th className="p-3">
                           Expiry
                         </th>
 
@@ -2745,7 +2768,7 @@ const PharmacistDashboard = () => {
                         <tr>
 
                           <td
-                            colSpan={8}
+                            colSpan={7}
                             className="p-8 text-center text-xs text-slate-400"
                           >
                             No expiry medicines found.
@@ -2797,13 +2820,6 @@ const PharmacistDashboard = () => {
                                     }
                                   </div>
 
-                                </td>
-
-                                <td className="p-3 text-xs font-mono">
-                                  {
-                                    medicine.batchNumber ||
-                                    'N/A'
-                                  }
                                 </td>
 
                                 <td className="p-3 text-xs">
@@ -3210,7 +3226,7 @@ const PharmacistDashboard = () => {
             'medicines' && (
             <div className="space-y-4">
 
-              <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="section-banner p-4 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
 
                 <div>
 
@@ -3218,8 +3234,8 @@ const PharmacistDashboard = () => {
                     Medicine Inventory
                   </h2>
 
-                  <p className="text-xs text-slate-400 mt-1">
-                    Manage medicines, batches, stock and expiry.
+                  <p className="text-xs mt-1">
+                    Manage medicines, expiry, stock and rack locations.
                   </p>
 
                 </div>
@@ -3234,10 +3250,11 @@ const PharmacistDashboard = () => {
 
                       refetchMeds();
                     }}
-                    className="p-2 bg-slate-100 rounded-lg"
+                    className="flex items-center justify-center rounded-lg !bg-white px-3 py-2 !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
                     title="Refresh"
+                    aria-label="Refresh medicine inventory"
                   >
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="h-4 w-4 !text-emerald-700" />
                   </button>
 
                   <button
@@ -3255,7 +3272,7 @@ const PharmacistDashboard = () => {
                         false
                       );
                     }}
-                    className="px-3 py-2 bg-slate-100 rounded-lg text-xs font-bold"
+                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
                   >
                     All
                   </button>
@@ -3269,7 +3286,7 @@ const PharmacistDashboard = () => {
                         'ALL'
                       );
                     }}
-                    className="px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-bold"
+                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-rose-700 shadow-sm transition hover:!bg-rose-50"
                   >
                     Expired
                   </button>
@@ -3278,7 +3295,7 @@ const PharmacistDashboard = () => {
                     onClick={
                       showLowStockMedicines
                     }
-                    className="px-3 py-2 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold"
+                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-amber-800 shadow-sm transition hover:!bg-amber-50"
                   >
                     Low Stock
                   </button>
@@ -3289,9 +3306,9 @@ const PharmacistDashboard = () => {
                         true
                       )
                     }
-                    className="px-3 py-2 bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-1"
+                    className="flex items-center gap-1 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
                   >
-                    <Upload className="w-3.5 h-3.5" />
+                    <Upload className="h-3.5 w-3.5 !text-emerald-700" />
                     Bulk
                   </button>
 
@@ -3299,9 +3316,9 @@ const PharmacistDashboard = () => {
                     onClick={
                       openAddModal
                     }
-                    className="px-3 py-2 bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1"
+                    className="flex items-center gap-1 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="h-3.5 w-3.5 !text-emerald-700" />
                     Add Medicine
                   </button>
 
@@ -3339,11 +3356,11 @@ const PharmacistDashboard = () => {
                 </div>
               )}
 
-              <div className="bg-white p-3 rounded-2xl border shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
 
-                <div className="relative">
+                <div className="relative md:col-span-2">
 
-                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                  <Search className="w-5 h-5 absolute left-4 top-3.5 text-blue-600" />
 
                   <input
                     value={search}
@@ -3356,8 +3373,8 @@ const PharmacistDashboard = () => {
                         'ALL'
                       );
                     }}
-                    placeholder="Search medicine..."
-                    className="w-full pl-9 pr-3 py-2 border rounded-lg text-xs"
+                    placeholder="Search medicine, generic name, manufacturer or rack..."
+                    className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
                   />
 
                 </div>
@@ -3503,15 +3520,15 @@ const PharmacistDashboard = () => {
                         </th>
 
                         <th className="p-3 text-left">
-                          Batch
-                        </th>
-
-                        <th className="p-3 text-left">
                           Price
                         </th>
 
                         <th className="p-3 text-left">
                           Stock
+                        </th>
+
+                        <th className="p-3 text-left">
+                          Rack
                         </th>
 
                         <th className="p-3 text-left">
@@ -3597,13 +3614,6 @@ const PharmacistDashboard = () => {
 
                               </td>
 
-                              <td className="p-3 text-xs font-mono">
-                                {
-                                  medicine.batchNumber ||
-                                  'N/A'
-                                }
-                              </td>
-
                               <td className="p-3 text-xs font-bold">
                                 {getCurrency(
                                   medicine.price
@@ -3635,18 +3645,15 @@ const PharmacistDashboard = () => {
 
                               </td>
 
+                              <td className="p-3 text-xs font-semibold text-blue-700">
+                                {medicine.rackLocation || 'Not assigned'}
+                              </td>
+
                               <td className="p-3 text-xs">
 
                                 {formatDate(
                                   medicine.expiryDate
                                 )}
-
-                                <div className="text-[10px] text-slate-400">
-                                  MFG:{' '}
-                                  {formatDate(
-                                    medicine.manufactureDate
-                                  )}
-                                </div>
 
                               </td>
 
@@ -3829,16 +3836,7 @@ const PharmacistDashboard = () => {
                             </div>
 
                             <div className="text-[10px] text-slate-400 mt-1">
-                              Stock:{' '}
-                              {
-                                medicine.quantity ??
-                                0
-                              }{' '}
-                              {getDot()}{' '}
-                              {
-                                medicine.batchNumber ||
-                                'N/A'
-                              }
+                              Stock: {medicine.quantity ?? 0} {getDot()} Rack: {medicine.rackLocation || 'Not assigned'}
                             </div>
 
                           </div>
@@ -4165,7 +4163,65 @@ const PharmacistDashboard = () => {
 
           {activeTab ===
             'customers' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="space-y-4">
+
+              {pendingCustomers.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <h3 className="font-bold text-sm text-amber-900">
+                        Customer Approval Requests ({pendingCustomers.length})
+                      </h3>
+                      <p className="text-xs text-amber-700 mt-1">
+                        Approve accounts before they can access the customer portal.
+                      </p>
+                    </div>
+                    {isPendingCustomersLoading && (
+                      <RefreshCw className="w-4 h-4 animate-spin text-amber-700" />
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {pendingCustomers.map((customer) => (
+                      <div
+                        key={customer._id}
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl bg-white border border-amber-100 p-3"
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">
+                            {customer.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            {customer.email} {customer.phone && `| ${customer.phone}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={updateCustomerStatusMutation.isPending}
+                            onClick={() => updateCustomerStatusMutation.mutate({ customerId: customer._id, action: 'approve' })}
+                            className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-[10px] font-bold disabled:opacity-50"
+                          >
+                            <CheckCircle className="inline w-3.5 h-3.5 mr-1" />
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updateCustomerStatusMutation.isPending}
+                            onClick={() => updateCustomerStatusMutation.mutate({ customerId: customer._id, action: 'reject' })}
+                            className="px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[10px] font-bold disabled:opacity-50"
+                          >
+                            <X className="inline w-3.5 h-3.5 mr-1" />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
 
               <div className="p-5 border-b">
 
@@ -4297,6 +4353,8 @@ const PharmacistDashboard = () => {
                   </tbody>
 
                 </table>
+
+              </div>
 
               </div>
 
@@ -4688,12 +4746,20 @@ const PharmacistDashboard = () => {
                   Upload a medicine label to extract available information.
                 </p>
 
+                {ocrLoading && (
+                  <div className="mb-3 flex items-center gap-2 text-[10px] font-bold text-blue-700">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Scanning label, please wait...
+                  </div>
+                )}
+
                 <input
                   ref={
                     fileInputRef
                   }
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   disabled={
                     ocrLoading
                   }
@@ -4706,6 +4772,33 @@ const PharmacistDashboard = () => {
               </div>
             )}
 
+            {ocrPreview && (
+              <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                    Scanned medicine information
+                  </p>
+                  <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    {ocrPreview.confidence} confidence
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Medicine</span>
+                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.medicineName || 'Not detected'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Generic</span>
+                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.genericName || 'Not detected'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Expiry</span>
+                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.expiryDate || 'Not detected'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <form
               onSubmit={
                 handleMedSubmit
@@ -4713,7 +4806,7 @@ const PharmacistDashboard = () => {
               className="space-y-3"
             >
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                 <input
                   required
@@ -4743,7 +4836,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
                 <input
                   required
@@ -4759,37 +4852,9 @@ const PharmacistDashboard = () => {
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
-                <input
-                  required
-                  value={
-                    batchNumber
-                  }
-                  onChange={(event) =>
-                    setBatchNumber(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Batch Number"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
-
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-
-                <input
-                  required
-                  type="date"
-                  value={
-                    manufactureDate
-                  }
-                  onChange={(event) =>
-                    setManufactureDate(
-                      event.target.value
-                    )
-                  }
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
+              <div className="grid grid-cols-1 gap-3">
 
                 <input
                   required
@@ -4807,7 +4872,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
                 <input
                   required
@@ -4860,7 +4925,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
                 <select
                   value={
@@ -4899,6 +4964,19 @@ const PharmacistDashboard = () => {
                     )
                   }
                   placeholder="Barcode"
+                  className="border rounded-lg px-3 py-2 text-xs"
+                />
+
+                <input
+                  value={
+                    rackLocation
+                  }
+                  onChange={(event) =>
+                    setRackLocation(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Rack / Shelf (e.g. R-02-B)"
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
@@ -5004,13 +5082,12 @@ const PharmacistDashboard = () => {
     "name": "Panadol 500mg",
     "genericName": "Paracetamol",
     "manufacturer": "GSK",
-    "batchNumber": "PAN-001",
-    "manufactureDate": "2026-01-01",
     "expiryDate": "2028-01-01",
     "price": 450,
     "quantity": 500,
     "reorderLevel": 50,
-    "category": "Analgesic"
+    "category": "Analgesic",
+    "rackLocation": "R-02-B"
   }
 ]`}
                 className="w-full border rounded-lg p-3 font-mono text-xs"
@@ -5061,7 +5138,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <p className="text-xs text-slate-400 mt-1">
-                  Complete medicine and batch information
+                  Complete medicine, expiry and rack information
                 </p>
 
               </div>
@@ -5149,31 +5226,6 @@ const PharmacistDashboard = () => {
 
                 <div className="p-3 bg-slate-50 rounded-xl">
                   <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
-                    <Hash className="w-3.5 h-3.5" />
-                    Batch Number
-                  </div>
-                  <div className="text-xs font-semibold mt-2 font-mono">
-                    {
-                      selectedMedicine.batchNumber ||
-                      'N/A'
-                    }
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Manufacture Date
-                  </div>
-                  <div className="text-xs font-semibold mt-2">
-                    {formatDate(
-                      selectedMedicine.manufactureDate
-                    )}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
                     <Clock className="w-3.5 h-3.5" />
                     Expiry Date
                   </div>
@@ -5234,6 +5286,16 @@ const PharmacistDashboard = () => {
                       selectedMedicine.barcode ||
                       'Not available'
                     }
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50 rounded-xl">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-blue-600 font-bold">
+                    <Layers className="w-3.5 h-3.5" />
+                    Rack / Shelf Location
+                  </div>
+                  <div className="text-xs font-semibold mt-2 text-blue-800">
+                    {selectedMedicine.rackLocation || 'Not assigned'}
                   </div>
                 </div>
 

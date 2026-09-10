@@ -20,12 +20,22 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
+      if (
+        req.user.role !== 'superadmin' &&
+        req.user.accountStatus !== 'approved'
+      ) {
+        return res.status(403).json({
+          message: 'Your account is not approved',
+          code: 'ACCOUNT_NOT_APPROVED',
+        });
+      }
+
       next();
     } catch (error) {
-      console.error('Auth error:', error.message);
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ message: 'Token expired', code: 'TOKEN_EXPIRED' });
       }
+      console.error('Auth error:', error.message);
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
   }

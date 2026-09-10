@@ -29,7 +29,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config();
+// Load environment variables from server/.env
+dotenv.config({
+  path: path.join(__dirname, ".env"),
+});
 
 // Connect to Database
 connectDB();
@@ -43,38 +46,38 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "http://localhost:3000",
   "https://ai-based-medicine-quality.vercel.app",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  const cleanOrigin = origin.replace(/\/$/, "");
+
+  if (allowedOrigins.some((o) => o && o.replace(/\/$/, "") === cleanOrigin)) {
+    return true;
+  }
+
+  const localhostPattern = /^http:\/\/(localhost|127\.0\.0\.1):517[0-9]$/;
+  const localhostAltPattern = /^http:\/\/(localhost|127\.0\.0\.1):300[0-9]$/;
+
+  return localhostPattern.test(cleanOrigin) || localhostAltPattern.test(cleanOrigin);
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // Remove trailing slash
-      const cleanOrigin = origin.replace(/\/$/, "");
-
-      const isAllowed = allowedOrigins.some(
-        (o) =>
-          o &&
-          o.replace(/\/$/, "") === cleanOrigin
-      );
-
-      if (isAllowed) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
       const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
 
-      return callback(
-        new Error(msg),
-        false
-      );
+      return callback(new Error(msg), false);
     },
 
     credentials: true,
@@ -133,10 +136,21 @@ app.use(errorHandler);
 // Server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(
     `Server running in ${
       process.env.NODE_ENV || "development"
     } mode on port ${PORT}`
   );
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(
+      `Port ${PORT} is already in use. Stop the running server or set a different PORT in server/.env.`
+    );
+    process.exit(1);
+  }
+
+  throw error;
 });

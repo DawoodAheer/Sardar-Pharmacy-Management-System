@@ -295,7 +295,7 @@ const InStoreBilling = () => {
           expiryStatus: medicine.expiryStatus,
           stock: medicineStock,
           expiryDate: medicine.expiryDate,
-          batchNumber: medicine.batchNumber,
+          rackLocation: medicine.rackLocation,
         },
       ];
     });
@@ -642,10 +642,10 @@ const InStoreBilling = () => {
    * BILLING SCREEN
    */
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-5 font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-100 sm:px-6">
+    <div className="min-h-screen bg-[var(--page-bg)] px-4 py-5 font-sans text-[var(--text-body)] sm:px-6">
       <div className="mx-auto max-w-7xl space-y-5">
         {/* Header */}
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm text-white sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -658,33 +658,33 @@ const InStoreBilling = () => {
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
                   Counter Billing
                 </h1>
 
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-50 ring-1 ring-white/20">
                   POS Active
                 </span>
               </div>
 
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-emerald-50/90">
                 Create and complete an in-store pharmacy sale.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 dark:border-slate-700 dark:bg-slate-800">
-            <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-white shadow-sm backdrop-blur-sm">
+            <User className="h-4 w-4 text-emerald-100" />
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-50/80">
                 Customer
               </p>
-              <p className="max-w-[220px] truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+              <p className="max-w-[220px] truncate text-xs font-bold text-white">
                 {customer?.name || 'Guest Customer'}
               </p>
             </div>
-            <span className="mx-1 h-6 w-px bg-slate-200 dark:bg-slate-700" />
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-300">
+            <span className="mx-1 h-6 w-px bg-white/30" />
+            <p className="text-xs font-medium text-emerald-50/90">
               {phone}
             </p>
           </div>
@@ -861,9 +861,9 @@ const InStoreBilling = () => {
                                 </span>
 
                                 <span>
-                                  Batch:{' '}
+                                  Rack:{' '}
                                   <strong className="text-slate-600 dark:text-slate-300">
-                                    {medicine.batchNumber || 'N/A'}
+                                    {medicine.rackLocation || 'Not assigned'}
                                   </strong>
                                 </span>
 

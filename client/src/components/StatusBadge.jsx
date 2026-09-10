@@ -1,26 +1,26 @@
 
-
 const StatusBadge = ({ status }) => {
+  const normalized = String(status || 'INFO').toUpperCase();
+
   const getStyles = () => {
-    switch (status) {
+    switch (normalized) {
       case 'EXPIRED':
-        return 'bg-red-50 text-redAccent border-red-200 border';
       case 'CRITICAL':
-        return 'bg-rose-50 text-redAccent border-rose-200 border';
+        return 'border border-rose-200 bg-rose-100 text-rose-800 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-200';
       case 'WARNING':
-        return 'bg-orange-50 text-orangeAccent border-orange-200 border';
       case 'CAUTION':
-        return 'bg-yellow-50 text-amber-700 border-yellow-200 border';
+        return 'border border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200';
       case 'SAFE':
-        return 'bg-emerald-50 text-greenAccent border-emerald-200 border';
+      case 'IN STOCK':
+        return 'border border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-200';
       default:
-        return 'bg-slate-50 text-slate-700 border-slate-200 border';
+        return 'border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
     }
   };
 
   return (
-    <span className={`text-[11px] font-bold px-2 py-0.5 rounded uppercase ${getStyles()}`}>
-      {status}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${getStyles()}`}>
+      {normalized}
     </span>
   );
 };

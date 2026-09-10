@@ -9,6 +9,13 @@ const medicineSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Active ingredient / generic medicine name
+    genericName: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+
     // Manufacturer / company
     manufacturer: {
       type: String,
@@ -58,6 +65,13 @@ const medicineSchema = new mongoose.Schema(
       type: String,
       trim: true,
       index: true,
+    },
+
+    // Physical shelf/rack location inside the pharmacy
+    rackLocation: {
+      type: String,
+      trim: true,
+      default: '',
     },
 
     // Scanned label image URL

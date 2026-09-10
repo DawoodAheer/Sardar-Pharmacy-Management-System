@@ -156,7 +156,7 @@ export const createBill = async (req, res, next) => {
 
       if (expiryStatus === 'EXPIRED') {
         expiredItems.push(
-          `${medicine.name} (Batch: ${medicine.batchNumber})`
+          `${medicine.name} (Rack: ${medicine.rackLocation || 'Not assigned'})`
         );
       }
 
@@ -175,6 +175,7 @@ export const createBill = async (req, res, next) => {
         unitPrice: medicine.price,
         expiryStatus,
         expiryDate: medicine.expiryDate,
+        rackLocation: medicine.rackLocation || '',
         ref: medicine,
       });
     }
@@ -237,6 +238,7 @@ export const createBill = async (req, res, next) => {
         unitPrice: item.unitPrice,
         expiryStatus: item.expiryStatus,
         expiryDate: item.expiryDate,
+        rackLocation: item.rackLocation,
       })),
 
       subtotal,
@@ -1250,7 +1252,7 @@ export const createInstoreBill = async (
 
       if (expiryStatus === 'EXPIRED') {
         expiredItems.push(
-          `${medicine.name} (Batch: ${medicine.batchNumber})`
+          `${medicine.name} (Rack: ${medicine.rackLocation || 'Not assigned'})`
         );
       }
 
@@ -1357,6 +1359,8 @@ export const createInstoreBill = async (
                 item.expiryStatus,
               expiryDate:
                 item.expiryDate,
+              rackLocation:
+                item.rackLocation,
             })
           ),
 

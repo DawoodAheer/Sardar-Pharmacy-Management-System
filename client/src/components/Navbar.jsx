@@ -1,7 +1,7 @@
 
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LogOut } from 'lucide-react';
+import { LogOut, Moon, Sun, Stethoscope } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -10,13 +10,13 @@ const Navbar = () => {
   const getRoleBadgeStyle = (role) => {
     switch (role) {
       case 'superadmin':
-        return 'bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20';
+        return 'border border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-slate-600 dark:bg-slate-700 dark:text-indigo-100';
       case 'pharmacist':
-        return 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20';
+        return 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200';
       case 'customer':
-        return 'bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20';
+        return 'border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-100';
       default:
-        return 'bg-slate-50 dark:bg-slate-500/15 text-slate-700 dark:text-slate-400 border border-slate-200 dark:border-slate-500/20';
+        return 'border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100';
     }
   };
 
@@ -27,67 +27,49 @@ const Navbar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full h-12 px-6 flex items-center justify-between bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-slate-700/50 shadow-sm transition-colors duration-200">
-      {/* Brand logo + "PHARMADESK" */}
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg bg-[#1A56A0] flex items-center justify-center shadow-md shadow-blue-500/10">
-          <span className="text-sm font-bold text-white">⚕</span>
+    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur-sm transition-colors duration-200 dark:border-slate-700 dark:bg-slate-900/95 sm:px-6">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 text-white shadow-sm shadow-teal-600/20">
+          <Stethoscope className="h-5 w-5" />
         </div>
-        <div>
-          <span className="font-bold text-sm text-slate-900 dark:text-white font-sans tracking-wide">PHARMA</span>
-          <span className="text-[#1A56A0] dark:text-sky-400 font-bold text-sm font-sans tracking-wide ml-1">DESK</span>
+        <div className="leading-tight">
+          <span className="block text-sm font-extrabold tracking-[0.18em] text-slate-900 dark:text-slate-100">SARDAR</span>
+          <span className="block text-[10px] font-bold uppercase tracking-[0.22em] text-teal-700 dark:text-teal-300">Pharmacy</span>
         </div>
       </div>
 
       {user && (
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Avatar + name + email + Role Badge - Hidden on mobile */}
-          <div className="hidden sm:flex items-center gap-3 pl-3 pr-3 py-1 rounded-full border border-slate-200/60 dark:border-slate-700/30 bg-slate-50/50 dark:bg-white/5">
-            <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${getRoleBadgeStyle(user.role)}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800 sm:flex">
+            <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getRoleBadgeStyle(user.role)}`}>
               {getRoleLabel(user.role)}
             </span>
             <div className="flex flex-col text-right">
-              <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 leading-tight">{user.name}</span>
-              <span className="text-[9px] text-slate-400 dark:text-slate-500 leading-none">{user.email}</span>
+              <span className="text-xs font-semibold leading-tight text-slate-900 dark:text-slate-100">{user.name}</span>
+              <span className="text-[9px] leading-none text-slate-500 dark:text-slate-400">{user.email}</span>
             </div>
-            <div className="w-[28px] h-[28px] rounded-full bg-brand/10 dark:bg-brand/20 border border-brand/20 dark:border-brand/30 flex items-center justify-center text-brand dark:text-sky-400 font-bold text-xs uppercase">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-teal-200 bg-teal-50 text-xs font-bold uppercase text-teal-700 dark:border-teal-700 dark:bg-slate-700 dark:text-teal-200">
               {user.name.charAt(0)}
             </div>
           </div>
 
-          {/* Theme Toggle Button */}
-          <button 
-            onClick={toggle} 
-            className="p-1.5 rounded-lg transition-colors border border-slate-200/50 dark:border-slate-700/50 dark:bg-slate-800 dark:hover:bg-slate-700 bg-slate-100 hover:bg-slate-200"
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition-colors hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-slate-700"
             title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {theme === 'dark' ? (
-              <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="5" />
-                <line x1="12" y1="1" x2="12" y2="3" />
-                <line x1="12" y1="21" x2="12" y2="23" />
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                <line x1="1" y1="12" x2="3" y2="12" />
-                <line x1="21" y1="12" x2="23" y2="12" />
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-              </svg>
-            ) : (
-              <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-              </svg>
-            )}
+            {theme === 'dark' ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4" />}
           </button>
 
-          {/* Logout Button - Always visible */}
           <button
             onClick={logout}
-            className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors py-1 px-2 sm:px-2.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 whitespace-nowrap"
+            className="flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-300"
             title="Logout"
           >
-            <LogOut className="w-4 h-4 shrink-0" />
-            <span className="text-sm font-semibold hidden sm:inline">Logout</span>
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className="hidden text-sm font-semibold sm:inline">Logout</span>
           </button>
         </div>
       )}

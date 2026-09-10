@@ -1,12 +1,18 @@
 
-
-const PageHeader = ({ title, subtitle }) => {
+const PageSectionHeader = ({ title, subtitle }) => {
   return (
-    <div className="pb-2 border-b border-slate-100 dark:border-slate-700/50 mb-4 transition-colors duration-200">
-      <h1 className="text-lg font-bold text-slate-805 dark:text-slate-200 tracking-tight">{title}</h1>
-      {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{subtitle}</p>}
+    <div className="mb-6 overflow-hidden rounded-2xl border border-teal-700/40 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm shadow-teal-900/10">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
+        {subtitle && <p className="text-sm text-emerald-50">{subtitle}</p>}
+      </div>
     </div>
   );
 };
 
+const PageHeader = ({ title, subtitle }) => {
+  return <PageSectionHeader title={title} subtitle={subtitle} />;
+};
+
+export { PageSectionHeader };
 export default PageHeader;

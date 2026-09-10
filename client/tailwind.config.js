@@ -2,50 +2,30 @@
 export default {
   darkMode: 'class',
 
-  content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
 
   theme: {
     extend: {
       colors: {
-        /*
-         * Primary application colors
-         */
-        primary: '#1A56A0',
-        lightblue: '#D5E8F0',
-
-        /*
-         * PharmaDesk brand palette
-         *
-         * One single brand object is intentionally used here
-         * to avoid duplicate Tailwind configuration keys.
-         */
         brand: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
-          950: '#172554',
-
-          DEFAULT: '#2563EB',
-          light: '#3B82F6',
-          dark: '#1E3A8A',
+          primary: '#0D9488',
+          primaryBright: '#10B981',
+          primaryDark: '#047857',
+          secondary: '#0284C7',
+          secondaryBright: '#38BDF8',
+          50: '#F0FDFA',
+          100: '#CCFBF1',
+          200: '#99F6E4',
+          300: '#5EEAD4',
+          400: '#2DD4BF',
+          500: '#14B8A6',
+          600: '#0D9488',
+          700: '#0F766E',
+          800: '#115E59',
+          900: '#134E4A',
+          950: '#042F2E',
+          DEFAULT: '#0D9488',
         },
-
-        /*
-         * Application surfaces
-         *
-         * These are useful for dashboards, cards,
-         * sidebars and dark mode layouts.
-         */
         surface: {
           50: '#F8FAFC',
           100: '#F1F5F9',
@@ -59,30 +39,6 @@ export default {
           900: '#0F172A',
           950: '#020617',
         },
-
-        /*
-         * Dark dashboard palette
-         */
-        darkbg: {
-          50: '#F8FAFC',
-          100: '#EEF2F7',
-          200: '#D8E0EC',
-          300: '#B8C4D6',
-          400: '#94A3B8',
-          500: '#71809A',
-          600: '#56657F',
-          700: '#3F4C63',
-          800: '#29354A',
-          900: '#182235',
-          950: '#0B1120',
-        },
-
-        /*
-         * Semantic status colors
-         *
-         * Useful for stock, expiry, alerts,
-         * billing and notification states.
-         */
         success: {
           50: '#ECFDF5',
           100: '#D1FAE5',
@@ -95,7 +51,6 @@ export default {
           800: '#065F46',
           900: '#064E3B',
         },
-
         warning: {
           50: '#FFFBEB',
           100: '#FEF3C7',
@@ -108,7 +63,6 @@ export default {
           800: '#92400E',
           900: '#78350F',
         },
-
         danger: {
           50: '#FEF2F2',
           100: '#FEE2E2',
@@ -121,63 +75,23 @@ export default {
           800: '#991B1B',
           900: '#7F1D1D',
         },
-
-        info: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
-        },
-
-        /*
-         * Existing application aliases
-         */
-        greenAccent: '#16A34A',
-        orangeAccent: '#D97706',
-        redAccent: '#DC2626',
-
-        bgLight: '#F8FAFC',
-        textDark: '#1F2937',
       },
-
-      /*
-       * Typography
-       */
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
-
-      /*
-       * Slightly more polished application-level radius
-       */
       borderRadius: {
         '2xl': '1rem',
         '3xl': '1.25rem',
       },
-
-      /*
-       * Useful pharmacy dashboard shadows
-       */
       boxShadow: {
         soft: '0 8px 30px rgba(15, 23, 42, 0.06)',
         card: '0 4px 20px rgba(15, 23, 42, 0.06)',
         elevated: '0 16px 40px rgba(15, 23, 42, 0.10)',
       },
-
-      /*
-       * Smooth application transitions
-       */
       transitionDuration: {
         250: '250ms',
       },
     },
   },
-
   plugins: [],
 };

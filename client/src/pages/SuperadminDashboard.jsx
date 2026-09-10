@@ -1123,7 +1123,7 @@ export default function SuperadminDashboard() {
 
         {/* HEADER */}
 
-        <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:flex-row md:items-center md:justify-between">
+        <div className="section-banner flex flex-col gap-4 rounded-2xl p-6 shadow-sm md:flex-row md:items-center md:justify-between">
 
           <div>
             <div className="flex items-center gap-3">
@@ -1133,11 +1133,11 @@ export default function SuperadminDashboard() {
               </div>
 
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-white">
                   Superadmin Dashboard
                 </h1>
 
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-sm text-teal-100">
                   Complete system overview and management
                 </p>
               </div>
@@ -1145,7 +1145,7 @@ export default function SuperadminDashboard() {
             </div>
 
             {user?.name && (
-              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+              <p className="mt-4 text-sm text-teal-50">
                 Welcome,{' '}
                 <span className="font-semibold">
                   {user.name}
@@ -1703,7 +1703,13 @@ export default function SuperadminDashboard() {
                                   }
                                 )
                               }
-                              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                              className={`rounded-lg border px-3 py-2 text-sm font-medium dark:text-white ${
+                                item?.role === 'customer'
+                                  ? 'border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-400/30 dark:bg-sky-500/15 dark:text-sky-300'
+                                  : item?.role === 'pharmacist'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                    : 'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-400/30 dark:bg-violet-500/15 dark:text-violet-300'
+                              }`}
                             >
 
                               <option value="customer">
@@ -1728,11 +1734,11 @@ export default function SuperadminDashboard() {
                               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
                                 item?.accountStatus ===
                                 'approved'
-                                  ? 'bg-emerald-100 text-emerald-700'
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                                   : item?.accountStatus ===
                                     'rejected'
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-amber-100 text-amber-700'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                               }`}
                             >
                               {item?.accountStatus ||

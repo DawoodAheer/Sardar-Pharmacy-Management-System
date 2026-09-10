@@ -318,12 +318,12 @@ const Login = () => {
       {/* LEFT PANEL                                                       */}
       {/* ================================================================ */}
 
-      <div className="hidden md:flex md:w-[55%] bg-[#0C1628] text-white flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden md:flex md:w-[55%] bg-slate-900 text-white flex-col justify-between overflow-hidden p-12 relative">
 
         {/* Decorative blur */}
-        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-[#1A56A0]/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-teal-500/10 rounded-full blur-[100px] pointer-events-none" />
 
-        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-teal-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none" />
 
         {/* ============================================================ */}
         {/* LOGO                                                          */}
@@ -331,13 +331,13 @@ const Login = () => {
 
         <div className="flex items-center gap-3 relative z-10">
 
-          <div className="w-10 h-10 rounded-xl bg-[#1A56A0] flex items-center justify-center shadow-lg shadow-blue-500/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
             <Activity className="w-5 h-5 text-white" />
           </div>
 
           <div>
             <span className="block font-bold text-lg tracking-tight text-white">
-              Pharmadesk
+              Sardar Pharmacy
             </span>
 
             <span className="block text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-0.5">
@@ -436,7 +436,7 @@ const Login = () => {
 
           <div className="mb-8">
 
-            <span className="block text-xs font-bold text-[#1A56A0] tracking-widest uppercase mb-1.5">
+            <span className="block text-xs font-bold text-teal-600 tracking-widest uppercase mb-1.5">
               SECURE ACCESS
             </span>
 
@@ -498,7 +498,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "pharmacist"
-                  ? "border-[#1A56A0] bg-blue-50 text-[#1A56A0] shadow-sm shadow-[#1A56A0]/5"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -515,7 +515,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "superadmin"
-                  ? "border-[#1A56A0] bg-blue-50 text-[#1A56A0] shadow-sm shadow-[#1A56A0]/5"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -532,7 +532,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "customer"
-                  ? "border-[#1A56A0] bg-blue-50 text-[#1A56A0] shadow-sm shadow-[#1A56A0]/5"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -576,7 +576,7 @@ const Login = () => {
                   }}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-1 focus:ring-[#1A56A0] transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
 
               </div>
@@ -594,7 +594,7 @@ const Login = () => {
 
                 <Link
                   to="/forgot-password"
-                  className="text-xs font-semibold text-[#1A56A0] hover:underline"
+                  className="text-xs font-semibold text-teal-700 hover:underline"
                 >
                   Forgot password?
                 </Link>
@@ -624,7 +624,7 @@ const Login = () => {
                   }}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-1 focus:ring-[#1A56A0] transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
 
                 <button
@@ -661,7 +661,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-[#1A56A0] hover:bg-[#1A56A0]/95 text-white font-bold rounded-xl transition-all duration-300 shadow-md flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed text-sm mt-6"
+              className="w-full py-3 px-4 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 text-white font-bold rounded-xl transition-all duration-300 shadow-md flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed text-sm mt-6"
             >
 
               {isSubmitting ? (
@@ -701,7 +701,7 @@ const Login = () => {
 
             <Link
               to="/register"
-              className="text-[#1A56A0] hover:underline font-bold"
+              className="text-teal-700 hover:underline font-bold"
             >
               Create one &rarr;
             </Link>
