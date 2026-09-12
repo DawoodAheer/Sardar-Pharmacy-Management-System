@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import { checkExpiryStatus } from './expiryCheck.js';
+import { createBackup } from './backupManager.js';
 
 // Setup Nodemailer email transporter
 const getEmailTransporter = () => {
@@ -75,11 +76,11 @@ export const runExpiryReport = async () => {
       else if (status === 'CAUTION') grouped.CAUTION.push(item);
     });
 
-    // Find all pharmacists
-    const pharmacists = await User.find({ role: 'pharmacist' });
-    if (pharmacists.length === 0) {
-      console.log('No pharmacists registered to receive expiry report.');
-      return { status: 'success', message: 'No pharmacists found' };
+    // Find all pharmacists and superadmins to receive expiry report
+    const staffUsers = await User.find({ role: { $in: ['pharmacist', 'superadmin'] } });
+    if (staffUsers.length === 0) {
+      console.log('No admin/pharmacists registered to receive expiry report.');
+      return { status: 'success', message: 'No staff users found' };
     }
 
     // Build HTML table content
@@ -141,35 +142,35 @@ export const runExpiryReport = async () => {
 
     const transporter = getEmailTransporter();
 
-    // Send emails to all pharmacists
-    for (const pharmacist of pharmacists) {
+    // Send emails to all staff members (pharmacists & superadmin)
+    for (const staffMember of staffUsers) {
       try {
         const isEthereal = transporter.options.host === 'smtp.ethereal.email';
         
         const mailOptions = {
           from: `"Pharmadesk Notifications" <${process.env.SMTP_USER || 'no-reply@pharmadesk.com'}>`,
-          to: pharmacist.email,
+          to: staffMember.email,
           subject: '⚠️ Daily Expiry Report - Pharmadesk Pharmacy',
           html: htmlContent,
         };
 
         if (isEthereal) {
-          console.log(`[MOCK EMAIL] Sent to ${pharmacist.email}: Expiry Report`);
+          console.log(`[MOCK EMAIL] Sent to ${staffMember.email}: Expiry Report`);
         } else {
           await transporter.sendMail(mailOptions);
         }
 
         // Log Notification in DB
         await Notification.create({
-          recipientId: pharmacist._id,
+          recipientId: staffMember._id,
           type: 'Email',
           message: detailedMessage,
           status: 'sent',
         });
       } catch (err) {
-        console.error(`Failed sending expiry report to ${pharmacist.email}:`, err.message);
+        console.error(`Failed sending expiry report to ${staffMember.email}:`, err.message);
         await Notification.create({
-          recipientId: pharmacist._id,
+          recipientId: staffMember._id,
           type: 'Email',
           message: `Daily Expiry Report failed: ${err.message}`,
           status: 'failed',
@@ -439,4 +440,15 @@ export const initializeNotificationScheduler = () => {
   // Matches each reminder's configured hour and minute, and sends email instantly
   cron.schedule('* * * * *', runEmailReminders);
   console.log('Scheduled Customer Email Reminder Cron Job (every minute, time-matched)');
+
+  // Cron 4 — Daily Automated Database Backup at 12:00 AM Midnight (0 0 * * *)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('Running daily database automated backup...');
+    try {
+      await createBackup();
+    } catch (err) {
+      console.error('Daily automated backup failed:', err.message);
+    }
+  });
+  console.log('Scheduled Daily Database Backup Cron Job (12:00 AM Midnight daily)');
 };

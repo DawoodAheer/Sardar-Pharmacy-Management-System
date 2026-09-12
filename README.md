@@ -180,8 +180,9 @@ npm run dev
 ---
 
 ## 🧪 Test Accounts
-After running the seeder script, you can log in using the following pre-configured credentials:
+After running the seeder script (`npm run seed`), you can log in using the following pre-configured credentials:
 
-* **Superadmin**: `superadmin@pharmadesk.com` / `admin123`
-* **Pharmacist**: `pharmacist@pharmadesk.com` / `pharmacist123`
-* **Customer**: `customer@pharmadesk.com` / `customer123`
+* **Superadmin**: `aheerdawood014@gmail.com` / `Dawood@@5786`
+* **Pharmacist**: `mlksardar6@gmail.com` / `Dawood@@5786`
+* **Customer**: `aheerraza0@gmail.com` / `Dawood@@5786`
+

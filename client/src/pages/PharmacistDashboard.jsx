@@ -144,7 +144,7 @@ const getExpiryBadgeClass = (status) => {
 
   return (
     classes[status] ||
-    'bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600'
+    'bg-slate-50 text-slate-700 dark:text-slate-200 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600'
   );
 };
 
@@ -194,14 +194,14 @@ const CategoryBadge = ({ category }) => {
       'bg-green-50 text-green-800',
 
     Other:
-      'bg-slate-100 text-slate-700',
+      'bg-slate-100 text-slate-700 dark:text-slate-200',
   };
 
   return (
     <span
       className={`text-[10px] font-semibold px-2 py-1 rounded whitespace-nowrap ${
         classes[category] ||
-        'bg-slate-100 text-slate-700'
+        'bg-slate-100 text-slate-700 dark:text-slate-200'
       }`}
     >
       {category || 'Other'}
@@ -2076,7 +2076,7 @@ const PharmacistDashboard = () => {
               false
             )
           }
-          className="fixed inset-0 z-20 bg-black/40 md:hidden"
+          className="fixed inset-0 z-20 bg-slate-950/70 backdrop-blur-sm md:hidden"
         />
       )}
 
@@ -2170,7 +2170,7 @@ const PharmacistDashboard = () => {
                   'Pharmacist'}
               </div>
 
-              <div className="text-[10px] text-slate-400">
+              <div className="text-[10px] text-slate-600 dark:text-slate-400">
                 Pharmacist
               </div>
 
@@ -2182,7 +2182,7 @@ const PharmacistDashboard = () => {
             onClick={
               logout
             }
-            className="p-2 text-slate-400 hover:text-red-600"
+            className="p-2 text-slate-600 dark:text-slate-400 hover:text-red-600"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -2214,11 +2214,11 @@ const PharmacistDashboard = () => {
 
             <div>
 
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">
                 Sardar Pharmacy Operations
               </div>
 
-              <div className="text-sm font-bold capitalize text-slate-900 dark:text-slate-100">
+              <div className="text-sm font-bold capitalize text-slate-900 dark:text-slate-50 dark:text-slate-100">
                 {activeTab.replace(
                   '-',
                   ' '
@@ -2229,13 +2229,13 @@ const PharmacistDashboard = () => {
 
           </div>
 
-          <div className="flex items-center gap-3 text-[10px] text-slate-500">
+          <div className="flex items-center gap-3 text-[10px] text-slate-600 dark:text-slate-400">
 
             <button
               onClick={
                 toggle
               }
-              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-slate-700"
+              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 dark:text-slate-200 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-slate-700"
               title="Toggle theme"
             >
               {resolvedTheme ===
@@ -2277,9 +2277,29 @@ const PharmacistDashboard = () => {
           {/* DASHBOARD */}
           {/* ================================================================= */}
 
-          {activeTab ===
-            'dashboard' && (
+          {activeTab === 'dashboard' && (
             <div className="space-y-5">
+              {/* SECTION BANNER */}
+              <div className="section-banner bg-gradient-to-r from-teal-800 via-teal-700 to-emerald-600 p-6 rounded-2xl shadow-sm border border-teal-600/30 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/30 text-emerald-100 text-[10px] font-bold uppercase tracking-wider border border-emerald-400/30">Pharmacy Operations</span>
+                    <span className="text-emerald-200 text-xs font-semibold">Live Workspace</span>
+                  </div>
+                  <h1 className="text-2xl font-extrabold text-white tracking-tight">Pharmacist Command Center</h1>
+                  <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">Real-time inventory metrics, billing terminal, customer orders, and automated compliance alerts.</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => setActiveTab('new-bill')} className="bg-white text-emerald-950 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl shadow-sm border border-emerald-100 flex items-center gap-2 text-xs transition-all cursor-pointer">
+                    <Receipt className="w-4 h-4 text-emerald-700" />
+                    New Bill POS
+                  </button>
+                  <button onClick={openAddModal} className="bg-emerald-500/20 hover:bg-emerald-500/30 text-white font-bold px-4 py-2.5 rounded-xl border border-emerald-400/30 flex items-center gap-2 text-xs transition-all cursor-pointer">
+                    <Plus className="w-4 h-4 text-emerald-200" />
+                    Add Medicine
+                  </button>
+                </div>
+              </div>
 
               {/* STAT CARDS */}
 
@@ -2291,14 +2311,14 @@ const PharmacistDashboard = () => {
                   onClick={
                     showAllMedicines
                   }
-                  className="text-left bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-blue-300 transition"
                 >
 
                   <div className="flex justify-between">
 
                     <div>
 
-                      <div className="text-[10px] uppercase font-bold text-slate-400">
+                      <div className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400">
                         Total Medicines
                       </div>
 
@@ -2443,7 +2463,7 @@ const PharmacistDashboard = () => {
                       'daily'
                     )
                   }
-                  className="text-left bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-emerald-300 transition"
                 >
 
                   <div className="text-[10px] uppercase font-bold text-emerald-600">
@@ -2462,7 +2482,7 @@ const PharmacistDashboard = () => {
                             )}
                       </div>
 
-                      <div className="text-[9px] text-slate-500 mt-1">
+                      <div className="text-[9px] text-slate-600 dark:text-slate-400 mt-1">
                         {
                           todayBills
                         }{' '}
@@ -2489,7 +2509,7 @@ const PharmacistDashboard = () => {
                       'monthly'
                     )
                   }
-                  className="text-left bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-blue-300 transition"
                 >
 
                   <div className="text-[10px] uppercase font-bold text-blue-600">
@@ -2508,7 +2528,7 @@ const PharmacistDashboard = () => {
                             )}
                       </div>
 
-                      <div className="text-[9px] text-slate-500 mt-1">
+                      <div className="text-[9px] text-slate-600 dark:text-slate-400 mt-1">
                         {
                           monthlyBills
                         }{' '}
@@ -2531,7 +2551,7 @@ const PharmacistDashboard = () => {
 
               {/* QUICK ACTIONS */}
 
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
                 <div className="mb-3">
 
@@ -2539,7 +2559,7 @@ const PharmacistDashboard = () => {
                     Quick Actions
                   </h3>
 
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                     Frequently used pharmacist actions
                   </p>
 
@@ -2609,7 +2629,7 @@ const PharmacistDashboard = () => {
 
               {/* CHART */}
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
                 <div className="flex justify-between mb-5">
 
@@ -2619,7 +2639,7 @@ const PharmacistDashboard = () => {
                       Sales Revenue History
                     </h3>
 
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       Last 7 days revenue
                     </p>
 
@@ -2691,7 +2711,7 @@ const PharmacistDashboard = () => {
 
               {/* TOP 100 EXPIRY */}
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
 
                 <div className="p-5 border-b flex items-center justify-between gap-3">
 
@@ -2701,7 +2721,7 @@ const PharmacistDashboard = () => {
                       Top 100 Medicines by Earliest Expiry
                     </h3>
 
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       Medicines with available stock sorted by expiry date.
                     </p>
 
@@ -2726,7 +2746,7 @@ const PharmacistDashboard = () => {
 
                     <thead>
 
-                      <tr className="bg-slate-50 text-left text-[10px] uppercase text-slate-400">
+                      <tr className="bg-slate-100 dark:bg-gray-800 text-left text-[10px] uppercase font-bold text-slate-700 dark:text-gray-200 border-b border-slate-200 dark:border-gray-700">
 
                         <th className="p-3">
                           #
@@ -2769,7 +2789,7 @@ const PharmacistDashboard = () => {
 
                           <td
                             colSpan={7}
-                            className="p-8 text-center text-xs text-slate-400"
+                            className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                           >
                             No expiry medicines found.
                           </td>
@@ -2794,10 +2814,10 @@ const PharmacistDashboard = () => {
                                 key={
                                   medicine._id
                                 }
-                                className="border-t hover:bg-slate-50"
+                                className="border-b border-slate-200/80 dark:border-gray-800/80 hover:bg-teal-50/40 dark:hover:bg-gray-800/50 transition-colors"
                               >
 
-                                <td className="p-3 text-xs text-slate-400">
+                                <td className="p-3 text-xs text-slate-600 dark:text-slate-400">
                                   {
                                     index +
                                     1
@@ -2813,7 +2833,7 @@ const PharmacistDashboard = () => {
                                     }
                                   </div>
 
-                                  <div className="text-[10px] text-slate-400">
+                                  <div className="text-[10px] text-slate-600 dark:text-slate-400">
                                     {
                                       medicine.genericName ||
                                       'N/A'
@@ -2894,7 +2914,7 @@ const PharmacistDashboard = () => {
 
               {/* RECENT BILLS */}
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
 
                 <div className="p-5 border-b flex items-center justify-between">
 
@@ -2904,7 +2924,7 @@ const PharmacistDashboard = () => {
                       Recent Bills
                     </h3>
 
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       Latest sales transactions.
                     </p>
 
@@ -2929,7 +2949,7 @@ const PharmacistDashboard = () => {
 
                     <thead>
 
-                      <tr className="bg-slate-50 text-left text-[10px] uppercase text-slate-400">
+                      <tr className="bg-slate-100 dark:bg-gray-800 text-left text-[10px] uppercase font-bold text-slate-700 dark:text-gray-200 border-b border-slate-200 dark:border-gray-700">
 
                         <th className="p-3">
                           Bill
@@ -2968,7 +2988,7 @@ const PharmacistDashboard = () => {
 
                           <td
                             colSpan={6}
-                            className="p-8 text-center text-xs text-slate-400"
+                            className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                           >
                             No bills found.
                           </td>
@@ -2983,7 +3003,7 @@ const PharmacistDashboard = () => {
                               key={
                                 bill._id
                               }
-                              className="border-t hover:bg-slate-50"
+                              className="border-b border-slate-200/80 dark:border-gray-800/80 hover:bg-teal-50/40 dark:hover:bg-gray-800/50 transition-colors"
                             >
 
                               <td className="p-3 text-xs font-bold">
@@ -3061,13 +3081,13 @@ const PharmacistDashboard = () => {
             'orders' && (
             <div className="space-y-4">
 
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm dark:bg-slate-900 dark:border-slate-700">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h2 className="font-bold text-sm">
                       Customer Orders
                     </h2>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                       Review online pharmacy orders and accept or reject them.
                     </p>
                   </div>
@@ -3075,7 +3095,7 @@ const PharmacistDashboard = () => {
                   <button
                     type="button"
                     onClick={() => refetchOnlineOrders()}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <RefreshCw className="inline w-3.5 h-3.5 mr-1" />
                     Refresh Orders
@@ -3084,19 +3104,19 @@ const PharmacistDashboard = () => {
               </div>
 
               {isOrdersLoading ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
                   <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
-                  <p className="text-xs text-slate-400 mt-3">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
                     Loading customer orders...
                   </p>
                 </div>
               ) : onlineOrders.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
                   <ClipboardList className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold mt-3">
                     No customer orders yet
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                     New online orders will appear here automatically.
                   </p>
                 </div>
@@ -3109,12 +3129,12 @@ const PharmacistDashboard = () => {
                     return (
                       <div
                         key={order?._id}
-                        className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 dark:bg-slate-900 dark:border-slate-700"
+                        className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm p-4 dark:bg-slate-900 dark:border-slate-700"
                       >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                              <span className="text-xs font-bold text-slate-900 dark:text-slate-50 dark:text-white">
                                 {order?.billNumber || order?._id || 'Order'}
                               </span>
 
@@ -3133,20 +3153,20 @@ const PharmacistDashboard = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
-                                <p className="text-[10px] uppercase font-bold text-slate-400">Customer</p>
-                                <p className="text-xs font-bold mt-1 text-slate-900 dark:text-white">
+                                <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400">Customer</p>
+                                <p className="text-xs font-bold mt-1 text-slate-900 dark:text-slate-50 dark:text-white">
                                   {order?.customerId?.name || 'Customer'}
                                 </p>
-                                <p className="text-[10px] text-slate-500 mt-1 dark:text-slate-400">
+                                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 dark:text-slate-600 dark:text-slate-400">
                                   {order?.customerId?.email || 'No email'}
                                 </p>
-                                <p className="text-[10px] text-slate-500 mt-1 dark:text-slate-400">
+                                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 dark:text-slate-600 dark:text-slate-400">
                                   {order?.customerPhone || order?.customerId?.phone || 'No phone'}
                                 </p>
                               </div>
 
                               <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800">
-                                <p className="text-[10px] uppercase font-bold text-slate-400">Delivery Address</p>
+                                <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400">Delivery Address</p>
                                 <p className="text-xs font-semibold mt-1 leading-5 text-slate-700 dark:text-slate-200">
                                   {order?.shippingAddress || 'No delivery address provided'}
                                 </p>
@@ -3154,7 +3174,7 @@ const PharmacistDashboard = () => {
                             </div>
 
                             <div className="mt-4 rounded-xl border border-slate-100 p-3 dark:border-slate-800">
-                              <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">Medicines</p>
+                              <p className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-400 mb-2">Medicines</p>
                               <div className="space-y-2">
                                 {Array.isArray(order?.items) && order.items.map((item, index) => (
                                   <div
@@ -3164,7 +3184,7 @@ const PharmacistDashboard = () => {
                                     <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">
                                       {item?.name || 'Medicine'} × {item?.quantity || 0}
                                     </span>
-                                    <span className="shrink-0 font-bold text-slate-900 dark:text-white">
+                                    <span className="shrink-0 font-bold text-slate-900 dark:text-slate-50 dark:text-white">
                                       {getCurrency((Number(item?.unitPrice) || 0) * (Number(item?.quantity) || 0))}
                                     </span>
                                   </div>
@@ -3172,7 +3192,7 @@ const PharmacistDashboard = () => {
                               </div>
                             </div>
 
-                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-400">
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-slate-600 dark:text-slate-400">
                               <span>Placed: {formatDateTime(order?.createdAt)}</span>
                               <span>Payment: {order?.paymentMethod || 'Cash'}</span>
                               {order?.rejectionReason && (
@@ -3374,7 +3394,7 @@ const PharmacistDashboard = () => {
                       );
                     }}
                     placeholder="Search medicine, generic name, manufacturer or rack..."
-                    className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-600 dark:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
                   />
 
                 </div>
@@ -3482,13 +3502,13 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
 
                 <div className="p-4 border-b flex items-center justify-between">
 
                   <div>
 
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
                       Showing
                     </div>
 
@@ -3501,7 +3521,7 @@ const PharmacistDashboard = () => {
 
                   </div>
 
-                  <div className="text-[10px] text-slate-400">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400">
                     View Details shows complete information.
                   </div>
 
@@ -3513,7 +3533,7 @@ const PharmacistDashboard = () => {
 
                     <thead>
 
-                      <tr className="bg-slate-50 text-[10px] uppercase text-slate-400">
+                      <tr className="bg-slate-50 text-[10px] uppercase text-slate-600 dark:text-slate-400">
 
                         <th className="p-3 text-left">
                           Medicine
@@ -3555,7 +3575,7 @@ const PharmacistDashboard = () => {
 
                           <td
                             colSpan={7}
-                            className="p-8 text-center text-xs text-slate-400"
+                            className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                           >
                             Loading medicines...
                           </td>
@@ -3569,7 +3589,7 @@ const PharmacistDashboard = () => {
 
                           <td
                             colSpan={7}
-                            className="p-8 text-center text-xs text-slate-400"
+                            className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                           >
                             No medicines found.
                           </td>
@@ -3585,7 +3605,7 @@ const PharmacistDashboard = () => {
                               key={
                                 medicine._id
                               }
-                              className="border-t hover:bg-slate-50"
+                              className="border-b border-slate-200/80 dark:border-gray-800/80 hover:bg-teal-50/40 dark:hover:bg-gray-800/50 transition-colors"
                             >
 
                               <td className="p-3">
@@ -3597,7 +3617,7 @@ const PharmacistDashboard = () => {
                                   }
                                 </div>
 
-                                <div className="text-[10px] text-slate-400">
+                                <div className="text-[10px] text-slate-600 dark:text-slate-400">
                                   {
                                     medicine.genericName ||
                                     'N/A'
@@ -3677,7 +3697,7 @@ const PharmacistDashboard = () => {
                                         medicine
                                       )
                                     }
-                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-700"
+                                    className="p-2 rounded-lg hover:bg-slate-100 text-slate-700 dark:text-slate-200"
                                     title="View Details"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -3745,7 +3765,7 @@ const PharmacistDashboard = () => {
                     Medicine Catalog
                   </h3>
 
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                     Select medicine for the bill.
                   </p>
 
@@ -3755,7 +3775,7 @@ const PharmacistDashboard = () => {
 
                   <div className="relative flex-1">
 
-                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-600 dark:text-slate-400" />
 
                     <input
                       value={
@@ -3835,7 +3855,7 @@ const PharmacistDashboard = () => {
                               }
                             </div>
 
-                            <div className="text-[10px] text-slate-400 mt-1">
+                            <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
                               Stock: {medicine.quantity ?? 0} {getDot()} Rack: {medicine.rackLocation || 'Not assigned'}
                             </div>
 
@@ -3872,7 +3892,7 @@ const PharmacistDashboard = () => {
 
                   {filteredBillMedicines.length ===
                     0 && (
-                    <div className="p-8 text-center text-xs text-slate-400">
+                    <div className="p-8 text-center text-xs text-slate-600 dark:text-slate-400">
                       No medicines found.
                     </div>
                   )}
@@ -3960,7 +3980,7 @@ const PharmacistDashboard = () => {
 
                         <FileText className="w-10 h-10 text-slate-200 mx-auto" />
 
-                        <p className="text-xs text-slate-400 mt-2">
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
                           Invoice is empty
                         </p>
 
@@ -3987,7 +4007,7 @@ const PharmacistDashboard = () => {
                               }
                             </div>
 
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-[10px] text-slate-600 dark:text-slate-400">
                               {
                                 item.billQuantity
                               }{' '}
@@ -4108,7 +4128,7 @@ const PharmacistDashboard = () => {
 
                   <div className="flex justify-between">
 
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
                       Subtotal
                     </span>
 
@@ -4188,10 +4208,10 @@ const PharmacistDashboard = () => {
                         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl bg-white border border-amber-100 p-3"
                       >
                         <div>
-                          <p className="text-xs font-bold text-slate-900">
+                          <p className="text-xs font-bold text-slate-900 dark:text-slate-50">
                             {customer.name}
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-1">
+                          <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
                             {customer.email} {customer.phone && `| ${customer.phone}`}
                           </p>
                         </div>
@@ -4221,7 +4241,7 @@ const PharmacistDashboard = () => {
                 </div>
               )}
 
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
 
               <div className="p-5 border-b">
 
@@ -4229,7 +4249,7 @@ const PharmacistDashboard = () => {
                   Customer Records
                 </h3>
 
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Select a customer to start a bill.
                 </p>
 
@@ -4241,7 +4261,7 @@ const PharmacistDashboard = () => {
 
                   <thead>
 
-                    <tr className="bg-slate-50 text-[10px] uppercase text-slate-400">
+                    <tr className="bg-slate-50 text-[10px] uppercase text-slate-600 dark:text-slate-400">
 
                       <th className="p-3 text-left">
                         Name
@@ -4271,7 +4291,7 @@ const PharmacistDashboard = () => {
 
                         <td
                           colSpan={4}
-                          className="p-8 text-center text-xs text-slate-400"
+                          className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                         >
                           Loading customers...
                         </td>
@@ -4285,7 +4305,7 @@ const PharmacistDashboard = () => {
 
                         <td
                           colSpan={4}
-                          className="p-8 text-center text-xs text-slate-400"
+                          className="p-8 text-center text-xs text-slate-600 dark:text-slate-400"
                         >
                           No customers found.
                         </td>
@@ -4416,7 +4436,7 @@ const PharmacistDashboard = () => {
                           }
                         </h4>
 
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
                           {
                             item.description
                           }
@@ -4463,7 +4483,7 @@ const PharmacistDashboard = () => {
             'settings' && (
             <div className="max-w-xl mx-auto space-y-4">
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
                 <div className="flex items-center gap-3">
 
@@ -4494,7 +4514,7 @@ const PharmacistDashboard = () => {
 
                 <div className="mt-4 text-xs">
 
-                  <span className="text-[9px] uppercase text-slate-400 font-bold">
+                  <span className="text-[9px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Email
                   </span>
 
@@ -4508,7 +4528,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
                 <div className="flex items-center gap-2 mb-4">
 
@@ -4566,7 +4586,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
                 <div className="flex items-center gap-2 mb-4">
 
@@ -4628,7 +4648,7 @@ const PharmacistDashboard = () => {
                           !showCurrentPassword
                         )
                       }
-                      className="absolute right-3 top-2.5 text-slate-400"
+                      className="absolute right-3 top-2.5 text-slate-600 dark:text-slate-400"
                     >
                       {showCurrentPassword ? (
                         <EyeOff className="w-4 h-4" />
@@ -4666,7 +4686,7 @@ const PharmacistDashboard = () => {
                           !showNewPassword
                         )
                       }
-                      className="absolute right-3 top-2.5 text-slate-400"
+                      className="absolute right-3 top-2.5 text-slate-600 dark:text-slate-400"
                     >
                       {showNewPassword ? (
                         <EyeOff className="w-4 h-4" />
@@ -4700,7 +4720,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {medModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-y-auto">
 
@@ -4718,7 +4738,7 @@ const PharmacistDashboard = () => {
                 onClick={
                   closeMedModal
                 }
-                className="text-slate-400"
+                className="text-slate-600 dark:text-slate-400"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -4742,7 +4762,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <p className="text-[10px] text-slate-500 mt-1 mb-3">
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 mb-3">
                   Upload a medicine label to extract available information.
                 </p>
 
@@ -4784,16 +4804,16 @@ const PharmacistDashboard = () => {
                 </div>
                 <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Medicine</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.medicineName || 'Not detected'}</p>
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">Medicine</span>
+                    <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.medicineName || 'Not detected'}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Generic</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.genericName || 'Not detected'}</p>
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">Generic</span>
+                    <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.genericName || 'Not detected'}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400">Expiry</span>
-                    <p className="font-bold text-slate-900 dark:text-white">{ocrPreview.expiryDate || 'Not detected'}</p>
+                    <span className="text-[10px] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">Expiry</span>
+                    <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.expiryDate || 'Not detected'}</p>
                   </div>
                 </div>
               </div>
@@ -5022,7 +5042,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {bulkModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-5">
 
@@ -5119,7 +5139,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {selectedMedicine && (
-        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
 
@@ -5137,7 +5157,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Complete medicine, expiry and rack information
                 </p>
 
@@ -5147,7 +5167,7 @@ const PharmacistDashboard = () => {
                 onClick={
                   closeMedicineDetails
                 }
-                className="text-slate-400 hover:text-slate-700"
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5167,7 +5187,7 @@ const PharmacistDashboard = () => {
                     }
                   </h2>
 
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                     {
                       selectedMedicine.genericName ||
                       'N/A'
@@ -5212,7 +5232,7 @@ const PharmacistDashboard = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Building2 className="w-3.5 h-3.5" />
                     Manufacturer
                   </div>
@@ -5225,7 +5245,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Clock className="w-3.5 h-3.5" />
                     Expiry Date
                   </div>
@@ -5237,7 +5257,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Package className="w-3.5 h-3.5" />
                     Current Stock
                   </div>
@@ -5251,7 +5271,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Layers className="w-3.5 h-3.5" />
                     Reorder Level
                   </div>
@@ -5265,7 +5285,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Wallet className="w-3.5 h-3.5" />
                     Unit Price
                   </div>
@@ -5277,7 +5297,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Barcode className="w-3.5 h-3.5" />
                     Barcode
                   </div>
@@ -5305,7 +5325,7 @@ const PharmacistDashboard = () => {
 
                 <div className="p-3 border rounded-xl">
 
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Clock className="w-3.5 h-3.5" />
                     Days Left
                   </div>
@@ -5341,7 +5361,7 @@ const PharmacistDashboard = () => {
 
                 <div className="p-3 border rounded-xl">
 
-                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="flex items-center gap-2 text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     <Tag className="w-3.5 h-3.5" />
                     Category
                   </div>
@@ -5367,7 +5387,7 @@ const PharmacistDashboard = () => {
 
                   <div>
 
-                    <span className="text-slate-400">
+                    <span className="text-slate-600 dark:text-slate-400">
                       Medicine ID
                     </span>
 
@@ -5382,7 +5402,7 @@ const PharmacistDashboard = () => {
 
                   <div>
 
-                    <span className="text-slate-400">
+                    <span className="text-slate-600 dark:text-slate-400">
                       Created At
                     </span>
 
@@ -5396,7 +5416,7 @@ const PharmacistDashboard = () => {
 
                   <div>
 
-                    <span className="text-slate-400">
+                    <span className="text-slate-600 dark:text-slate-400">
                       Updated At
                     </span>
 
@@ -5410,7 +5430,7 @@ const PharmacistDashboard = () => {
 
                   <div>
 
-                    <span className="text-slate-400">
+                    <span className="text-slate-600 dark:text-slate-400">
                       Label Image URL
                     </span>
 
@@ -5478,7 +5498,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {salesDetailsType && (
-        <div className="fixed inset-0 z-[65] bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[65] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl max-h-[92vh] overflow-hidden">
 
@@ -5506,7 +5526,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
 
                   {salesDetailsType ===
                   'daily'
@@ -5521,7 +5541,7 @@ const PharmacistDashboard = () => {
                 onClick={
                   closeSalesDetails
                 }
-                className="text-slate-400 hover:text-slate-700"
+                className="text-slate-600 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5588,7 +5608,7 @@ const PharmacistDashboard = () => {
                     Sales Transactions
                   </h4>
 
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
                     {
                       selectedSalesBillCount
                     }{' '}
@@ -5597,7 +5617,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg text-slate-500 font-bold">
+                <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400 font-bold">
 
                   {salesDetailsType ===
                   'daily'
@@ -5615,7 +5635,7 @@ const PharmacistDashboard = () => {
 
                   <Receipt className="w-10 h-10 text-slate-200 mx-auto" />
 
-                  <p className="text-xs text-slate-400 mt-3">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
                     No sales found for this period.
                   </p>
 
@@ -5629,7 +5649,7 @@ const PharmacistDashboard = () => {
 
                     <thead>
 
-                      <tr className="bg-slate-50 text-[10px] uppercase text-slate-400">
+                      <tr className="bg-slate-50 text-[10px] uppercase text-slate-600 dark:text-slate-400">
 
                         <th className="p-3 text-left">
                           #
@@ -5699,10 +5719,10 @@ const PharmacistDashboard = () => {
                                 bill?._id ||
                                 index
                               }
-                              className="border-t hover:bg-slate-50"
+                              className="border-b border-slate-200/80 dark:border-gray-800/80 hover:bg-teal-50/40 dark:hover:bg-gray-800/50 transition-colors"
                             >
 
-                              <td className="p-3 text-xs text-slate-400">
+                              <td className="p-3 text-xs text-slate-600 dark:text-slate-400">
                                 {
                                   index +
                                   1
@@ -5826,7 +5846,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {selectedBill && (
-        <div className="fixed inset-0 z-[70] bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
 
@@ -5838,7 +5858,7 @@ const PharmacistDashboard = () => {
                   Bill Details
                 </h3>
 
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                   Complete transaction information
                 </p>
 
@@ -5848,7 +5868,7 @@ const PharmacistDashboard = () => {
                 onClick={
                   closeBillDetails
                 }
-                className="text-slate-400"
+                className="text-slate-600 dark:text-slate-400"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -5860,7 +5880,7 @@ const PharmacistDashboard = () => {
               <div className="grid grid-cols-2 gap-3">
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Bill Number
                   </div>
 
@@ -5874,7 +5894,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Payment
                   </div>
 
@@ -5887,7 +5907,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Customer
                   </div>
 
@@ -5901,7 +5921,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Customer Phone
                   </div>
 
@@ -5915,7 +5935,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-xl">
-                  <div className="text-[10px] uppercase text-slate-400 font-bold">
+                  <div className="text-[10px] uppercase text-slate-600 dark:text-slate-400 font-bold">
                     Discount
                   </div>
 
@@ -5979,7 +5999,7 @@ const PharmacistDashboard = () => {
                             }
                           </div>
 
-                          <div className="text-[10px] text-slate-400 mt-1">
+                          <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
                             Qty:{' '}
                             {
                               item.quantity ??
@@ -6015,7 +6035,7 @@ const PharmacistDashboard = () => {
 
                 ) : (
 
-                  <div className="p-5 text-center text-xs text-slate-400">
+                  <div className="p-5 text-center text-xs text-slate-600 dark:text-slate-400">
                     No bill items available.
                   </div>
 
@@ -6023,10 +6043,10 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="mt-4 text-xs text-slate-400">
+              <div className="mt-4 text-xs text-slate-600 dark:text-slate-400">
 
                 Created:{' '}
-                <span className="font-semibold text-slate-700">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
                   {formatDateTime(
                     selectedBill.createdAt
                   )}
@@ -6071,7 +6091,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {confirmedBill && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
 
@@ -6083,7 +6103,7 @@ const PharmacistDashboard = () => {
                 Payment Done!
               </h3>
 
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
                 Bill{' '}
                 {
                   confirmedBill.billNumber ||

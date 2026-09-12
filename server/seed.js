@@ -1,3 +1,5 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import User from './models/User.js';
@@ -6,6 +8,10 @@ import Bill from './models/Bill.js';
 import Reminder from './models/Reminder.js';
 import Notification from './models/Notification.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config();
 
 const uri = process.env.MONGO_URI;
@@ -33,30 +39,33 @@ async function seedData() {
     // 2. Create Users
     console.log('Seeding Users...');
     const superadmin = await User.create({
-      name: 'Pharmadesk Admin',
-      email: 'superadmin@pharmadesk.com',
-      password: 'Test@1234',
+      name: 'Dawood Super Admin',
+      email: 'aheerdawood014@gmail.com',
+      password: 'Dawood@@5786',
       role: 'superadmin',
+      accountStatus: 'approved',
     });
 
     const pharmacist = await User.create({
-      name: 'John Doe (Pharmacist)',
-      email: 'testpharmacist@pharmadesk.com',
-      password: 'Test@1234',
+      name: 'Sardar Pharmacist',
+      email: 'mlksardar6@gmail.com',
+      password: 'Dawood@@5786',
       role: 'pharmacist',
+      accountStatus: 'approved',
     });
 
     const customer = await User.create({
-      name: 'Alice Smith (Customer)',
-      email: 'testcustomer@pharmadesk.com',
-      password: 'Test@1234',
+      name: 'Raza Customer',
+      email: 'aheerraza0@gmail.com',
+      password: 'Dawood@@5786',
       role: 'customer',
+      accountStatus: 'approved',
     });
 
     console.log('Users created successfully:');
-    console.log(`- Super Admin: ${superadmin.email} (password: Test@1234)`);
-    console.log(`- Pharmacist: ${pharmacist.email} (password: Test@1234)`);
-    console.log(`- Customer: ${customer.email} (password: Test@1234)`);
+    console.log(`- Super Admin: ${superadmin.email} (password: Dawood@@5786)`);
+    console.log(`- Pharmacist: ${pharmacist.email} (password: Dawood@@5786)`);
+    console.log(`- Customer: ${customer.email} (password: Dawood@@5786)`);
 
     // Helper dates
     const now = new Date();

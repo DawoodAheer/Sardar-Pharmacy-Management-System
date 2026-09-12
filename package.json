@@ -9,6 +9,8 @@
     "dev:client": "npm run dev --prefix client",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "seed": "npm run seed --prefix server",
+    "db:backup": "npm run db:backup --prefix server",
+    "db:restore": "npm run db:restore --prefix server",
     "start": "node server/server.js"
   },
   "devDependencies": {

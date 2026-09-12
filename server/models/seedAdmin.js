@@ -14,7 +14,7 @@ const createSuperAdmin = async () => {
 
     console.log("MongoDB Connected");
 
-    const adminEmail = "aheerraza0@gmail.com";
+    const adminEmail = "aheerdawood014@gmail.com";
     const adminPassword = "Dawood@@5786";
     const adminName = "Dawood PharmaDesk Super Admin";
 
