@@ -1,5 +1,6 @@
 import Medicine from '../models/Medicine.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
+import { checkAndSendExpiryAlerts } from '../utils/notificationScheduler.js';
 import Tesseract from 'tesseract.js';
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
@@ -120,6 +121,11 @@ export const createMedicine = async (req, res, next) => {
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
 
+    // Real-time check: if newly created medicine is expiring within 10 days, 1 day, or expired, dispatch alert immediately
+    checkAndSendExpiryAlerts({ medicineId: medicine._id }).catch((err) => {
+      console.error('[New Medicine Alert Error]:', err.message);
+    });
+
     res.status(201).json(medObj);
   } catch (error) {
     next(error);
@@ -156,7 +162,14 @@ export const updateMedicine = async (req, res, next) => {
     medicine.name = name !== undefined ? name : medicine.name;
     medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
     medicine.manufacturer = manufacturer !== undefined ? manufacturer : medicine.manufacturer;
-    medicine.expiryDate = expiryDate !== undefined ? expiryDate : medicine.expiryDate;
+    if (expiryDate !== undefined && String(expiryDate) !== String(medicine.expiryDate)) {
+      medicine.expiryDate = expiryDate;
+      // Reset alert flags so that alerts fire appropriately for the new date
+      medicine.expiryAlert10Sent = false;
+      medicine.expiryAlert1Sent = false;
+      medicine.expiryAlertExpiredSent = false;
+    }
+
     medicine.quantity = quantity !== undefined ? quantity : medicine.quantity;
     medicine.reorderLevel = reorderLevel !== undefined ? reorderLevel : medicine.reorderLevel;
     medicine.price = price !== undefined ? price : medicine.price;
@@ -169,6 +182,11 @@ export const updateMedicine = async (req, res, next) => {
     const populatedMed = await Medicine.findById(updatedMedicine._id).populate('createdBy', 'name email');
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
+
+    // Trigger alert evaluation for the updated medicine
+    checkAndSendExpiryAlerts({ medicineId: updatedMedicine._id }).catch((err) => {
+      console.error('[Update Medicine Alert Error]:', err.message);
+    });
 
     res.json(medObj);
   } catch (error) {
@@ -251,6 +269,11 @@ export const bulkImportMedicines = async (req, res, next) => {
 
       insertedCount++;
     }
+
+    // Evaluate newly bulk imported medicines
+    checkAndSendExpiryAlerts().catch((err) => {
+      console.error('[Bulk Import Alert Error]:', err.message);
+    });
 
     res.status(201).json({
       message: 'Bulk import complete',

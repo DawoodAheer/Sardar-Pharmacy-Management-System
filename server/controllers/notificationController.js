@@ -1,7 +1,12 @@
 import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import User from '../models/User.js';
-import { runExpiryReport, runLowStockReport, runEmailReminders } from '../utils/notificationScheduler.js';
+import {
+  checkAndSendExpiryAlerts,
+  runExpiryReport,
+  runLowStockReport,
+  runEmailReminders,
+} from '../utils/notificationScheduler.js';
 
 // @desc    Get notification history for a specific user
 // @route   GET /api/notifications/:userId
@@ -133,9 +138,10 @@ export const triggerCron = async (req, res, next) => {
 
   try {
     let result;
+    const force = req.query.force === 'true';
 
-    if (cronNumber === '1') {
-      result = await runExpiryReport();
+    if (cronNumber === '1' || cronNumber === 'expiry-check') {
+      result = await checkAndSendExpiryAlerts({ force });
     } else if (cronNumber === '2') {
       result = await runLowStockReport();
     } else if (cronNumber === '3') {

@@ -38,151 +38,282 @@ const getEmailTransporter = () => {
   }
 };
 
-// --- CRON JOB 1: Daily Expiry Report at 8:00 AM ---
-export const runExpiryReport = async () => {
-  console.log('Running daily medicine expiry check...');
+/**
+ * Helper: Get recipient email addresses (Superadmin, Pharmacists, and SMTP_USER)
+ */
+const getStaffEmailRecipients = async () => {
+  const staffUsers = await User.find({ role: { $in: ['pharmacist', 'superadmin'] } });
+  const emails = new Set();
+
+  staffUsers.forEach((u) => {
+    if (u.email && u.email.trim()) emails.add(u.email.trim());
+  });
+
+  // Ensure configured SMTP owner email is always included
+  if (process.env.SMTP_USER && process.env.SMTP_USER.includes('@')) {
+    emails.add(process.env.SMTP_USER.trim());
+  }
+
+  return {
+    staffUsers,
+    emailList: Array.from(emails),
+  };
+};
+
+/**
+ * Check medicines and dispatch targeted expiry alert emails:
+ * 1) 1-Day Final Urgent Alert (diffDays <= 1 && diffDays >= 0)
+ * 2) 10-Day Advance Warning (diffDays <= 10 && diffDays > 1)
+ * 3) Expired Alert (diffDays < 0)
+ *
+ * @param {Object} options
+ * @param {boolean} options.force - Force sending even if already flagged as sent
+ * @param {string} options.medicineId - Optional filter to check a specific medicine
+ */
+export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = null } = {}) => {
+  console.log(`[Expiry Alert Engine] Checking medicines (force: ${force}, medicineId: ${medicineId || 'all'})...`);
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const msInDay = 24 * 60 * 60 * 1000;
-    const ninetyDaysFromNow = new Date(today.getTime() + 90 * msInDay);
 
-    // Find medicines expiring within 90 days (not yet expired)
-    const medicines = await Medicine.find({
-      expiryDate: { $gte: today, $lte: ninetyDaysFromNow },
-    });
-
-    if (medicines.length === 0) {
-      console.log('No medicines expiring within 90 days.');
-      return { status: 'success', message: 'No expiring medicines found' };
+    const query = {};
+    if (medicineId) {
+      query._id = medicineId;
     }
 
-    // Group by status
-    const grouped = {
-      CRITICAL: [],
-      WARNING: [],
-      CAUTION: [],
-    };
+    const medicines = await Medicine.find(query);
+    if (medicines.length === 0) {
+      console.log('[Expiry Alert Engine] No medicines found.');
+      return { status: 'success', message: 'No medicines to evaluate' };
+    }
+
+    const oneDayUrgentList = [];
+    const tenDaysWarningList = [];
+    const expiredList = [];
 
     medicines.forEach((med) => {
-      const status = checkExpiryStatus(med.expiryDate);
-      const diffTime = new Date(med.expiryDate).getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / msInDay);
-      const item = { med, diffDays };
+      const exp = new Date(med.expiryDate);
+      exp.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((exp.getTime() - today.getTime()) / msInDay);
 
-      if (status === 'CRITICAL') grouped.CRITICAL.push(item);
-      else if (status === 'WARNING') grouped.WARNING.push(item);
-      else if (status === 'CAUTION') grouped.CAUTION.push(item);
+      if (diffDays < 0) {
+        // Expired
+        if (!med.expiryAlertExpiredSent || force) {
+          expiredList.push({ med, diffDays });
+        }
+      } else if (diffDays <= 1 && diffDays >= 0) {
+        // 1 Day before expiry (or expiring today)
+        if (!med.expiryAlert1Sent || force) {
+          oneDayUrgentList.push({ med, diffDays });
+        }
+      } else if (diffDays <= 10 && diffDays > 1) {
+        // 10 Days before expiry
+        if (!med.expiryAlert10Sent || force) {
+          tenDaysWarningList.push({ med, diffDays });
+        }
+      }
     });
 
-    // Find all pharmacists and superadmins to receive expiry report
-    const staffUsers = await User.find({ role: { $in: ['pharmacist', 'superadmin'] } });
-    if (staffUsers.length === 0) {
-      console.log('No admin/pharmacists registered to receive expiry report.');
-      return { status: 'success', message: 'No staff users found' };
+    const totalAlertsNeeded = oneDayUrgentList.length + tenDaysWarningList.length + expiredList.length;
+    if (totalAlertsNeeded === 0) {
+      console.log('[Expiry Alert Engine] All medicines are healthy or already notified. No new alerts needed.');
+      return { status: 'success', message: 'No pending expiry alerts' };
     }
 
-    // Build HTML table content
-    let htmlContent = `
-      <h2 style="color: #0f172a; font-family: sans-serif;">Pharmadesk Expiry Warning Report</h2>
-      <p style="color: #475569; font-family: sans-serif;">The following medicines are expiring within 90 days. Please review stocks.</p>
-    `;
+    const { staffUsers, emailList } = await getStaffEmailRecipients();
+    if (emailList.length === 0) {
+      console.log('[Expiry Alert Engine] No recipient email addresses configured.');
+      return { status: 'warning', message: 'No email recipients found' };
+    }
 
-    const addGroupTable = (title, items, color) => {
-      if (items.length === 0) return '';
-      let tableHtml = `
-        <h3 style="color: ${color}; font-family: sans-serif; margin-top: 20px;">${title} (${items.length} items)</h3>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; text-align: left; border-color: #cbd5e1;">
-          <tr style="background-color: #f8fafc; color: #334155;">
-            <th>Medicine Name</th>
-            <th>Batch No</th>
-            <th>Category</th>
-            <th>Quantity</th>
-            <th>Expiry Date</th>
-            <th>Days Remaining</th>
-          </tr>
-      `;
+    const transporter = getEmailTransporter();
+    const isEthereal = transporter.options && transporter.options.host === 'smtp.ethereal.email';
+    const sender = `"Sardar Pharmacy Alerts" <${process.env.SMTP_USER || 'no-reply@sardarpharmacy.com'}>`;
 
+    // --- Helper to send formatted alert email to all staff ---
+    const sendBatchAlert = async ({ subject, headerBg, badgeText, title, description, actionNotice, items, isCritical }) => {
+      let tableRows = '';
       items.forEach(({ med, diffDays }) => {
-        tableHtml += `
-          <tr>
-            <td><strong>${med.name}</strong><br><span style="font-size: 11px; color: #64748b;">${med.genericName}</span></td>
-            <td><code>${med.rackLocation || 'Not assigned'}</code></td>
-            <td>${med.category}</td>
-            <td>${med.quantity}</td>
-            <td>${new Date(med.expiryDate).toLocaleDateString()}</td>
-            <td style="color: ${color}; font-weight: bold;">${diffDays} days</td>
+        const daysLabel = diffDays === 1 ? '1 Day (Tomorrow!)' : diffDays === 0 ? 'Today!' : diffDays < 0 ? `Expired (${Math.abs(diffDays)}d ago)` : `${diffDays} Days`;
+        tableRows += `
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px; font-weight: 600; color: #0f172a;">
+              ${med.name}
+              <div style="font-size: 12px; font-weight: normal; color: #64748b;">${med.genericName || 'No generic'} | Mfr: ${med.manufacturer || 'N/A'}</div>
+            </td>
+            <td style="padding: 12px; font-family: monospace; color: #334155;">${med.rackLocation || 'Shelf'}</td>
+            <td style="padding: 12px; text-align: center; font-weight: bold; color: #0f172a;">${med.quantity}</td>
+            <td style="padding: 12px; color: #334155;">${new Date(med.expiryDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+            <td style="padding: 12px; text-align: center; font-weight: 700; color: ${isCritical ? '#dc2626' : '#d97706'};">
+              ${daysLabel}
+            </td>
           </tr>
         `;
       });
 
-      tableHtml += `</table>`;
-      return tableHtml;
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="margin:0; padding:20px; background-color:#f1f5f9; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:640px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 6px rgba(0,0,0,0.07); border:1px solid #e2e8f0;">
+            <tr>
+              <td style="background:${headerBg}; padding:28px 32px; text-align:center; color:#ffffff;">
+                <span style="background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase;">
+                  ${badgeText}
+                </span>
+                <h1 style="margin:12px 0 6px; font-size:22px; font-weight:800; letter-spacing:-0.5px;">${title}</h1>
+                <p style="margin:0; font-size:14px; opacity:0.95;">Sardar Pharmacy Management System</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                <p style="margin:0 0 16px; color:#334155; font-size:15px; line-height:22px;">${description}</p>
+                <div style="background:#fef2f2; border-left:4px solid ${isCritical ? '#dc2626' : '#f59e0b'}; padding:12px 16px; border-radius:6px; margin-bottom:20px;">
+                  <strong style="color:#991b1b; font-size:13px;">Recommended Action:</strong>
+                  <p style="margin:4px 0 0; color:#7f1d1d; font-size:13px; line-height:18px;">${actionNotice}</p>
+                </div>
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse; font-size:13px; margin-top:16px;">
+                  <thead>
+                    <tr style="background:#f8fafc; border-bottom:2px solid #cbd5e1; text-align:left; color:#475569;">
+                      <th style="padding:10px 12px;">Medicine Name</th>
+                      <th style="padding:10px 12px;">Rack</th>
+                      <th style="padding:10px 12px; text-align:center;">Qty</th>
+                      <th style="padding:10px 12px;">Expiry Date</th>
+                      <th style="padding:10px 12px; text-align:center;">Remaining</th>
+                    </tr>
+                  </thead>
+                  <tbody>${tableRows}</tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f8fafc; padding:16px 32px; border-top:1px solid #e2e8f0; text-align:center; font-size:12px; color:#94a3b8;">
+                Sardar Pharmacy Automation System &bull; Intelligent Real-Time Expiry Sentinel
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `;
+
+      for (const email of emailList) {
+        try {
+          if (isEthereal) {
+            console.log(`[MOCK EMAIL] Alert sent to ${email}: ${subject}`);
+          } else {
+            await transporter.sendMail({
+              from: sender,
+              to: email,
+              subject,
+              html: htmlContent,
+            });
+            console.log(`[EMAIL DISPATCHED] To: ${email} | Subject: ${subject}`);
+          }
+        } catch (err) {
+          console.error(`[EMAIL ERROR] Failed sending to ${email}:`, err.message);
+        }
+      }
+
+      // Log notification in DB for all staff members
+      for (const staff of staffUsers) {
+        try {
+          await Notification.create({
+            recipientId: staff._id,
+            type: 'Email',
+            message: `${subject}\n${items.map(i => `- ${i.med.name} (Qty: ${i.med.quantity})`).join('\n')}`,
+            status: 'sent',
+          });
+        } catch (dbErr) {
+          console.error('[NOTIFICATION LOG ERROR]', dbErr.message);
+        }
+      }
     };
 
-    htmlContent += addGroupTable('CRITICAL (Expiring &le; 30 Days)', grouped.CRITICAL, '#ef4444');
-    htmlContent += addGroupTable('WARNING (Expiring &le; 60 Days)', grouped.WARNING, '#f97316');
-    htmlContent += addGroupTable('CAUTION (Expiring &le; 90 Days)', grouped.CAUTION, '#eab308');
+    // 1. Send 1-Day Final Urgent Warning (Expires Tomorrow / Today)
+    if (oneDayUrgentList.length > 0) {
+      const subject = oneDayUrgentList.length === 1
+        ? `🚨 [URGENT 1-DAY FINAL ALERT] ${oneDayUrgentList[0].med.name} Expires Tomorrow!`
+        : `🚨 [URGENT 1-DAY FINAL ALERT] ${oneDayUrgentList.length} Medicines Expire Tomorrow!`;
 
-    htmlContent += `
-      <p style="font-size: 11px; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-        Pharmadesk Medicine System - Scheduled Automation Report
-      </p>
-    `;
+      await sendBatchAlert({
+        subject,
+        headerBg: 'linear-gradient(135deg, #b91c1c 0%, #dc2626 100%)',
+        badgeText: 'FINAL URGENT EXPIRY WARNING',
+        title: 'Medicines Expiring Tomorrow!',
+        description: 'The following medicines are reaching their final day before expiry. Immediate clearance or final sale is critical today.',
+        actionNotice: 'Sell immediately today or discard from shelves. Once expired, the billing module will strictly block their sale.',
+        items: oneDayUrgentList,
+        isCritical: true,
+      });
 
-    const medSummary = medicines.map((m) => {
-      const status = checkExpiryStatus(m.expiryDate);
-      const diffTime = new Date(m.expiryDate).getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / msInDay);
-      return `- ${m.name} (Rack: ${m.rackLocation || 'Not assigned'}) [${status}]: ${diffDays} days remaining.`;
-    }).join('\n');
-
-    const detailedMessage = `Daily Expiry Report:\n${medSummary}`;
-
-    const transporter = getEmailTransporter();
-
-    // Send emails to all staff members (pharmacists & superadmin)
-    for (const staffMember of staffUsers) {
-      try {
-        const isEthereal = transporter.options.host === 'smtp.ethereal.email';
-        
-        const mailOptions = {
-          from: `"Pharmadesk Notifications" <${process.env.SMTP_USER || 'no-reply@pharmadesk.com'}>`,
-          to: staffMember.email,
-          subject: '⚠️ Daily Expiry Report - Pharmadesk Pharmacy',
-          html: htmlContent,
-        };
-
-        if (isEthereal) {
-          console.log(`[MOCK EMAIL] Sent to ${staffMember.email}: Expiry Report`);
-        } else {
-          await transporter.sendMail(mailOptions);
-        }
-
-        // Log Notification in DB
-        await Notification.create({
-          recipientId: staffMember._id,
-          type: 'Email',
-          message: detailedMessage,
-          status: 'sent',
-        });
-      } catch (err) {
-        console.error(`Failed sending expiry report to ${staffMember.email}:`, err.message);
-        await Notification.create({
-          recipientId: staffMember._id,
-          type: 'Email',
-          message: `Daily Expiry Report failed: ${err.message}`,
-          status: 'failed',
-        });
+      // Mark expiryAlert1Sent = true
+      for (const { med } of oneDayUrgentList) {
+        await Medicine.findByIdAndUpdate(med._id, { expiryAlert1Sent: true });
       }
     }
 
-    return { status: 'success', message: 'Expiry reports processed' };
+    // 2. Send 10-Day Advance Warning
+    if (tenDaysWarningList.length > 0) {
+      const subject = tenDaysWarningList.length === 1
+        ? `⚠️ [10-Day Warning] Medicine Expiring Soon: ${tenDaysWarningList[0].med.name}`
+        : `⚠️ [10-Day Warning] ${tenDaysWarningList.length} Medicines Expiring in 10 Days`;
+
+      await sendBatchAlert({
+        subject,
+        headerBg: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+        badgeText: '10 DAYS TO EXPIRY ADVANCE ALERT',
+        title: 'Medicines Expiring in 10 Days',
+        description: 'The following medicines have approximately 10 days left before expiry. Plan clearance discounts or supplier returns now.',
+        actionNotice: 'Prioritize front-shelf sales, apply a promotion/discount, or initiate distributor return before expiry to prevent total financial loss.',
+        items: tenDaysWarningList,
+        isCritical: false,
+      });
+
+      // Mark expiryAlert10Sent = true
+      for (const { med } of tenDaysWarningList) {
+        await Medicine.findByIdAndUpdate(med._id, { expiryAlert10Sent: true });
+      }
+    }
+
+    // 3. Send Expired Alert
+    if (expiredList.length > 0) {
+      const subject = expiredList.length === 1
+        ? `⛔ [EXPIRED ALERT] ${expiredList[0].med.name} is Expired!`
+        : `⛔ [EXPIRED ALERT] ${expiredList.length} Medicines Have Expired`;
+
+      await sendBatchAlert({
+        subject,
+        headerBg: 'linear-gradient(135deg, #334155 0%, #475569 100%)',
+        badgeText: 'MEDICINE EXPIRED NOTICE',
+        title: 'Medicines Expired - Immediate Shelf Removal Required',
+        description: 'The following medicines have passed their expiry date. The system has automatically locked them from billing.',
+        actionNotice: 'Immediately remove these stocks from the physical racks and store in the quarantine/expiry bin for return or destruction.',
+        items: expiredList,
+        isCritical: true,
+      });
+
+      for (const { med } of expiredList) {
+        await Medicine.findByIdAndUpdate(med._id, { expiryAlertExpiredSent: true });
+      }
+    }
+
+    return {
+      status: 'success',
+      sent1DayAlerts: oneDayUrgentList.length,
+      sent10DayAlerts: tenDaysWarningList.length,
+      sentExpiredAlerts: expiredList.length,
+    };
   } catch (error) {
-    console.error('Error running expiry report cron:', error);
+    console.error('[Expiry Alert Engine Error]:', error);
     return { status: 'error', error: error.message };
   }
+};
+
+// Backwards compatibility wrapper for daily report
+export const runExpiryReport = async () => {
+  return await checkAndSendExpiryAlerts({ force: false });
 };
 
 // --- CRON JOB 2: Daily Low Stock Alert at 9:00 AM ---
@@ -428,16 +559,43 @@ export const runEmailReminders = async () => {
 
 // Initialize Cron Schedulers
 export const initializeNotificationScheduler = () => {
-  // Cron 1 — 8:00 AM daily (0 8 * * *)
-  cron.schedule('0 8 * * *', runExpiryReport);
-  console.log('Scheduled Expiry Report Cron Job (8:00 AM daily)');
+  // 1. Initial boot check: runs 5 seconds after server launch so DB connection is ready
+  setTimeout(async () => {
+    console.log('[Scheduler Boot] Running startup medicine expiry check...');
+    try {
+      await checkAndSendExpiryAlerts({ force: false });
+    } catch (err) {
+      console.error('[Scheduler Boot] Startup check failed:', err.message);
+    }
+  }, 5000);
+
+  // Cron 1A — Hourly Expiry Check (at minute 0 of every hour: 0 * * * *)
+  cron.schedule('0 * * * *', async () => {
+    console.log('[Hourly Cron] Running regular medicine expiry check...');
+    try {
+      await checkAndSendExpiryAlerts({ force: false });
+    } catch (err) {
+      console.error('[Hourly Cron] Expiry check failed:', err.message);
+    }
+  });
+  console.log('Scheduled Hourly Medicine Expiry Check (0 * * * *)');
+
+  // Cron 1B — 8:00 AM daily morning summary (0 8 * * *)
+  cron.schedule('0 8 * * *', async () => {
+    console.log('[Daily Morning Cron] Running 8:00 AM medicine expiry check...');
+    try {
+      await checkAndSendExpiryAlerts({ force: false });
+    } catch (err) {
+      console.error('[Daily Morning Cron] Expiry check failed:', err.message);
+    }
+  });
+  console.log('Scheduled Daily Morning Expiry Report (8:00 AM daily)');
 
   // Cron 2 — 9:00 AM daily (0 9 * * *)
   cron.schedule('0 9 * * *', runLowStockReport);
   console.log('Scheduled Low Stock Alert Cron Job (9:00 AM daily)');
 
   // Cron 3 — Every minute (* * * * *)
-  // Matches each reminder's configured hour and minute, and sends email instantly
   cron.schedule('* * * * *', runEmailReminders);
   console.log('Scheduled Customer Email Reminder Cron Job (every minute, time-matched)');
 
