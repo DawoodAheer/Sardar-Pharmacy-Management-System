@@ -9,7 +9,7 @@ import {
 
 const ThemeContext = createContext(null);
 
-const THEME_STORAGE_KEY = 'pharmadesk-theme';
+const THEME_STORAGE_KEY = 'sardar-pharmacy-theme';
 const VALID_THEMES = ['light', 'dark', 'system'];
 
 const getSystemTheme = () => {
