@@ -30,37 +30,9 @@ if (-not (Test-Path $TargetBat)) {
     exit 1
 }
 
-foreach ($DesktopPath in $PossibleDesktopPaths) {
-    $ShortcutPath = Join-Path $DesktopPath "Sardar Medical Store.lnk"
-    try {
-        $WshShell = New-Object -ComObject WScript.Shell
-        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-        $Shortcut.TargetPath = $TargetBat
-        $Shortcut.WorkingDirectory = $ProjectRoot
-        $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
-        
-        $shell32Path = "$env:SystemRoot\System32\shell32.dll"
-        if (Test-Path $shell32Path) {
-            $Shortcut.IconLocation = "$shell32Path, 14"
-        }
-        
-        $Shortcut.Save()
-        Write-Host "[OK] DESKTOP SHORTCUT CREATED AT: $ShortcutPath" -ForegroundColor Green
-    } catch {
-        Write-Host "[ERROR] Failed to create desktop shortcut at $DesktopPath: $_" -ForegroundColor Red
-    }
-}
-
 # -----------------------------------------------------------------
-# Shortcut 2: Desktop App Window (Chrome/Edge --app mode)
-# -----------------------------------------------------------------
-Write-Host ""
-Write-Host "Creating Desktop App Window shortcut..." -ForegroundColor Yellow
-
-$AppShortcutPath = Join-Path $DesktopPath "Sardar Medical Store App.lnk"
-$AppUrl = "http://localhost:5173"
-
 # Detect browser path: prefer Chrome, then Edge
+# -----------------------------------------------------------------
 $BrowserPath = ""
 $BrowserName = ""
 
@@ -93,41 +65,53 @@ if (-not $BrowserPath) {
     }
 }
 
-if ($BrowserPath) {
-    try {
-        $WshShell2 = New-Object -ComObject WScript.Shell
-        $AppShortcut = $WshShell2.CreateShortcut($AppShortcutPath)
-        $AppShortcut.TargetPath = $BrowserPath
-        $AppShortcut.Arguments = "--app=$AppUrl --new-window"
-        $AppShortcut.WorkingDirectory = $ProjectRoot
-        $AppShortcut.Description = "Sardar Medical Store - Desktop App Window (No Address Bar)"
-        
-        # Use browser icon
-        $AppShortcut.IconLocation = "$BrowserPath, 0"
-        
-        $AppShortcut.Save()
+$WshShell = New-Object -ComObject WScript.Shell
+$AppUrl = "http://localhost:5173"
 
-        Write-Host "[OK] DESKTOP SHORTCUT 2 CREATED: Sardar Medical Store App.lnk" -ForegroundColor Green
-        Write-Host "     (Opens in $BrowserName as a frameless desktop app window)" -ForegroundColor Gray
+foreach ($DesktopFolder in $PossibleDesktopPaths) {
+    # 1. Launcher Shortcut
+    try {
+        $ShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store.lnk"
+        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+        $Shortcut.TargetPath = $TargetBat
+        $Shortcut.WorkingDirectory = $ProjectRoot
+        $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
+        
+        $shell32Path = "$env:SystemRoot\System32\shell32.dll"
+        if (Test-Path $shell32Path) {
+            $Shortcut.IconLocation = "$shell32Path, 14"
+        }
+        
+        $Shortcut.Save()
+        Write-Host "[OK] DESKTOP LAUNCHER CREATED: $ShortcutPath" -ForegroundColor Green
     } catch {
-        Write-Host "[ERROR] Failed to create app shortcut: $_" -ForegroundColor Red
+        Write-Host "[WARN] Could not create launcher shortcut at $DesktopFolder" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "[WARN] Neither Google Chrome nor Microsoft Edge found." -ForegroundColor Yellow
-    Write-Host "       Skipping desktop app shortcut creation." -ForegroundColor Yellow
+
+    # 2. App Window Shortcut
+    if ($BrowserPath) {
+        try {
+            $AppShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store App.lnk"
+            $AppShortcut = $WshShell.CreateShortcut($AppShortcutPath)
+            $AppShortcut.TargetPath = $BrowserPath
+            $AppShortcut.Arguments = "--app=$AppUrl --new-window"
+            $AppShortcut.WorkingDirectory = $ProjectRoot
+            $AppShortcut.Description = "Sardar Medical Store - Desktop App Window (No Address Bar)"
+            $AppShortcut.IconLocation = "$BrowserPath, 0"
+            $AppShortcut.Save()
+            Write-Host "[OK] DESKTOP APP SHORTCUT CREATED: $AppShortcutPath" -ForegroundColor Green
+        } catch {
+            Write-Host "[WARN] Could not create app shortcut at $DesktopFolder" -ForegroundColor Yellow
+        }
+    }
 }
 
-# -----------------------------------------------------------------
-# Summary
-# -----------------------------------------------------------------
 Write-Host ""
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "  SHORTCUTS CREATED ON YOUR DESKTOP:" -ForegroundColor Green
-Write-Host "  1. Sardar Medical Store        — Full Docker launcher" -ForegroundColor White
-Write-Host "  2. Sardar Medical Store App    — Desktop app window" -ForegroundColor White
+Write-Host "  SHORTCUTS CREATED ON YOUR DESKTOP!" -ForegroundColor Green
+Write-Host "  1. Sardar Medical Store     -- Full Docker launcher" -ForegroundColor White
+Write-Host "  2. Sardar Medical Store App -- Frameless Desktop App Window" -ForegroundColor White
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Desktop Location: $DesktopPath" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Press any key to close..." -ForegroundColor Gray
 try { $null = [Console]::ReadKey() } catch {}
