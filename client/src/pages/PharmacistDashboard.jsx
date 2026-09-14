@@ -2197,7 +2197,7 @@ const PharmacistDashboard = () => {
 
         {/* HEADER */}
 
-        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-900/20 bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 px-6 py-3.5 shadow-md backdrop-blur-md dark:border-teal-500/20 dark:from-slate-950 dark:via-teal-950 dark:to-slate-950">
 
           <div className="flex items-center gap-3">
 
@@ -2214,11 +2214,11 @@ const PharmacistDashboard = () => {
 
             <div>
 
-              <div className="text-[10px] uppercase tracking-[0.18em] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">
+              <div className="text-[11px] uppercase tracking-[0.2em] font-semibold text-emerald-300">
                 Sardar Medical Store Operations
               </div>
 
-              <div className="text-sm font-bold capitalize text-slate-900 dark:text-slate-50 dark:text-slate-100">
+              <div className="text-base font-bold capitalize text-white drop-shadow-sm">
                 {activeTab.replace(
                   '-',
                   ' '
@@ -2229,13 +2229,13 @@ const PharmacistDashboard = () => {
 
           </div>
 
-          <div className="flex items-center gap-3 text-[10px] text-slate-600 dark:text-slate-400">
+          <div className="flex items-center gap-3.5 text-xs text-teal-100">
 
             <button
               onClick={
                 toggle
               }
-              className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-700 dark:text-slate-200 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-teal-700 dark:hover:bg-slate-700"
+              className="rounded-lg border border-white/20 bg-white/10 p-2 text-white transition hover:bg-white/20 hover:scale-105 active:scale-95"
               title="Toggle theme"
             >
               {resolvedTheme ===
@@ -2244,14 +2244,14 @@ const PharmacistDashboard = () => {
                 : '◐'}
             </button>
 
-            <span className="text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-1.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 text-xs text-emerald-200 shadow-inner">
               Server:{' '}
-              <strong className="text-emerald-600 dark:text-emerald-400">
+              <strong className="text-emerald-300 font-semibold">
                 Online
               </strong>
-            </span>
+            </div>
 
-            <span className="hidden sm:inline">
+            <span className="hidden sm:inline font-medium text-teal-100/90 bg-white/10 px-3 py-1 rounded-full border border-white/10">
               {new Date().toLocaleDateString(
                 undefined,
                 {

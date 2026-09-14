@@ -41,8 +41,8 @@ const sendOrderStatusEmail = async (bill, status, rejectionReason = '') => {
   const accepted = status === 'ACCEPTED';
 
   const subject = accepted
-    ? `PharmaDesk Order ${bill.billNumber} Accepted`
-    : `PharmaDesk Order ${bill.billNumber} Rejected`;
+    ? `Sardar Medical Store Order ${bill.billNumber} Accepted`
+    : `Sardar Medical Store Order ${bill.billNumber} Rejected`;
 
   const text = accepted
     ? `Hello ${bill.customerId?.name || 'Customer'},
@@ -51,7 +51,7 @@ Your order ${bill.billNumber} has been received and accepted by the pharmacist.
 
 Total: PKR ${Number(bill.total || 0).toFixed(2)}
 
-Thank you for using PharmaDesk.`
+Thank you for using Sardar Medical Store.`
     : `Hello ${bill.customerId?.name || 'Customer'},
 
 Your order ${bill.billNumber} has been rejected by the pharmacist.
@@ -385,7 +385,7 @@ export const generateBillPDF = async (
       .fillColor('#0ea5e9')
       .fontSize(22)
       .text(
-        'PHARMADESK',
+        'SARDAR MEDICAL STORE',
         50,
         45,
         {
@@ -730,7 +730,7 @@ export const generateBillPDF = async (
       .fillColor('#64748b')
       .fontSize(9)
       .text(
-        'Thank you for choosing Pharmadesk. Wishing you strong health!',
+        'Thank you for choosing Sardar Medical Store. Wishing you strong health!',
         50,
         720,
         {

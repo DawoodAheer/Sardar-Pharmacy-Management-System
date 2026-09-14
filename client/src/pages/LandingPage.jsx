@@ -675,7 +675,7 @@ export default function LandingPage() {
             Ready to Upgrade Your Medicine Management?
           </h2>
           <p className="text-sm sm:text-base text-blue-100 max-w-xl mx-auto leading-relaxed">
-            Join Pharmadesk today. Experience intelligent quality checking, rapid prescription billing, and automated patient reminders.
+            Join Sardar Medical Store today. Experience intelligent quality checking, rapid prescription billing, and automated patient reminders.
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-2">
             {user ? (
@@ -712,10 +712,10 @@ export default function LandingPage() {
             <div className="w-7 h-7 rounded-lg bg-[#1A56A0] flex items-center justify-center text-white text-xs font-bold">
               ⚕
             </div>
-            <span className="font-bold text-slate-900 dark:text-white">Pharmadesk AI Medicine Quality System</span>
+            <span className="font-bold text-slate-900 dark:text-white">Sardar Medical Store Management System</span>
           </div>
           <div>
-            <span>&copy; 2026 Pharmadesk. Final Year Engineering Project. All rights reserved.</span>
+            <span>&copy; 2026 Sardar Medical Store. All rights reserved.</span>
           </div>
         </div>
       </footer>

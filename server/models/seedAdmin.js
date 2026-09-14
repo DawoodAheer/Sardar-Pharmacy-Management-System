@@ -16,7 +16,7 @@ const createSuperAdmin = async () => {
 
     const adminEmail = "aheerdawood014@gmail.com";
     const adminPassword = "Dawood@@5786";
-    const adminName = "Dawood PharmaDesk Super Admin";
+    const adminName = "Dawood Sardar Medical Store Super Admin";
 
     // Check if admin already exists
     const existingAdmin = await User.findOne({

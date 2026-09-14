@@ -856,7 +856,7 @@ const CustomerBills = () => {
                       {selectedBill
                         .pharmacistId
                         ?.name ||
-                        'Pharmadesk'}
+                        'Sardar Medical Store'}
                     </p>
 
                   </div>

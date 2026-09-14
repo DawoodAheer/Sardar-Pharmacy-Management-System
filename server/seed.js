@@ -255,7 +255,7 @@ async function seedData() {
       {
         recipientId: customer._id,
         type: 'SMS',
-        message: 'Pharmadesk Reminder: Time to take your Paracetamol 500mg. Keep healthy!',
+        message: 'Sardar Medical Store Reminder: Time to take your Paracetamol 500mg. Keep healthy!',
         status: 'sent',
       }
     ]);

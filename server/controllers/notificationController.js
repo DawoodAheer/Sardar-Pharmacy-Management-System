@@ -115,7 +115,7 @@ export const logBrowserNotification = async (req, res, next) => {
   }
 
   try {
-    const messageText = `Pharmadesk Reminder: Time to take your ${medicineName}. Keep healthy!`;
+    const messageText = `Sardar Medical Store Reminder: Time to take your ${medicineName}. Keep healthy!`;
 
     const log = await Notification.create({
       recipientId: req.user._id,

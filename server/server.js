@@ -109,7 +109,7 @@ app.use(
 
 // Base Route
 app.get("/", (req, res) => {
-  res.send("Pharmadesk API is running...");
+  res.send("Sardar Medical Store API is running...");
 });
 
 // Register API Routes

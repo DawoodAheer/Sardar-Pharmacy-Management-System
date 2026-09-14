@@ -339,7 +339,7 @@ export const runLowStockReport = async () => {
 
     // Build low stock HTML report
     let htmlContent = `
-      <h2 style="color: #0f172a; font-family: sans-serif;">Pharmadesk Low Stock Alert</h2>
+      <h2 style="color: #0f172a; font-family: sans-serif;">Sardar Medical Store Low Stock Alert</h2>
       <p style="color: #475569; font-family: sans-serif;">The following medicines have fallen below their configured reorder thresholds:</p>
       <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; text-align: left; border-color: #cbd5e1;">
         <tr style="background-color: #f8fafc; color: #334155;">
@@ -371,7 +371,7 @@ export const runLowStockReport = async () => {
     htmlContent += `
       </table>
       <p style="font-size: 11px; color: #64748b; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-        Pharmadesk Medicine System - Stock Alert Notification
+        Sardar Medical Store System - Stock Alert Notification
       </p>
     `;
 
@@ -390,9 +390,9 @@ export const runLowStockReport = async () => {
       try {
         const isEthereal = transporter.options.host === 'smtp.ethereal.email';
         const mailOptions = {
-          from: `"Pharmadesk Notifications" <${process.env.SMTP_USER || 'no-reply@pharmadesk.com'}>`,
+          from: `"Sardar Medical Store Notifications" <${process.env.SMTP_USER || 'no-reply@sardarmedical.com'}>`,
           to: pharmacist.email,
-          subject: '⚠️ Stock Replenishment Alert - Pharmadesk Pharmacy',
+          subject: '⚠️ Stock Replenishment Alert - Sardar Medical Store',
           html: htmlContent,
         };
 
@@ -452,7 +452,7 @@ const buildReminderEmailHtml = (medicineName, customerName) => {
             💊 Rx
           </div>
           <h2 style="color: #0f172a; margin: 12px 0 4px; font-size: 18px;">Medication Reminder</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 0;">Pharmadesk Health Alert</p>
+          <p style="color: #64748b; font-size: 13px; margin: 0;">Sardar Medical Store Health Alert</p>
         </div>
         
         <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px; padding: 16px; text-align: center; margin: 16px 0;">
@@ -465,12 +465,12 @@ const buildReminderEmailHtml = (medicineName, customerName) => {
         </div>
 
         <p style="color: #475569; font-size: 13px; line-height: 1.6; margin: 16px 0 0;">
-          Hi <strong>${customerName}</strong>, this is your scheduled medication reminder from Pharmadesk.
+          Hi <strong>${customerName}</strong>, this is your scheduled medication reminder from Sardar Medical Store.
           Please take your prescribed dose of <strong>${medicineName}</strong> as directed by your doctor.
         </p>
 
         <p style="color: #94a3b8; font-size: 11px; margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center;">
-          Pharmadesk Medicine System — Automated Health Reminder
+          Sardar Medical Store System — Automated Health Reminder
         </p>
       </div>
     </div>
@@ -514,13 +514,13 @@ export const runEmailReminders = async () => {
         continue;
       }
 
-      const messageText = `Pharmadesk Reminder: Time to take your ${reminder.medicineName}. Keep healthy!`;
+      const messageText = `Sardar Medical Store Reminder: Time to take your ${reminder.medicineName}. Keep healthy!`;
 
       try {
         const htmlContent = buildReminderEmailHtml(reminder.medicineName, customer.name);
 
         const mailOptions = {
-          from: `"Pharmadesk Reminders" <${process.env.SMTP_USER || 'no-reply@pharmadesk.com'}>`,
+          from: `"Sardar Medical Store Reminders" <${process.env.SMTP_USER || 'no-reply@sardarmedical.com'}>`,
           to: customer.email,
           subject: `💊 Reminder: Time to take ${reminder.medicineName}`,
           html: htmlContent,

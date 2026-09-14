@@ -27,7 +27,7 @@ import { useAuth } from '../context/AuthContext';
 |--------------------------------------------------------------------------
 | Currency
 |--------------------------------------------------------------------------
-| PharmaDesk uses Pakistani Rupees.
+| Sardar Medical Store uses Pakistani Rupees.
 */
 const formatPKR = (value) => {
   const amount = Number(value) || 0;
