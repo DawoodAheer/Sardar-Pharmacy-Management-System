@@ -16,12 +16,12 @@ Write-Host "     Sardar Medical Store DESKTOP SHORTCUT CREATOR        " -Foregro
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
 
-$DesktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+$PossibleDesktopPaths = @(
+    [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop),
+    "$env:USERPROFILE\Desktop",
+    "$env:USERPROFILE\OneDrive\Desktop"
+) | Select-Object -Unique | Where-Object { Test-Path $_ }
 
-# -----------------------------------------------------------------
-# Shortcut 1: Docker Launcher (Start-Sardar-Pharmacy.bat)
-# -----------------------------------------------------------------
-$ShortcutPath = Join-Path $DesktopPath "Sardar Medical Store.lnk"
 $TargetBat = Join-Path $ProjectRoot "Start-Sardar-Pharmacy.bat"
 
 if (-not (Test-Path $TargetBat)) {
@@ -30,25 +30,25 @@ if (-not (Test-Path $TargetBat)) {
     exit 1
 }
 
-try {
-    $WshShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-    $Shortcut.TargetPath = $TargetBat
-    $Shortcut.WorkingDirectory = $ProjectRoot
-    $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
-    
-    # Try to set standard shell icon
-    $shell32Path = "$env:SystemRoot\System32\shell32.dll"
-    if (Test-Path $shell32Path) {
-        $Shortcut.IconLocation = "$shell32Path, 14"
+foreach ($DesktopPath in $PossibleDesktopPaths) {
+    $ShortcutPath = Join-Path $DesktopPath "Sardar Medical Store.lnk"
+    try {
+        $WshShell = New-Object -ComObject WScript.Shell
+        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+        $Shortcut.TargetPath = $TargetBat
+        $Shortcut.WorkingDirectory = $ProjectRoot
+        $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
+        
+        $shell32Path = "$env:SystemRoot\System32\shell32.dll"
+        if (Test-Path $shell32Path) {
+            $Shortcut.IconLocation = "$shell32Path, 14"
+        }
+        
+        $Shortcut.Save()
+        Write-Host "[OK] DESKTOP SHORTCUT CREATED AT: $ShortcutPath" -ForegroundColor Green
+    } catch {
+        Write-Host "[ERROR] Failed to create desktop shortcut at $DesktopPath: $_" -ForegroundColor Red
     }
-    
-    $Shortcut.Save()
-
-    Write-Host "[OK] DESKTOP SHORTCUT 1 CREATED: Sardar Medical Store.lnk" -ForegroundColor Green
-    Write-Host "     (Docker launcher + full startup pipeline)" -ForegroundColor Gray
-} catch {
-    Write-Host "[ERROR] Failed to create desktop shortcut: $_" -ForegroundColor Red
 }
 
 # -----------------------------------------------------------------
