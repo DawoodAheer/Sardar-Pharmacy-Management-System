@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Copy Backup to External Drive
+TITLE Sardar Medical Store - Copy Backup to External Drive
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
 

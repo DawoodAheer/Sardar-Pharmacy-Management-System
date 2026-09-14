@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy - 1-Click Desktop Launcher Script (PowerShell)
+# Sardar Medical Store - 1-Click Desktop Launcher Script (PowerShell)
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +9,7 @@ $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "         SARDAR PHARMACY MANAGEMENT SYSTEM           " -ForegroundColor Green
+Write-Host "         Sardar Medical Store MANAGEMENT SYSTEM           " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Project Location: $ProjectRoot" -ForegroundColor Gray
 Write-Host ""
@@ -91,7 +91,7 @@ Write-Host "[OK] Docker Engine is ready and active!" -ForegroundColor Green
 # Step 2: Start Docker Compose Stack (Preserving Persistent Volumes)
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/5] Starting Sardar Pharmacy Docker Services..." -ForegroundColor Yellow
+Write-Host "[2/5] Starting Sardar Medical Store Docker Services..." -ForegroundColor Yellow
 
 # NEVER use -v or destructive flags here
 try {
@@ -175,7 +175,7 @@ if ($frontendReady) {
 # Step 4: System Ready & Automatic Browser Launch
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/5] Launching Sardar Pharmacy Portal..." -ForegroundColor Yellow
+Write-Host "[4/5] Launching Sardar Medical Store Portal..." -ForegroundColor Yellow
 $appUrl = "http://localhost:5173"
 
 try {
@@ -190,7 +190,7 @@ try {
 # ---------------------------------------------------------------------
 Write-Host ""
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "   SARDAR PHARMACY IS RUNNING & READY TO USE!        " -ForegroundColor Green
+Write-Host "   Sardar Medical Store IS RUNNING & READY TO USE!        " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Local URL: $appUrl" -ForegroundColor White
 Write-Host "Database : Local Offline MongoDB Container (Port 27017)" -ForegroundColor White

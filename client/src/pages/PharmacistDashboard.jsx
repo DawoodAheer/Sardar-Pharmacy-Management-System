@@ -2099,7 +2099,7 @@ const PharmacistDashboard = () => {
           <div>
 
             <div className="text-lg font-bold text-slate-900 dark:text-slate-50">
-              Sardar Pharmacy
+              Sardar Medical Store
             </div>
 
             <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">
@@ -2215,7 +2215,7 @@ const PharmacistDashboard = () => {
             <div>
 
               <div className="text-[10px] uppercase tracking-[0.18em] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">
-                Sardar Pharmacy Operations
+                Sardar Medical Store Operations
               </div>
 
               <div className="text-sm font-bold capitalize text-slate-900 dark:text-slate-50 dark:text-slate-100">

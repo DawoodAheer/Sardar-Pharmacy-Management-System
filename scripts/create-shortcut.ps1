@@ -1,8 +1,8 @@
 # =====================================================================
-# Sardar Pharmacy - Windows Desktop Shortcut Installer (PowerShell)
+# Sardar Medical Store - Windows Desktop Shortcut Installer (PowerShell)
 # Creates TWO shortcuts:
-#   1. Sardar Pharmacy (Docker Launcher)
-#   2. Sardar Pharmacy App (PWA-like Chrome/Edge window without address bar)
+#   1. Sardar Medical Store (Docker Launcher)
+#   2. Sardar Medical Store App (PWA-like Chrome/Edge window without address bar)
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +12,7 @@ $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "     SARDAR PHARMACY DESKTOP SHORTCUT CREATOR        " -ForegroundColor Green
+Write-Host "     Sardar Medical Store DESKTOP SHORTCUT CREATOR        " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -21,7 +21,7 @@ $DesktopPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFo
 # -----------------------------------------------------------------
 # Shortcut 1: Docker Launcher (Start-Sardar-Pharmacy.bat)
 # -----------------------------------------------------------------
-$ShortcutPath = Join-Path $DesktopPath "Sardar Pharmacy.lnk"
+$ShortcutPath = Join-Path $DesktopPath "Sardar Medical Store.lnk"
 $TargetBat = Join-Path $ProjectRoot "Start-Sardar-Pharmacy.bat"
 
 if (-not (Test-Path $TargetBat)) {
@@ -35,7 +35,7 @@ try {
     $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
     $Shortcut.TargetPath = $TargetBat
     $Shortcut.WorkingDirectory = $ProjectRoot
-    $Shortcut.Description = "Launch Sardar Pharmacy Management System (1-Click)"
+    $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
     
     # Try to set standard shell icon
     $shell32Path = "$env:SystemRoot\System32\shell32.dll"
@@ -45,7 +45,7 @@ try {
     
     $Shortcut.Save()
 
-    Write-Host "[OK] DESKTOP SHORTCUT 1 CREATED: Sardar Pharmacy.lnk" -ForegroundColor Green
+    Write-Host "[OK] DESKTOP SHORTCUT 1 CREATED: Sardar Medical Store.lnk" -ForegroundColor Green
     Write-Host "     (Docker launcher + full startup pipeline)" -ForegroundColor Gray
 } catch {
     Write-Host "[ERROR] Failed to create desktop shortcut: $_" -ForegroundColor Red
@@ -57,7 +57,7 @@ try {
 Write-Host ""
 Write-Host "Creating Desktop App Window shortcut..." -ForegroundColor Yellow
 
-$AppShortcutPath = Join-Path $DesktopPath "Sardar Pharmacy App.lnk"
+$AppShortcutPath = Join-Path $DesktopPath "Sardar Medical Store App.lnk"
 $AppUrl = "http://localhost:5173"
 
 # Detect browser path: prefer Chrome, then Edge
@@ -100,14 +100,14 @@ if ($BrowserPath) {
         $AppShortcut.TargetPath = $BrowserPath
         $AppShortcut.Arguments = "--app=$AppUrl --new-window"
         $AppShortcut.WorkingDirectory = $ProjectRoot
-        $AppShortcut.Description = "Sardar Pharmacy - Desktop App Window (No Address Bar)"
+        $AppShortcut.Description = "Sardar Medical Store - Desktop App Window (No Address Bar)"
         
         # Use browser icon
         $AppShortcut.IconLocation = "$BrowserPath, 0"
         
         $AppShortcut.Save()
 
-        Write-Host "[OK] DESKTOP SHORTCUT 2 CREATED: Sardar Pharmacy App.lnk" -ForegroundColor Green
+        Write-Host "[OK] DESKTOP SHORTCUT 2 CREATED: Sardar Medical Store App.lnk" -ForegroundColor Green
         Write-Host "     (Opens in $BrowserName as a frameless desktop app window)" -ForegroundColor Gray
     } catch {
         Write-Host "[ERROR] Failed to create app shortcut: $_" -ForegroundColor Red
@@ -123,8 +123,8 @@ if ($BrowserPath) {
 Write-Host ""
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "  SHORTCUTS CREATED ON YOUR DESKTOP:" -ForegroundColor Green
-Write-Host "  1. Sardar Pharmacy        — Full Docker launcher" -ForegroundColor White
-Write-Host "  2. Sardar Pharmacy App    — Desktop app window" -ForegroundColor White
+Write-Host "  1. Sardar Medical Store        — Full Docker launcher" -ForegroundColor White
+Write-Host "  2. Sardar Medical Store App    — Desktop app window" -ForegroundColor White
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Desktop Location: $DesktopPath" -ForegroundColor Gray

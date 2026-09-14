@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Database Restore Utility
+TITLE Sardar Medical Store - Database Restore Utility
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
 

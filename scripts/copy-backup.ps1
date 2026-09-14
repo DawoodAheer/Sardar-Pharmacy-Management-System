@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy — Copy Backups to External Drive Utility (PowerShell)
+# Sardar Medical Store — Copy Backups to External Drive Utility (PowerShell)
 # =====================================================================
 
 param(
@@ -13,7 +13,7 @@ $ProjectRoot = Resolve-Path "$ScriptDir\.." | Select-Object -ExpandProperty Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "     SARDAR PHARMACY EXTERNAL DRIVE BACKUP COPY      " -ForegroundColor Green
+Write-Host "     Sardar Medical Store EXTERNAL DRIVE BACKUP COPY      " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
 

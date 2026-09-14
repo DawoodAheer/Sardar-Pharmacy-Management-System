@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy - Safe Database Restore Utility (PowerShell)
+# Sardar Medical Store - Safe Database Restore Utility (PowerShell)
 # =====================================================================
 
 param(
@@ -13,7 +13,7 @@ $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "       [WARN] SARDAR PHARMACY DATABASE RESTORE       " -ForegroundColor Red
+Write-Host "       [WARN] Sardar Medical Store DATABASE RESTORE       " -ForegroundColor Red
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Project Location: $ProjectRoot" -ForegroundColor Gray
 Write-Host ""

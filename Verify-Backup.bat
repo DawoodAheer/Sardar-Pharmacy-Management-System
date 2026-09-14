@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Backup Verifier
+TITLE Sardar Medical Store - Backup Verifier
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
 

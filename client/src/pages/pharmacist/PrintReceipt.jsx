@@ -325,7 +325,7 @@ const PrintReceipt = () => {
 
                   <div>
                     <h1 className="text-2xl font-extrabold tracking-tight">
-                      Sardar Pharmacy
+                      Sardar Medical Store
                     </h1>
 
                     <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-blue-100 print:text-slate-500">

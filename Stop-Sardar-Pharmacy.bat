@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Safe Shutdown
+TITLE Sardar Medical Store - Safe Shutdown
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
 

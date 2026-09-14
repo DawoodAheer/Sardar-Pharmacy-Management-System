@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Create Desktop Shortcut
+TITLE Sardar Medical Store - Create Desktop Shortcut
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
 

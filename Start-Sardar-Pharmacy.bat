@@ -1,5 +1,5 @@
 @echo off
-TITLE Sardar Pharmacy - Starting Application...
+TITLE Sardar Medical Store - Starting Application...
 :: Determine batch script directory safely
 SET "SCRIPT_DIR=%~dp0"
 CD /D "%SCRIPT_DIR%"
@@ -9,6 +9,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%scripts\start-p
 
 IF %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Sardar Pharmacy launcher encountered an issue.
+    echo [ERROR] Sardar Medical Store launcher encountered an issue.
     pause
 )

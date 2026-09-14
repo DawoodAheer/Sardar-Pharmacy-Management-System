@@ -405,7 +405,7 @@ export default function LandingPage() {
             Built for High-Precision Pharmacy Operations
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Discover the 3 integrated pillars of Sardar Pharmacy: Quality Scanning, POS Dispensing, and Patient Adherence.
+                  Discover the 3 integrated pillars of Sardar Medical Store: Quality Scanning, POS Dispensing, and Patient Adherence.
           </p>
         </div>
 

@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy - Safe Shutdown Script (PowerShell)
+# Sardar Medical Store - Safe Shutdown Script (PowerShell)
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +9,7 @@ $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "         SARDAR PHARMACY SAFE SHUTDOWN               " -ForegroundColor Red
+Write-Host "         Sardar Medical Store SAFE SHUTDOWN               " -ForegroundColor Red
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Project Location: $ProjectRoot" -ForegroundColor Gray
 Write-Host ""
@@ -20,7 +20,7 @@ Write-Host "Stopping Docker containers safely..." -ForegroundColor Yellow
 try {
     docker compose stop
     Write-Host ""
-    Write-Host "[OK] All Sardar Pharmacy services stopped successfully!" -ForegroundColor Green
+    Write-Host "[OK] All Sardar Medical Store services stopped successfully!" -ForegroundColor Green
     Write-Host "[DATA SAFE] Your MongoDB database and file uploads are preserved." -ForegroundColor Cyan
     Write-Host "You can restart the application anytime using 'Start-Sardar-Pharmacy.bat'." -ForegroundColor Gray
 } catch {

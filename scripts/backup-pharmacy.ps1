@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy — Database & Uploads Backup Utility (PowerShell)
+# Sardar Medical Store — Database & Uploads Backup Utility (PowerShell)
 # =====================================================================
 
 param(
@@ -52,7 +52,7 @@ function Write-Log {
 }
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "       SARDAR PHARMACY BACKUP GENERATOR              " -ForegroundColor Green
+Write-Host "       Sardar Medical Store BACKUP GENERATOR              " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Backup Type: $BackupType" -ForegroundColor Gray
 Write-Host "Timestamp  : $Timestamp" -ForegroundColor Gray

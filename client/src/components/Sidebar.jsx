@@ -41,7 +41,7 @@ const Sidebar = () => {
             <Pill className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold text-slate-900 dark:text-slate-50">Sardar Pharmacy</div>
+            <div className="truncate text-sm font-bold text-slate-900 dark:text-slate-50">Sardar Medical Store</div>
             <div className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-700 dark:text-teal-300">{portalLabel}</div>
           </div>
         </div>

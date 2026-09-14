@@ -129,7 +129,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
     const transporter = getEmailTransporter();
     const isEthereal = transporter.options && transporter.options.host === 'smtp.ethereal.email';
-    const sender = `"Sardar Pharmacy Alerts" <${process.env.SMTP_USER || 'no-reply@sardarpharmacy.com'}>`;
+    const sender = `"Sardar Medical Store Alerts" <${process.env.SMTP_USER || 'no-reply@sardarpharmacy.com'}>`;
 
     // --- Helper to send formatted alert email to all staff ---
     const sendBatchAlert = async ({ subject, headerBg, badgeText, title, description, actionNotice, items, isCritical }) => {
@@ -164,7 +164,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
                   ${badgeText}
                 </span>
                 <h1 style="margin:12px 0 6px; font-size:22px; font-weight:800; letter-spacing:-0.5px;">${title}</h1>
-                <p style="margin:0; font-size:14px; opacity:0.95;">Sardar Pharmacy Management System</p>
+                <p style="margin:0; font-size:14px; opacity:0.95;">Sardar Medical Store Management System</p>
               </td>
             </tr>
             <tr>
@@ -190,7 +190,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
             </tr>
             <tr>
               <td style="background:#f8fafc; padding:16px 32px; border-top:1px solid #e2e8f0; text-align:center; font-size:12px; color:#94a3b8;">
-                Sardar Pharmacy Automation System &bull; Intelligent Real-Time Expiry Sentinel
+                Sardar Medical Store Automation System &bull; Intelligent Real-Time Expiry Sentinel
               </td>
             </tr>
           </table>

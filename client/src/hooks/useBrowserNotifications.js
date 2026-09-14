@@ -177,7 +177,7 @@ const useBrowserNotifications = () => {
 
       try {
         const notification = new Notification(
-          'Sardar Pharmacy Medicine Reminder',
+          'Sardar Medical Store Medicine Reminder',
           {
             body: `It is time to take your ${reminder.medicineName}.`,
             icon: '/favicon.ico',

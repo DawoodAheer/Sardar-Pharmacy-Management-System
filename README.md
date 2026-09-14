@@ -121,7 +121,7 @@ Before running the application, make sure the target system has the following so
 ```env
 PORT=5000
 NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/Sardar Pharmacy
+MONGO_URI=mongodb://localhost:27017/Sardar Medical Store
 JWT_ACCESS_SECRET=your_access_token_secret_here
 JWT_REFRESH_SECRET=your_refresh_token_secret_here
 CLIENT_URL=http://localhost:5173
@@ -135,8 +135,8 @@ SMTP_PASS=your-gmail-app-password
 
 #### 💡 Environment Config Notes for Different Systems:
 * **`MONGO_URI`**:
-  * If running **local MongoDB**, use `mongodb://localhost:27017/Sardar Pharmacy`. (On some systems, if `localhost` fails to connect, try `mongodb://127.0.0.1:27017/Sardar Pharmacy`).
-  * If running **MongoDB Atlas cloud**, replace it with your Atlas connection string (e.g., `mongodb+srv://username:password@cluster.xxxx.mongodb.net/Sardar Pharmacy?retryWrites=true&w=majority`).
+  * If running **local MongoDB**, use `mongodb://localhost:27017/Sardar Medical Store`. (On some systems, if `localhost` fails to connect, try `mongodb://127.0.0.1:27017/Sardar Medical Store`).
+  * If running **MongoDB Atlas cloud**, replace it with your Atlas connection string (e.g., `mongodb+srv://username:password@cluster.xxxx.mongodb.net/Sardar Medical Store?retryWrites=true&w=majority`).
 * **`JWT Secrets`**:
   * You can generate high-entropy secure keys on any platform by executing this command in your terminal:
     ```bash

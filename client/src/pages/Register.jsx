@@ -200,7 +200,7 @@ const Register = () => {
   const steps = [
     'Fill in your personal details',
     'Your customer account is created securely',
-    'Start using Sardar Pharmacy',
+    'Start using Sardar Medical Store',
   ];
 
   return (
@@ -250,7 +250,7 @@ const Register = () => {
 
           <div>
             <span className="block font-bold text-lg tracking-tight text-white">
-              Sardar Pharmacy
+              Sardar Medical Store
             </span>
 
             <span className="block text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-0.5">

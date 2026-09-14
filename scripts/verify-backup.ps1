@@ -1,5 +1,5 @@
 # =====================================================================
-# Sardar Pharmacy - Backup Verification Utility (PowerShell)
+# Sardar Medical Store - Backup Verification Utility (PowerShell)
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
@@ -9,7 +9,7 @@ $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 Set-Location $ProjectRoot
 
 Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "       [INFO] SARDAR PHARMACY BACKUP VERIFIER        " -ForegroundColor Green
+Write-Host "       [INFO] Sardar Medical Store BACKUP VERIFIER        " -ForegroundColor Green
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host "Project Location: $ProjectRoot" -ForegroundColor Gray
 Write-Host ""
