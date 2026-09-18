@@ -1,3 +1,7 @@
+param (
+    [switch]$NoPause
+)
+
 # =====================================================================
 # Sardar Medical Store - Windows Desktop Shortcut Installer (PowerShell)
 # Creates TWO shortcuts:
@@ -26,7 +30,7 @@ $TargetBat = Join-Path $ProjectRoot "Start-Sardar-Pharmacy.bat"
 
 if (-not (Test-Path $TargetBat)) {
     Write-Host "[ERROR] Target batch launcher file not found at: $TargetBat" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
+    if (-not $NoPause) { Read-Host "Press Enter to exit..." }
     exit 1
 }
 
@@ -113,5 +117,7 @@ Write-Host "  1. Sardar Medical Store     -- Full Docker launcher" -ForegroundCo
 Write-Host "  2. Sardar Medical Store App -- Frameless Desktop App Window" -ForegroundColor White
 Write-Host "=====================================================" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Press any key to close..." -ForegroundColor Gray
-try { $null = [Console]::ReadKey() } catch {}
+if (-not $NoPause) {
+    Write-Host "Press any key to close..." -ForegroundColor Gray
+    try { $null = [Console]::ReadKey() } catch {}
+}

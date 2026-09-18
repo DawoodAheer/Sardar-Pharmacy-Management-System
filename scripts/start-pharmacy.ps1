@@ -202,5 +202,16 @@ Write-Host "  * Pharmacist : mlksardar6@gmail.com      / Password: Dawood@@5786"
 Write-Host "  * Customer   : aheerraza0@gmail.com      / Password: Dawood@@5786" -ForegroundColor Gray
 Write-Host ""
 Write-Host "To stop the system safely anytime, run 'Stop-Sardar-Pharmacy.bat'." -ForegroundColor Gray
+Write-Host ""
+
+# Automatically create the Desktop App shortcut so the user doesn't have to run it manually
+Write-Host "[INFO] Generating Desktop App Shortcuts..." -ForegroundColor Cyan
+try {
+    & "$ScriptDir\create-shortcut.ps1" -NoPause
+} catch {
+    Write-Host "[WARN] Shortcut generation skipped or failed." -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "Press any key to close this console window..." -ForegroundColor Gray
 try { $null = [Console]::ReadKey() } catch {}
