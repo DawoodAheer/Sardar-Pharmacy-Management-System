@@ -205,14 +205,7 @@ const InStoreBilling = () => {
         {/* Header */}
         <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm text-white sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleBackToLookup}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-              aria-label="Back to customer lookup"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </button>
+            
 
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -238,12 +231,12 @@ const InStoreBilling = () => {
                 Customer
               </p>
               <p className="max-w-[220px] truncate text-xs font-bold text-white">
-                {customer?.name || 'Guest Customer'}
+                {customerName || 'Guest Customer'}
               </p>
             </div>
             <span className="mx-1 h-6 w-px bg-white/30" />
             <p className="text-xs font-medium text-emerald-50/90">
-              {phone}
+              {customerPhone}
             </p>
           </div>
         </div>
@@ -253,44 +246,6 @@ const InStoreBilling = () => {
           {/* Left side */}
           <div className="space-y-5">
             <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              {/* Customer strip */}
-              <div className="flex flex-col gap-3 border-b border-slate-100 p-5 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
-                    <User className="h-4 w-4" />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Billing Customer
-                    </p>
-                    <div className="mt-0.5 flex min-w-0 items-center gap-2">
-                      <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">
-                        {customer?.name || 'Guest Customer'}
-                      </p>
-
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-                          isGuest
-                            ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
-                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-                        }`}
-                      >
-                        {isGuest ? 'Guest' : 'Registered'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleBackToLookup}
-                  className="self-start rounded-xl px-3 py-2 text-xs font-bold text-blue-600 transition hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 sm:self-auto"
-                >
-                  Change customer
-                </button>
-              </div>
-
               {/* Search */}
               <div className="p-5">
                 <div className="mb-2 flex items-center justify-between gap-3">
@@ -528,7 +483,10 @@ const InStoreBilling = () => {
 
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
                               <span>
-                                Unit price:{' '}
+                                Purchase: <strong className="text-slate-600 dark:text-slate-300">{formatPKR(item.purchasePrice || 0)}</strong>
+                              </span>
+                              <span>
+                                Sale Price:{' '}
                                 <input
                                   type="number"
                                   min="0"
@@ -642,7 +600,7 @@ const InStoreBilling = () => {
               </div>
 
               <div className="space-y-5 pt-5">
-                {/* Customer */}
+                {/* Customer Info */}
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -670,22 +628,44 @@ const InStoreBilling = () => {
                   </div>
                 </div>
 
-                {/* Payment */}
-                <div>
-                  <p className="mb-2.5 text-xs font-bold text-slate-700 dark:text-slate-200">
-                    Payment Method
-                  </p>
-
-                  <div className="grid grid-cols-1 gap-2">
-                    <button
-                      type="button"
-                      className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-blue-50 px-2 py-3 text-sm font-bold text-blue-700 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300"
-                    >
-                      <Banknote className="h-4 w-4" />
-                      Cash Payment
-                    </button>
-                  </div>
+                {/* Payment - Cash Only */}
+                <div className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-blue-50 px-2 py-2.5 text-sm font-bold text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300">
+                  <Banknote className="h-4 w-4" />
+                  Cash Payment
                 </div>
+
+                {/* Confirm & Print Bill - AT THE TOP */}
+                <button
+                  type="button"
+                  onClick={handleConfirmBill}
+                  disabled={
+                    cartItems.length === 0 ||
+                    billLoading ||
+                    hasExpiredItems
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {billLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Processing payment...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Confirm & Print Bill
+                    </>
+                  )}
+                </button>
+
+                {billError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{billError}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Discount */}
                 <div>
@@ -777,55 +757,7 @@ const InStoreBilling = () => {
                       <Receipt className="h-7 w-7 text-blue-200" />
                     </div>
                   </div>
-                
-                <div className="pt-4">
-                  {/* Confirm */}
-                <button
-                  type="button"
-                  onClick={handleConfirmBill}
-                  disabled={
-                    cartItems.length === 0 ||
-                    billLoading ||
-                    hasExpiredItems
-                  }
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {billLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Processing payment...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      Confirm & Print Bill
-                    </>
-                  )}
-                </button>
                 </div>
-                </div>
-
-                {/* Error */}
-                {billError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{billError}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Compliance */}
-                <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-[10px] leading-4 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Expired medicines are blocked from checkout. Stock limits
-                    are enforced while quantities are adjusted.
-                  </span>
-                </div>
-
-                
-
                 {hasExpiredItems && (
                   <p className="text-center text-[10px] font-semibold text-red-600 dark:text-red-400">
                     Remove expired medicines before confirming the bill.
