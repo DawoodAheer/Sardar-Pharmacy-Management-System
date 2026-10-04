@@ -19,6 +19,7 @@ const CustomerReminders = lazy(() => import('./pages/CustomerReminders'));
 const CustomerProfile = lazy(() => import('./pages/CustomerProfile'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const PrintReceipt = lazy(() => import('./pages/pharmacist/PrintReceipt'));
+const UdharManagement = lazy(() => import('./pages/UdharManagement'));
 
 const RouteFallback = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-[var(--page-bg)] px-4">
@@ -82,6 +83,16 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['pharmacist', 'superadmin']}>
             <PrintReceipt />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Udhar Khata */}
+      <Route
+        path="/udhar"
+        element={
+          <ProtectedRoute allowedRoles={['pharmacist', 'superadmin']}>
+            <UdharManagement />
           </ProtectedRoute>
         }
       />

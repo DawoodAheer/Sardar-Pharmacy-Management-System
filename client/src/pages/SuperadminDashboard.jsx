@@ -7,6 +7,9 @@ import {
 
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import ProfitDetailsModal from '../components/ProfitDetailsModal';
+import StockAdjustmentModal from '../components/StockAdjustmentModal';
+import SalesReturnModal from '../components/SalesReturnModal';
 
 import {
   AlertCircle,
@@ -441,6 +444,13 @@ export default function SuperadminDashboard() {
   const [message, setMessage] =
     useState('');
 
+  const [isProfitModalOpen, setIsProfitModalOpen] =
+    useState(false);
+  const [stockAdjMedicine, setStockAdjMedicine] =
+    useState(null);
+  const [returnModalBill, setReturnModalBill] =
+    useState(null);
+
   /* =======================================================
      USERS
   ======================================================= */
@@ -515,6 +525,17 @@ export default function SuperadminDashboard() {
           '/bills/sales-summary'
         );
 
+      return response.data;
+    },
+  });
+
+  const {
+    data: profitSummary,
+    isLoading: isProfitLoading,
+  } = useQuery({
+    queryKey: ['profitSummary'],
+    queryFn: async () => {
+      const response = await api.get('/bills/profit-summary');
       return response.data;
     },
   });
@@ -1331,6 +1352,57 @@ export default function SuperadminDashboard() {
 
           </div>
 
+        </section>
+
+        {/* PROFIT SUMMARY */}
+        <section>
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Profit & Analytics Summary
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Net profit calculated from sales revenue minus purchase cost.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsProfitModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+            >
+              <BarChart3 size={18} />
+              View Profit Details Breakdown
+            </button>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                Today's Profit
+              </p>
+              <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {isProfitLoading ? '...' : getCurrency(profitSummary?.dailyProfit || 0)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                This Month's Profit
+              </p>
+              <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {isProfitLoading ? '...' : getCurrency(profitSummary?.monthlyProfit || 0)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                This Year's Profit
+              </p>
+              <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {isProfitLoading ? '...' : getCurrency(profitSummary?.yearlyProfit || 0)}
+              </p>
+            </div>
+          </div>
         </section>
 
         {/* USER MANAGEMENT */}
@@ -3186,6 +3258,23 @@ export default function SuperadminDashboard() {
 
         </div>
       )}
+
+      <ProfitDetailsModal
+        isOpen={isProfitModalOpen}
+        onClose={() => setIsProfitModalOpen(false)}
+      />
+
+      <StockAdjustmentModal
+        isOpen={Boolean(stockAdjMedicine)}
+        onClose={() => setStockAdjMedicine(null)}
+        medicine={stockAdjMedicine}
+      />
+
+      <SalesReturnModal
+        isOpen={Boolean(returnModalBill)}
+        onClose={() => setReturnModalBill(null)}
+        bill={returnModalBill}
+      />
     </div>
   );
 }

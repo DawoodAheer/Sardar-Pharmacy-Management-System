@@ -20,6 +20,17 @@ const billItemSchema = new mongoose.Schema({
     required: true,
     min: [0, 'UnitPrice cannot be negative'],
   },
+  // Custom sale price set by pharmacist for this specific bill (may differ from default price)
+  salePrice: {
+    type: Number,
+    min: [0, 'Sale price cannot be negative'],
+    default: null,
+  },
+  // Purchase / cost price at time of billing (for profit tracking)
+  purchasePrice: {
+    type: Number,
+    default: 0,
+  },
   expiryStatus: {
     type: String,
     required: true,
@@ -31,6 +42,43 @@ const billItemSchema = new mongoose.Schema({
   rackLocation: {
     type: String,
     default: '',
+  },
+});
+
+const returnItemSchema = new mongoose.Schema({
+  medicineId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Medicine',
+    required: true,
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  quantityReturned: {
+    type: Number,
+    required: true,
+    min: [1, 'Quantity returned must be at least 1'],
+  },
+  unitPrice: {
+    type: Number,
+    required: true,
+  },
+  refundAmount: {
+    type: Number,
+    required: true,
+  },
+  reason: {
+    type: String,
+    default: 'Customer Return',
+  },
+  returnedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  returnedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
 });
 
@@ -121,6 +169,19 @@ const billSchema = new mongoose.Schema(
       required: true,
       enum: ['Cash', 'Card', 'UPI'],
       default: 'Card',
+    },
+
+    returns: [returnItemSchema],
+
+    isReturned: {
+      type: Boolean,
+      default: false,
+    },
+
+    totalRefunded: {
+      type: Number,
+      default: 0,
+      min: [0, 'Total refunded cannot be negative'],
     },
   },
   {

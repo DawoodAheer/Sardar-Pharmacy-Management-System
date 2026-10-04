@@ -8,6 +8,11 @@ import {
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import ProfitDetailsModal from '../components/ProfitDetailsModal';
+import StockAdjustmentModal from '../components/StockAdjustmentModal';
+import SalesReturnModal from '../components/SalesReturnModal';
+import UdharManagement from './UdharManagement';
+import * as XLSX from 'xlsx';
 
 import {
   BarChart,
@@ -54,6 +59,8 @@ import {
   Tag,
   Layers,
   ClipboardList,
+  ShoppingCart,
+  ArrowRight,
 } from 'lucide-react';
 
 // ============================================================================
@@ -300,6 +307,14 @@ const PharmacistDashboard = () => {
     useState('10');
   const [price, setPrice] =
     useState('');
+  const [purchasePrice, setPurchasePrice] =
+    useState('');
+  const [isProfitModalOpen, setIsProfitModalOpen] =
+    useState(false);
+  const [stockAdjMedicine, setStockAdjMedicine] =
+    useState(null);
+  const [returnModalBill, setReturnModalBill] =
+    useState(null);
   const [category, setCategory] =
     useState('Antibiotic');
   const [barcode, setBarcode] =
@@ -393,8 +408,10 @@ const PharmacistDashboard = () => {
   // BULK IMPORT
   // ==========================================================================
 
-  const [bulkJson, setBulkJson] =
-    useState('');
+  const [importMode, setImportMode] = useState('excel'); // 'excel' or 'json'
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkData, setBulkData] = useState([]);
+  const [bulkJson, setBulkJson] = useState('');
 
   const [bulkError, setBulkError] =
     useState('');
@@ -604,6 +621,21 @@ const PharmacistDashboard = () => {
           '/bills/sales-summary'
         );
 
+      return response.data || {};
+    },
+  });
+
+  // ==========================================================================
+  // PROFIT SUMMARY
+  // ==========================================================================
+
+  const {
+    data: profitSummary,
+    isLoading: isProfitLoading,
+  } = useQuery({
+    queryKey: ['profitSummary'],
+    queryFn: async () => {
+      const response = await api.get('/bills/profit-summary');
       return response.data || {};
     },
   });
@@ -822,6 +854,8 @@ const PharmacistDashboard = () => {
           }.`
         );
 
+        setBulkFile(null);
+        setBulkData([]);
         setBulkJson('');
       },
 
@@ -847,6 +881,7 @@ const PharmacistDashboard = () => {
     setQuantity('');
     setReorderLevel('10');
     setPrice('');
+    setPurchasePrice('');
     setCategory('Antibiotic');
     setBarcode('');
     setRackLocation('');
@@ -892,6 +927,10 @@ const PharmacistDashboard = () => {
 
     setPrice(
       medicine?.price ?? ''
+    );
+
+    setPurchasePrice(
+      medicine?.purchasePrice ?? ''
     );
 
     setCategory(
@@ -1112,6 +1151,7 @@ const PharmacistDashboard = () => {
           reorderLevel || 0
         ),
       price: Number(price),
+      purchasePrice: Number(purchasePrice) || 0,
       category,
       barcode:
         barcode.trim(),
@@ -1260,6 +1300,71 @@ const PharmacistDashboard = () => {
   // BULK
   // ==========================================================================
 
+  const downloadExcelTemplate = () => {
+    const templateData = [
+      {
+        name: 'Panadol',
+        manufacturer: 'GSK',
+        purchasePrice: 400,
+        price: 450,
+        quantity: 500,
+        expiryDate: '15/08/25',
+        rackLocation: 'R-02-B',
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Medicines');
+    XLSX.writeFile(wb, 'Medicine_Bulk_Import_Template.xlsx');
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBulkFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'dd/mm/yy' });
+        
+        const parsedData = data.map((row) => {
+          let parsedExpiry = null;
+          if (row.expiryDate) {
+             const parts = row.expiryDate.split('/');
+             if(parts.length === 3) {
+               let year = parseInt(parts[2], 10);
+               if(year < 100) year += 2000;
+               parsedExpiry = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).toISOString();
+             } else {
+               parsedExpiry = new Date(row.expiryDate).toISOString();
+             }
+          }
+
+          return {
+            name: row.name || row.Name || row['Medicine Name'],
+            manufacturer: row.manufacturer || row.Manufacturer || row['Manufacture Company'],
+            purchasePrice: Number(row.purchasePrice || row['Purchase Price'] || 0),
+            price: Number(row.price || row['Sale Price'] || 0),
+            quantity: Number(row.quantity || row.Quantity || 0),
+            expiryDate: parsedExpiry,
+            rackLocation: row.rackLocation || row.Rack || row['Rack Location'] || '',
+          };
+        });
+
+        setBulkData(parsedData);
+        setBulkError('');
+      } catch (err) {
+        setBulkError('Error parsing Excel file. Ensure it matches the template.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
   const handleBulkSubmit = (
     event
   ) => {
@@ -1268,35 +1373,29 @@ const PharmacistDashboard = () => {
     setBulkError('');
     setBulkSuccess('');
 
-    if (!bulkJson.trim()) {
-      setBulkError(
-        'Please enter JSON data'
-      );
-
-      return;
-    }
-
-    try {
-      const parsed =
-        JSON.parse(
-          bulkJson
-        );
-
-      if (!Array.isArray(parsed)) {
+    if (importMode === 'excel') {
+      if (!bulkData || bulkData.length === 0) {
         setBulkError(
-          'Please provide a JSON array'
+          'Please upload a valid Excel file with medicines'
         );
-
         return;
       }
-
-      bulkImportMutation.mutate(
-        parsed
-      );
-    } catch {
-      setBulkError(
-        'Invalid JSON format'
-      );
+      bulkImportMutation.mutate(bulkData);
+    } else {
+      if (!bulkJson.trim()) {
+        setBulkError('Please enter JSON data');
+        return;
+      }
+      try {
+        const parsed = JSON.parse(bulkJson);
+        if (!Array.isArray(parsed)) {
+          setBulkError('Please provide a JSON array');
+          return;
+        }
+        bulkImportMutation.mutate(parsed);
+      } catch {
+        setBulkError('Invalid JSON format');
+      }
     }
   };
 
@@ -2042,6 +2141,12 @@ const PharmacistDashboard = () => {
     },
 
     {
+      name: 'Udhar Khata',
+      tab: 'udhar',
+      icon: Wallet,
+    },
+
+    {
       name: 'Orders',
       tab: 'orders',
       icon: ClipboardList,
@@ -2547,6 +2652,28 @@ const PharmacistDashboard = () => {
 
                 </button>
 
+              </div>
+
+              {/* PROFIT ANALYTICS SUMMARY CARD */}
+              <div className="mt-4 p-5 bg-gradient-to-r from-emerald-900 to-teal-900 rounded-2xl text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-base flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                    Profit & Analytics Summary
+                  </h3>
+                  <p className="text-xs text-emerald-100 mt-1">
+                    Today's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.dailyProfit || 0)}</span> | 
+                    This Month's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.monthlyProfit || 0)}</span> | 
+                    This Year's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.yearlyProfit || 0)}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsProfitModalOpen(true)}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow"
+                >
+                  <BarChart className="w-4 h-4" />
+                  View Medicine Profit Details
+                </button>
               </div>
 
               {/* QUICK ACTIONS */}
@@ -3376,6 +3503,32 @@ const PharmacistDashboard = () => {
                 </div>
               )}
 
+              {billItems.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-500/30 bg-emerald-50 p-4 dark:bg-emerald-950/40 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow">
+                      <ShoppingCart className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-900 dark:text-emerald-100">
+                        {billItems.reduce((sum, item) => sum + (item.billQuantity || 1), 0)} Item(s) Selected in Bill Cart
+                      </p>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+                        You can keep searching & adding medicines. Click button when ready to open bill.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('new-bill')}
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-emerald-700 hover:scale-105"
+                  >
+                    <span>Open Bill Page ({billItems.length} Medicines)</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
 
                 <div className="relative md:col-span-2">
@@ -3701,6 +3854,17 @@ const PharmacistDashboard = () => {
                                     title="View Details"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      handleAddToBill(medicine);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-600 transition hover:scale-110"
+                                    title="Add to Bill (Items remain selected as you search)"
+                                    disabled={medicine.quantity === 0 || medicine.expiryStatus === 'EXPIRED'}
+                                  >
+                                    <ShoppingCart className="w-3.5 h-3.5" />
                                   </button>
 
                                   <button
@@ -4476,6 +4640,13 @@ const PharmacistDashboard = () => {
           )}
 
           {/* ================================================================= */}
+          {/* UDHAR KHATA */}
+          {/* ================================================================= */}
+          {activeTab === 'udhar' && (
+            <UdharManagement />
+          )}
+
+          {/* ================================================================= */}
           {/* SETTINGS */}
           {/* ================================================================= */}
 
@@ -4900,6 +5071,23 @@ const PharmacistDashboard = () => {
                   min="0"
                   step="0.01"
                   value={
+                    purchasePrice
+                  }
+                  onChange={(event) =>
+                    setPurchasePrice(
+                      event.target.value
+                    )
+                  }
+                  placeholder="Purchase Price (PKR)"
+                  className="border rounded-lg px-3 py-2 text-xs"
+                />
+
+                <input
+                  required
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={
                     price
                   }
                   onChange={(event) =>
@@ -4907,7 +5095,7 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Price (PKR)"
+                  placeholder="Sale Price (PKR)"
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
@@ -5086,39 +5274,62 @@ const PharmacistDashboard = () => {
               }
               className="space-y-3"
             >
+              <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
+                <button
+                  type="button"
+                  onClick={() => setImportMode('excel')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'excel' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  Excel File Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImportMode('json')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'json' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  JSON Upload
+                </button>
+              </div>
 
-              <textarea
-                rows={10}
-                value={
-                  bulkJson
-                }
-                onChange={(event) =>
-                  setBulkJson(
-                    event.target.value
-                  )
-                }
-                placeholder={`[
-  {
-    "name": "Panadol 500mg",
-    "genericName": "Paracetamol",
-    "manufacturer": "GSK",
-    "expiryDate": "2028-01-01",
-    "price": 450,
-    "quantity": 500,
-    "reorderLevel": 50,
-    "category": "Analgesic",
-    "rackLocation": "R-02-B"
-  }
-]`}
-                className="w-full border rounded-lg p-3 font-mono text-xs"
-              />
+              {importMode === 'excel' ? (
+                <>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-xs text-slate-500">Upload Excel file (.xlsx) with medicine data.</p>
+                    <button type="button" onClick={downloadExcelTemplate} className="text-blue-600 hover:text-blue-800 underline text-xs font-semibold transition">
+                      Download Sample Excel
+                    </button>
+                  </div>
+                  
+                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-slate-50 transition hover:bg-slate-100">
+                    <Upload className="h-10 w-10 text-slate-400 mb-3" />
+                    <label className="bg-white border border-slate-200 text-slate-700 shadow-sm px-4 py-2 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-50 hover:text-slate-900 transition">
+                      Select Excel File
+                      <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    {bulkFile && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg w-full text-center">
+                        <p className="text-xs text-slate-600 font-semibold">{bulkFile.name}</p>
+                        <p className="text-xs text-blue-700 font-bold mt-1">{bulkData.length} items found</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <textarea
+                  rows={10}
+                  value={bulkJson}
+                  onChange={(event) => setBulkJson(event.target.value)}
+                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "genericName": "Paracetamol",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "price": 450,\n    "quantity": 500,\n    "reorderLevel": 50,\n    "category": "Analgesic",\n    "rackLocation": "R-02-B"\n  }\n]`}
+                  className="w-full border rounded-lg p-3 font-mono text-xs"
+                />
+              )}
 
               <button
                 type="submit"
                 disabled={
-                  bulkImportMutation.isPending
+                  bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
                 }
-                className="w-full py-2 bg-blue-700 text-white rounded-lg text-xs font-bold"
+                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold shadow hover:brightness-110 disabled:opacity-50 transition"
               >
                 {
                   bulkImportMutation.isPending
@@ -5448,6 +5659,16 @@ const PharmacistDashboard = () => {
               </div>
 
               <div className="flex justify-end gap-2 mt-5">
+
+                <button
+                  onClick={() => {
+                    setStockAdjMedicine(selectedMedicine);
+                  }}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Adjust Stock
+                </button>
 
                 <button
                   onClick={() => {
@@ -5948,7 +6169,7 @@ const PharmacistDashboard = () => {
 
                 <div className="p-3 bg-blue-50 rounded-xl">
                   <div className="text-[10px] uppercase text-blue-500 font-bold">
-                    Total
+                    Original Bill Total
                   </div>
 
                   <div className="text-sm font-bold text-blue-700 mt-2">
@@ -5960,86 +6181,132 @@ const PharmacistDashboard = () => {
 
               </div>
 
+              {/* NET SALE AMOUNT AFTER REFUND */}
+              {selectedBill.isReturned && (selectedBill.totalRefunded || 0) > 0 && (
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-4">
+                  <h4 className="text-xs font-bold text-amber-800 dark:text-amber-300 mb-3 flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Return & Refund Summary
+                  </h4>
+                  <div className="grid grid-cols-3 gap-3 text-xs">
+                    <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-amber-200 dark:border-amber-900/40">
+                      <div className="text-[10px] uppercase text-slate-500 font-bold">Original Total</div>
+                      <div className="font-bold text-slate-700 dark:text-slate-200 mt-1">{getCurrency(selectedBill.total)}</div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-red-200 dark:border-red-900/40">
+                      <div className="text-[10px] uppercase text-red-500 font-bold">Total Refunded</div>
+                      <div className="font-bold text-red-600 dark:text-red-400 mt-1">- {getCurrency(selectedBill.totalRefunded || 0)}</div>
+                    </div>
+                    <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3 border border-emerald-300 dark:border-emerald-900/50">
+                      <div className="text-[10px] uppercase text-emerald-700 font-bold">Net Sale Amount</div>
+                      <div className="font-bold text-emerald-700 dark:text-emerald-400 mt-1">
+                        {getCurrency(Math.max(0, (selectedBill.total || 0) - (selectedBill.totalRefunded || 0)))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-5 border rounded-xl overflow-hidden">
 
-                <div className="p-3 bg-slate-50 border-b">
-
-                  <h4 className="text-xs font-bold">
-                    Bill Items
-                  </h4>
-
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 border-b flex items-center justify-between">
+                  <h4 className="text-xs font-bold">Bill Items</h4>
+                  {selectedBill.isReturned && (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                      Some items returned
+                    </span>
+                  )}
                 </div>
 
-                {Array.isArray(
-                  selectedBill.items
-                ) &&
-                selectedBill.items.length >
-                  0 ? (
+                {Array.isArray(selectedBill.items) && selectedBill.items.length > 0 ? (
+                  selectedBill.items.map((item, index) => {
+                    // Calculate how many of this item were returned
+                    const returnedQty = (selectedBill.returns || [])
+                      .filter((r) => String(r.medicineId) === String(item.medicineId))
+                      .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
 
-                  selectedBill.items.map(
-                    (
-                      item,
-                      index
-                    ) => (
+                    const netQty = (item.quantity || 0) - returnedQty;
+                    const unitPrice = item.salePrice || item.unitPrice || 0;
+                    const originalLineTotal = unitPrice * (item.quantity || 0);
+                    const netLineTotal = unitPrice * Math.max(0, netQty);
+                    const isFullyReturned = returnedQty >= (item.quantity || 0);
 
+                    return (
                       <div
-                        key={
-                          item._id ||
-                          `${item.medicineId}-${index}`
-                        }
-                        className="p-3 border-b last:border-0 flex items-center justify-between gap-3"
+                        key={item._id || `${item.medicineId}-${index}`}
+                        className={`p-3 border-b last:border-0 flex items-center justify-between gap-3 ${
+                          isFullyReturned ? 'bg-red-50/50 dark:bg-red-950/10 opacity-70' : ''
+                        }`}
                       >
-
-                        <div>
-
-                          <div className="text-xs font-bold">
-                            {
-                              item.name ||
-                              'Medicine'
-                            }
+                        <div className="flex-1">
+                          <div className={`text-xs font-bold ${isFullyReturned ? 'line-through text-slate-400' : ''}`}>
+                            {item.name || 'Medicine'}
                           </div>
-
-                          <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-1">
-                            Qty:{' '}
-                            {
-                              item.quantity ??
-                              0
-                            }{' '}
-                            ×{' '}
-                            {getCurrency(
-                              item.unitPrice
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            {isFullyReturned ? (
+                              <span className="text-red-500 font-semibold">All {item.quantity} returned</span>
+                            ) : returnedQty > 0 ? (
+                              <>
+                                <span className="line-through text-slate-400">{item.quantity}</span>
+                                {' → '}
+                                <span className="font-bold text-emerald-700">{netQty} sold</span>
+                                {' '}
+                                <span className="text-amber-600">({returnedQty} returned)</span>
+                                {' × '}{getCurrency(unitPrice)}
+                              </>
+                            ) : (
+                              <>Qty: {item.quantity} × {getCurrency(unitPrice)}</>
                             )}
                           </div>
-
                         </div>
 
-                        <div className="text-xs font-bold">
-
-                          {getCurrency(
-                            Number(
-                              item.unitPrice ||
-                                0
-                            ) *
-                              Number(
-                                item.quantity ||
-                                  0
-                              )
+                        <div className="text-right">
+                          {returnedQty > 0 && !isFullyReturned && (
+                            <div className="text-[10px] text-slate-400 line-through">{getCurrency(originalLineTotal)}</div>
                           )}
-
+                          <div className={`text-xs font-bold ${
+                            isFullyReturned ? 'text-red-400 line-through' : 'text-slate-900 dark:text-white'
+                          }`}>
+                            {isFullyReturned ? getCurrency(originalLineTotal) : getCurrency(netLineTotal)}
+                          </div>
+                          {isFullyReturned && (
+                            <div className="text-[10px] font-bold text-red-500 mt-0.5">Refunded</div>
+                          )}
                         </div>
-
                       </div>
-
-                    )
-                  )
-
+                    );
+                  })
                 ) : (
-
                   <div className="p-5 text-center text-xs text-slate-600 dark:text-slate-400">
                     No bill items available.
                   </div>
-
                 )}
+
+                {/* NET TOTALS FOOTER */}
+                <div className="border-t bg-slate-50 dark:bg-slate-800/60 px-3 py-3 space-y-1">
+                  <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
+                    <span>Subtotal</span>
+                    <span>{getCurrency(selectedBill.subtotal || selectedBill.total)}</span>
+                  </div>
+                  {(selectedBill.discount || 0) > 0 && (
+                    <div className="flex justify-between text-xs text-slate-600">
+                      <span>Discount</span>
+                      <span>- {getCurrency(selectedBill.discount)}</span>
+                    </div>
+                  )}
+                  {(selectedBill.totalRefunded || 0) > 0 && (
+                    <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400 font-semibold">
+                      <span>Total Refunded</span>
+                      <span>- {getCurrency(selectedBill.totalRefunded)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm font-bold text-slate-900 dark:text-white border-t pt-2 mt-1">
+                    <span>Net Sale Amount</span>
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      {getCurrency(Math.max(0, (selectedBill.total || 0) - (selectedBill.totalRefunded || 0)))}
+                    </span>
+                  </div>
+                </div>
 
               </div>
 
@@ -6055,6 +6322,16 @@ const PharmacistDashboard = () => {
               </div>
 
               <div className="flex justify-end gap-2 mt-5">
+
+                <button
+                  onClick={() => {
+                    setReturnModalBill(selectedBill);
+                  }}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Return Items / Refund
+                </button>
 
                 <button
                   onClick={() =>
@@ -6209,6 +6486,22 @@ const PharmacistDashboard = () => {
         </div>
       )}
 
+      <ProfitDetailsModal
+        isOpen={isProfitModalOpen}
+        onClose={() => setIsProfitModalOpen(false)}
+      />
+
+      <StockAdjustmentModal
+        isOpen={Boolean(stockAdjMedicine)}
+        onClose={() => setStockAdjMedicine(null)}
+        medicine={stockAdjMedicine}
+      />
+
+      <SalesReturnModal
+        isOpen={Boolean(returnModalBill)}
+        onClose={() => setReturnModalBill(null)}
+        bill={returnModalBill}
+      />
     </div>
   );
 };

@@ -16,7 +16,9 @@ const Sidebar = () => {
           { name: 'Inventory Manager', path: '/pharmacist', icon: Pill },
         ];
       case 'pharmacist':
-        return [{ name: 'Inventory Manager', path: '/pharmacist', icon: Pill }];
+        return [
+          { name: 'Inventory Manager', path: '/pharmacist', icon: Pill },
+        ];
       case 'customer':
         return [
           { name: 'Dashboard', path: '/customer/dashboard', icon: LayoutDashboard },

@@ -19,8 +19,8 @@ const medicineSchema = new mongoose.Schema(
     // Manufacturer / company
     manufacturer: {
       type: String,
-      required: [true, 'Please add a manufacturer'],
       trim: true,
+      default: '',
     },
 
 
@@ -33,7 +33,6 @@ const medicineSchema = new mongoose.Schema(
     // Available stock
     quantity: {
       type: Number,
-      required: [true, 'Please add a quantity'],
       min: [0, 'Quantity cannot be negative'],
       default: 0,
     },
@@ -41,23 +40,29 @@ const medicineSchema = new mongoose.Schema(
     // Minimum stock level
     reorderLevel: {
       type: Number,
-      required: [true, 'Please add a reorder level'],
       min: [0, 'Reorder level cannot be negative'],
       default: 10,
     },
 
-    // Selling price
+    // Selling price (default sale rate)
     price: {
       type: Number,
       required: [true, 'Please add a price'],
       min: [0, 'Price cannot be negative'],
     },
 
+    // Purchase / cost price (what you paid — fixed, for profit calculation)
+    purchasePrice: {
+      type: Number,
+      min: [0, 'Purchase price cannot be negative'],
+      default: 0,
+    },
+
     // Medicine category
     category: {
       type: String,
-      required: [true, 'Please add a category'],
       trim: true,
+      default: '',
     },
 
     // Barcode / GTIN

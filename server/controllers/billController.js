@@ -1,6 +1,7 @@
 import Bill from '../models/Bill.js';
 import Medicine from '../models/Medicine.js';
 import User from '../models/User.js';
+import StockAdjustment from '../models/StockAdjustment.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
@@ -166,13 +167,20 @@ export const createBill = async (req, res, next) => {
         );
       }
 
-      subtotal += medicine.price * requestedQuantity;
+      // Use custom salePrice from request if pharmacist set it, otherwise default to medicine.price
+      const effectivePrice = (item.salePrice !== undefined && item.salePrice !== null && item.salePrice !== '')
+        ? Number(item.salePrice)
+        : medicine.price;
+
+      subtotal += effectivePrice * requestedQuantity;
 
       validatedItems.push({
         medicineId: medicine._id,
         name: medicine.name,
         quantity: requestedQuantity,
-        unitPrice: medicine.price,
+        unitPrice: effectivePrice,
+        salePrice: effectivePrice,
+        purchasePrice: medicine.purchasePrice || 0,
         expiryStatus,
         expiryDate: medicine.expiryDate,
         rackLocation: medicine.rackLocation || '',
@@ -236,6 +244,8 @@ export const createBill = async (req, res, next) => {
         name: item.name,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
+        salePrice: item.salePrice,
+        purchasePrice: item.purchasePrice,
         expiryStatus: item.expiryStatus,
         expiryDate: item.expiryDate,
         rackLocation: item.rackLocation,
@@ -385,7 +395,7 @@ export const generateBillPDF = async (
       .fillColor('#0ea5e9')
       .fontSize(22)
       .text(
-        'SARDAR MEDICAL STORE',
+        'SARDAR PHARMACY',
         50,
         45,
         {
@@ -395,7 +405,7 @@ export const generateBillPDF = async (
       .fillColor('#64748b')
       .fontSize(10)
       .text(
-        'Intelligent Pharmacy & Batch Portal',
+        'Main Ada Girote Near MCB Bank | Mobile: 03056091354',
         50,
         70,
         {
@@ -1545,3 +1555,282 @@ export const getSalesSummary = async (
     next(error);
   }
 };
+// @desc    Get profit summary (daily, monthly, yearly, custom date range)
+// @route   GET /api/bills/profit-summary
+// @access  Private/Pharmacist/Superadmin
+export const getProfitSummary = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'pharmacist' && req.user.role !== 'superadmin') {
+      res.status(403);
+      return next(new Error('Only pharmacists and superadmins can view profit summary'));
+    }
+
+    const { startDate, endDate } = req.query;
+    const matchStage = {
+      orderStatus: { $nin: ['PENDING', 'REJECTED'] },
+    };
+
+    if (startDate && endDate) {
+      matchStage.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    const bills = await Bill.find(matchStage);
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+
+    let dailyProfit = 0;
+    let monthlyProfit = 0;
+    let yearlyProfit = 0;
+    let customProfit = 0;
+    let customSales = 0;
+
+    bills.forEach((bill) => {
+      let totalCost = 0;
+      bill.items.forEach((item) => {
+        const returnedQty = (bill.returns || [])
+          .filter((r) => String(r.medicineId) === String(item.medicineId))
+          .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
+        const netQty = Math.max(0, (item.quantity || 0) - returnedQty);
+        totalCost += (item.purchasePrice || 0) * netQty;
+      });
+
+      const netTotal = Math.max(0, (bill.total || 0) - (bill.totalRefunded || 0));
+      const profit = netTotal - totalCost;
+      const billDate = new Date(bill.createdAt);
+
+      if (billDate >= startOfDay) dailyProfit += profit;
+      if (billDate >= startOfMonth) monthlyProfit += profit;
+      if (billDate >= startOfYear) yearlyProfit += profit;
+
+      if (startDate && endDate) {
+        customProfit += profit;
+        customSales += netTotal;
+      }
+    });
+
+    res.json({
+      success: true,
+      dailyProfit,
+      monthlyProfit,
+      yearlyProfit,
+      customRange: startDate && endDate ? { profit: customProfit, sales: customSales } : null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get detailed profit by medicine
+// @route   GET /api/bills/profit-details
+// @access  Private/Pharmacist/Superadmin
+export const getProfitDetails = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'pharmacist' && req.user.role !== 'superadmin') {
+      res.status(403);
+      return next(new Error('Only pharmacists and superadmins can view profit details'));
+    }
+
+    const { startDate, endDate } = req.query;
+    const matchStage = {
+      orderStatus: { $nin: ['PENDING', 'REJECTED'] },
+    };
+
+    if (startDate && endDate) {
+      matchStage.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    }
+
+    const bills = await Bill.find(matchStage);
+    const medicines = await Medicine.find().lean();
+    const medMap = {};
+    medicines.forEach((m) => {
+      medMap[String(m._id)] = m;
+    });
+
+    // Aggregate by medicine
+    const medicineProfitMap = {};
+
+    bills.forEach((bill) => {
+      // Calculate total discount ratio for the bill to apply proportionally
+      const subtotal = bill.subtotal || bill.total;
+      const discountRatio = (bill.discount > 0 && subtotal > 0) ? (bill.discount / subtotal) : 0;
+
+      bill.items.forEach((item) => {
+        const returnedQty = (bill.returns || [])
+          .filter((r) => String(r.medicineId) === String(item.medicineId))
+          .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
+        const netQty = Math.max(0, (item.quantity || 0) - returnedQty);
+
+        if (netQty === 0) return;
+
+        const medObj = medMap[String(item.medicineId)];
+        const itemPurchasePrice = item.purchasePrice ?? (medObj ? medObj.purchasePrice : 0);
+        const itemSalePrice = item.salePrice || item.unitPrice || (medObj ? medObj.price : 0);
+
+        if (!medicineProfitMap[item.medicineId]) {
+          medicineProfitMap[item.medicineId] = {
+            medicineId: item.medicineId,
+            name: item.name,
+            purchasePrice: itemPurchasePrice,
+            salePrice: itemSalePrice,
+            remainingStock: medObj ? medObj.quantity : 0,
+            quantitySold: 0,
+            totalCost: 0,
+            totalSales: 0,
+            totalProfit: 0,
+          };
+        }
+
+        const cost = itemPurchasePrice * netQty;
+        const grossSales = itemSalePrice * netQty;
+        const itemDiscount = grossSales * discountRatio;
+        const netSales = grossSales - itemDiscount;
+        const profit = netSales - cost;
+
+        medicineProfitMap[item.medicineId].quantitySold += netQty;
+        medicineProfitMap[item.medicineId].totalCost += cost;
+        medicineProfitMap[item.medicineId].totalSales += netSales;
+        medicineProfitMap[item.medicineId].totalProfit += profit;
+      });
+    });
+
+    const profitDetails = Object.values(medicineProfitMap).sort((a, b) => b.totalProfit - a.totalProfit);
+
+    res.json({
+      success: true,
+      profitDetails,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Process Sales Return (Return medicines & issue refund)
+// @route   POST /api/bills/:id/return
+// @access  Private/Pharmacist,Superadmin
+export const processSalesReturn = async (req, res, next) => {
+  const { id } = req.params;
+  const { returns } = req.body; // Array of { medicineId, quantityReturned, reason }
+
+  try {
+    if (!returns || !Array.isArray(returns) || returns.length === 0) {
+      res.status(400);
+      return next(new Error('Please provide at least one medicine item to return'));
+    }
+
+    const bill = await Bill.findById(id);
+    if (!bill) {
+      res.status(404);
+      return next(new Error('Bill not found'));
+    }
+
+    if (bill.orderStatus === 'REJECTED') {
+      res.status(400);
+      return next(new Error('Cannot process return on a rejected order'));
+    }
+
+    let totalRefundThisCall = 0;
+
+    for (const returnItem of returns) {
+      const { medicineId, quantityReturned, reason } = returnItem;
+      const qtyToReturn = Number(quantityReturned);
+
+      if (!medicineId || isNaN(qtyToReturn) || qtyToReturn <= 0) {
+        res.status(400);
+        return next(new Error('Invalid return item details'));
+      }
+
+      // Find original item in bill
+      const billItem = bill.items.find(
+        (item) => item.medicineId.toString() === medicineId.toString()
+      );
+
+      if (!billItem) {
+        res.status(404);
+        return next(new Error(`Medicine item not found in bill ${bill.billNumber}`));
+      }
+
+      // Calculate how many items of this medicine were already returned previously
+      const previouslyReturned = (bill.returns || [])
+        .filter((r) => r.medicineId.toString() === medicineId.toString())
+        .reduce((sum, r) => sum + r.quantityReturned, 0);
+
+      const availableToReturn = billItem.quantity - previouslyReturned;
+
+      if (qtyToReturn > availableToReturn) {
+        res.status(400);
+        return next(
+          new Error(
+            `Cannot return ${qtyToReturn} of "${billItem.name}". Maximum available to return is ${availableToReturn}.`
+          )
+        );
+      }
+
+      // Price calculation
+      const itemUnitPrice = billItem.salePrice || billItem.unitPrice || 0;
+      const refundAmount = itemUnitPrice * qtyToReturn;
+
+      // Restock medicine in Database
+      const medicine = await Medicine.findById(medicineId);
+      if (medicine) {
+        const prevQty = medicine.quantity;
+        medicine.quantity += qtyToReturn;
+        await medicine.save();
+
+        // Create StockAdjustment record
+        await StockAdjustment.create({
+          medicineId: medicine._id,
+          medicineName: medicine.name,
+          previousQuantity: prevQty,
+          newQuantity: medicine.quantity,
+          adjustmentType: 'ADD',
+          quantityChanged: qtyToReturn,
+          reason: `Sales Return (Bill #${bill.billNumber}): ${reason || 'Customer Return'}`,
+          adjustedBy: req.user._id,
+        });
+      }
+
+      // Push return item to bill
+      const returnRecord = {
+        medicineId: billItem.medicineId,
+        name: billItem.name,
+        quantityReturned: qtyToReturn,
+        unitPrice: itemUnitPrice,
+        refundAmount,
+        reason: reason?.trim() || 'Customer Sale Return',
+        returnedAt: new Date(),
+        returnedBy: req.user._id,
+      };
+
+      bill.returns.push(returnRecord);
+      totalRefundThisCall += refundAmount;
+    }
+
+    bill.totalRefunded = (bill.totalRefunded || 0) + totalRefundThisCall;
+    bill.isReturned = true;
+    await bill.save();
+
+    const updatedBill = await Bill.findById(bill._id)
+      .populate('pharmacistId', 'name email')
+      .populate('customerId', 'name email phone')
+      .populate('returns.returnedBy', 'name email role');
+
+    res.json({
+      success: true,
+      message: `Sales return processed successfully! Refunded: PKR ${totalRefundThisCall.toFixed(2)}`,
+      bill: updatedBill,
+      refundedAmount: totalRefundThisCall,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

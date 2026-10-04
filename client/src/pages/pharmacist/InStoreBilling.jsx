@@ -30,16 +30,6 @@ const PAYMENT_METHODS = [
     label: 'Cash',
     icon: Banknote,
   },
-  {
-    value: 'Card',
-    label: 'Card',
-    icon: CreditCard,
-  },
-  {
-    value: 'UPI',
-    label: 'Digital',
-    icon: Wallet,
-  },
 ];
 
 const formatPKR = (amount) =>
@@ -134,14 +124,9 @@ const InStoreBilling = () => {
   const queryClient = useQueryClient();
 
   const [confirmedBill, setConfirmedBill] = useState(null);
-  const [step, setStep] = useState('lookup');
 
-  const [phone, setPhone] = useState('');
-  const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupError, setLookupError] = useState('');
-  const [customer, setCustomer] = useState(null);
-  const [isGuest, setIsGuest] = useState(false);
-  const [lookupDone, setLookupDone] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
 
   const [cartItems, setCartItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -203,445 +188,18 @@ const InStoreBilling = () => {
     gcTime: 120000,
   });
 
-  const handleLookup = async () => {
-    const normalizedPhone = phone.trim();
-
-    if (!normalizedPhone) {
-      setLookupError('Please enter the customer phone number.');
-      return;
-    }
-
-    setLookupLoading(true);
-    setLookupError('');
-    setLookupDone(false);
-    setCustomer(null);
-    setIsGuest(false);
-
-    try {
-      const { data } = await api.get(
-        `/bills/lookup-customer?phone=${encodeURIComponent(normalizedPhone)}`
-      );
-
-      if (data?.found && data.customer) {
-        setCustomer(data.customer);
-        setIsGuest(false);
-      } else {
-        setCustomer(null);
-        setIsGuest(true);
-      }
-
-      setLookupDone(true);
-    } catch (error) {
-      setLookupError(
-        error?.response?.data?.message ||
-          'Customer lookup failed. Please try again.'
-      );
-    } finally {
-      setLookupLoading(false);
-    }
-  };
-
-  const handlePhoneChange = (event) => {
-    setPhone(event.target.value);
-    setLookupDone(false);
-    setCustomer(null);
-    setIsGuest(false);
-    setLookupError('');
-  };
-
-  const handleAddToCart = (medicine) => {
-    const medicineStock = toNumber(medicine.quantity);
-    const medicinePrice = toNumber(medicine.price);
-
-    if (medicine.expiryStatus === 'EXPIRED') {
-      setCartNotice(
-        `${medicine.name} cannot be sold because it has expired.`
-      );
-      return;
-    }
-
-    if (medicineStock <= 0) {
-      setCartNotice(`${medicine.name} is currently out of stock.`);
-      return;
-    }
-
-    setCartItems((currentItems) => {
-      const existingItem = currentItems.find(
-        (item) => item.medicineId === medicine._id
-      );
-
-      if (existingItem) {
-        if (existingItem.quantity >= existingItem.stock) {
-          return currentItems;
-        }
-
-        return currentItems.map((item) =>
-          item.medicineId === medicine._id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-              }
-            : item
-        );
-      }
-
-      return [
-        ...currentItems,
-        {
-          medicineId: medicine._id,
-          name: medicine.name,
-          quantity: 1,
-          unitPrice: medicinePrice,
-          expiryStatus: medicine.expiryStatus,
-          stock: medicineStock,
-          expiryDate: medicine.expiryDate,
-          rackLocation: medicine.rackLocation,
-        },
-      ];
-    });
-
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setCartNotice('');
-  };
-
-  const updateQuantity = (medicineId, newQuantity) => {
-    setCartItems((currentItems) =>
-      currentItems.flatMap((item) => {
-        if (item.medicineId !== medicineId) {
-          return [item];
-        }
-
-        if (newQuantity <= 0) {
-          return [];
-        }
-
-        if (newQuantity > item.stock) {
-          return [item];
-        }
-
-        return [
-          {
-            ...item,
-            quantity: newQuantity,
-          },
-        ];
-      })
-    );
-
-    setCartNotice('');
-  };
-
-  const handleRemoveFromCart = (medicineId) => {
-    setCartItems((currentItems) =>
-      currentItems.filter((item) => item.medicineId !== medicineId)
-    );
-
-    setCartNotice('');
-  };
-
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.unitPrice * item.quantity,
-    0
-  );
-
-  const safeDiscount = Math.min(
-    Math.max(toNumber(discount), 0),
-    subtotal
-  );
-
-  const total = Math.max(0, subtotal - safeDiscount);
-
-  const totalItems = cartItems.reduce(
-    (sum, item) => sum + item.quantity,
-    0
-  );
-
-  const hasExpiredItems = cartItems.some(
-    (item) => item.expiryStatus === 'EXPIRED'
-  );
-
-  const handleDiscountChange = (event) => {
-    const value = event.target.value;
-
-    if (value === '') {
-      setDiscount('');
-      return;
-    }
-
-    const numericValue = Math.max(0, Number(value) || 0);
-    setDiscount(numericValue > subtotal ? subtotal : numericValue);
-  };
-
-  const handleConfirmBill = async () => {
-    if (cartItems.length === 0) {
-      setBillError('Please add at least one medicine to the bill.');
-      return;
-    }
-
-    if (hasExpiredItems) {
-      setBillError(
-        'Expired medicines must be removed before the bill can be confirmed.'
-      );
-      return;
-    }
-
-    if (safeDiscount > subtotal) {
-      setBillError('Discount cannot be greater than the subtotal.');
-      return;
-    }
-
-    setBillLoading(true);
-    setBillError('');
-
-    try {
-      const body = {
-        customerPhone: phone.trim(),
-        customerId: customer?._id || null,
-        customerName: customer?.name || 'Guest',
-        paymentMethod,
-        discount: safeDiscount,
-        items: cartItems.map(
-          ({
-            medicineId,
-            name,
-            quantity,
-            unitPrice,
-            expiryStatus,
-          }) => ({
-            medicineId,
-            name,
-            quantity,
-            unitPrice,
-            expiryStatus,
-          })
-        ),
-      };
-
-      const { data } = await api.post('/bills/instore', body);
-
-      if (!data?.bill) {
-        throw new Error('The server did not return a confirmed bill.');
-      }
-
-      setConfirmedBill(data.bill);
-
-      await queryClient.invalidateQueries({
-        queryKey: ['bills'],
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: ['medicines'],
-      });
-
-      setCartItems([]);
-      setDiscount('');
-      setPaymentMethod('Cash');
-      setBillError('');
-    } catch (error) {
-      setBillError(
-        error?.response?.data?.message ||
-          error?.message ||
-          'Billing failed. Please try again.'
-      );
-    } finally {
-      setBillLoading(false);
-    }
-  };
-
   const handleStartNewBill = () => {
     setConfirmedBill(null);
-    setStep('lookup');
-    setPhone('');
-    setCustomer(null);
-    setIsGuest(false);
-    setLookupDone(false);
-    setLookupError('');
-    setLookupLoading(false);
-    setCartItems([]);
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setPaymentMethod('Cash');
-    setDiscount('');
-    setBillError('');
-    setCartNotice('');
-  };
-
-  const handleBackToLookup = () => {
-    setStep('lookup');
     setCartItems([]);
     setSearchQuery('');
     setDebouncedSearch('');
     setBillError('');
     setCartNotice('');
+    setCustomerName('');
+    setCustomerPhone('');
   };
 
-  /*
-   * CUSTOMER LOOKUP SCREEN
-   */
-  if (step === 'lookup') {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-8 font-sans dark:bg-slate-950">
-        <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-xl items-center justify-center">
-          <div className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
-            <div className="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-600 px-6 py-8 text-white sm:px-8">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold backdrop-blur-sm">
-                    <Receipt className="h-3.5 w-3.5" />
-                    Counter Billing
-                  </div>
-
-                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                    Start a New Bill
-                  </h1>
-
-                  <p className="mt-2 max-w-md text-sm leading-6 text-blue-100">
-                    Identify the customer first, then add medicines and
-                    complete the checkout at the pharmacy counter.
-                  </p>
-                </div>
-
-                <div className="hidden rounded-2xl bg-white/10 p-3 backdrop-blur-sm sm:block">
-                  <ShoppingCart className="h-7 w-7" />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-6 p-6 sm:p-8">
-              <div>
-                <label
-                  htmlFor="customer-phone"
-                  className="mb-2 block text-sm font-semibold text-slate-800 dark:text-slate-200"
-                >
-                  Customer phone number
-                </label>
-
-                <div className="relative">
-                  <User className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                  <input
-                    id="customer-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    placeholder="+92 3XX XXXXXXX"
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !lookupLoading) {
-                        handleLookup();
-                      }
-                    }}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 dark:focus:bg-slate-800"
-                  />
-                </div>
-
-                {lookupError && (
-                  <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>{lookupError}</span>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleLookup}
-                disabled={lookupLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {lookupLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Checking customer...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4" />
-                    Find Customer
-                  </>
-                )}
-              </button>
-
-              {lookupDone && (
-                <div
-                  className={`rounded-2xl border p-4 ${
-                    isGuest
-                      ? 'border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20'
-                      : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`rounded-xl p-2 ${
-                        isGuest
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                      }`}
-                    >
-                      {isGuest ? (
-                        <User className="h-5 w-5" />
-                      ) : (
-                        <CheckCircle2 className="h-5 w-5" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0">
-                      <p
-                        className={`text-sm font-bold ${
-                          isGuest
-                            ? 'text-amber-800 dark:text-amber-200'
-                            : 'text-emerald-800 dark:text-emerald-200'
-                        }`}
-                      >
-                        {isGuest
-                          ? 'Guest customer'
-                          : customer?.name || 'Registered customer'}
-                      </p>
-
-                      <p
-                        className={`mt-1 text-xs leading-5 ${
-                          isGuest
-                            ? 'text-amber-700 dark:text-amber-300'
-                            : 'text-emerald-700 dark:text-emerald-300'
-                        }`}
-                      >
-                        {isGuest
-                          ? 'No matching account was found. The sale can still be processed as a guest transaction.'
-                          : `Customer account found for ${phone.trim()}.`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                disabled={!lookupDone}
-                onClick={() => setStep('billing')}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-              >
-                Continue to Billing
-                <ArrowLeft className="h-4 w-4 rotate-180" />
-              </button>
-
-              <div className="flex items-center justify-center gap-2 text-center text-xs text-slate-400">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Customer information is handled through the existing pharmacy
-                account system.
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  /*
-   * BILLING SCREEN
-   */
-  return (
     <div className="min-h-screen bg-[var(--page-bg)] px-4 py-5 font-sans text-[var(--text-body)] sm:px-6">
       <div className="mx-auto max-w-7xl space-y-5">
         {/* Header */}
@@ -971,9 +529,13 @@ const InStoreBilling = () => {
                             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-400">
                               <span>
                                 Unit price:{' '}
-                                <strong className="text-slate-600 dark:text-slate-300">
-                                  {formatPKR(item.unitPrice)}
-                                </strong>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={item.unitPrice}
+                                  onChange={(e) => updatePrice(item.medicineId, Number(e.target.value))}
+                                  className="w-16 ml-1 px-1 py-0.5 text-[10px] rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
                               </span>
 
                               <span>
@@ -1081,18 +643,31 @@ const InStoreBilling = () => {
 
               <div className="space-y-5 pt-5">
                 {/* Customer */}
-                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-800/60">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Customer
-                  </p>
-
-                  <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-100">
-                    {customer?.name || 'Guest Customer'}
-                  </p>
-
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    {phone}
-                  </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Customer Name
+                    </label>
+                    <input
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Optional"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Phone Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Optional"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                    />
+                  </div>
                 </div>
 
                 {/* Payment */}
@@ -1101,27 +676,14 @@ const InStoreBilling = () => {
                     Payment Method
                   </p>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    {PAYMENT_METHODS.map((method) => {
-                      const Icon = method.icon;
-                      const active = paymentMethod === method.value;
-
-                      return (
-                        <button
-                          key={method.value}
-                          type="button"
-                          onClick={() => setPaymentMethod(method.value)}
-                          className={`flex flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-3 text-[10px] font-bold transition ${
-                            active
-                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300'
-                              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
-                          }`}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {method.label}
-                        </button>
-                      );
-                    })}
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      type="button"
+                      className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-blue-50 px-2 py-3 text-sm font-bold text-blue-700 shadow-sm dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300"
+                    >
+                      <Banknote className="h-4 w-4" />
+                      Cash Payment
+                    </button>
                   </div>
                 </div>
 
@@ -1215,28 +777,9 @@ const InStoreBilling = () => {
                       <Receipt className="h-7 w-7 text-blue-200" />
                     </div>
                   </div>
-                </div>
-
-                {/* Error */}
-                {billError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                      <span>{billError}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Compliance */}
-                <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-[10px] leading-4 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    Expired medicines are blocked from checkout. Stock limits
-                    are enforced while quantities are adjusted.
-                  </span>
-                </div>
-
-                {/* Confirm */}
+                
+                <div className="pt-4">
+                  {/* Confirm */}
                 <button
                   type="button"
                   onClick={handleConfirmBill}
@@ -1259,6 +802,29 @@ const InStoreBilling = () => {
                     </>
                   )}
                 </button>
+                </div>
+                </div>
+
+                {/* Error */}
+                {billError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{billError}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compliance */}
+                <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-[10px] leading-4 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>
+                    Expired medicines are blocked from checkout. Stock limits
+                    are enforced while quantities are adjusted.
+                  </span>
+                </div>
+
+                
 
                 {hasExpiredItems && (
                   <p className="text-center text-[10px] font-semibold text-red-600 dark:text-red-400">
@@ -1343,7 +909,7 @@ const InStoreBilling = () => {
                     </p>
 
                     <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      {confirmedBill.customerPhone || phone}
+                      {confirmedBill.customerPhone || customerPhone}
                     </p>
                   </div>
 

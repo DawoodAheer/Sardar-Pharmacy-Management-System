@@ -7,6 +7,8 @@ import {
   bulkImportMedicines,
   processBill,
   scanLabel,
+  adjustStock,
+  getStockAdjustments,
 } from '../controllers/medicineController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -29,6 +31,10 @@ router.post(
 
 // Bulk import - restricted to pharmacist or superadmin
 router.post('/bulk', authorize('pharmacist', 'superadmin'), bulkImportMedicines);
+
+// Stock adjustments
+router.get('/stock-adjustments', authorize('pharmacist', 'superadmin'), getStockAdjustments);
+router.post('/:id/adjust-stock', authorize('pharmacist', 'superadmin'), adjustStock);
 
 // standard CRUD
 router

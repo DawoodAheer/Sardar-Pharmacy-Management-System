@@ -1,4 +1,5 @@
 import Medicine from '../models/Medicine.js';
+import StockAdjustment from '../models/StockAdjustment.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
 import { checkAndSendExpiryAlerts } from '../utils/notificationScheduler.js';
 import Tesseract from 'tesseract.js';
@@ -95,6 +96,7 @@ export const createMedicine = async (req, res, next) => {
     quantity,
     reorderLevel,
     price,
+    purchasePrice,
     category,
     barcode,
     rackLocation,
@@ -110,6 +112,7 @@ export const createMedicine = async (req, res, next) => {
       quantity,
       reorderLevel,
       price,
+      purchasePrice: purchasePrice !== undefined ? Number(purchasePrice) : 0,
       category,
       barcode,
       rackLocation,
@@ -145,6 +148,7 @@ export const updateMedicine = async (req, res, next) => {
     quantity,
     reorderLevel,
     price,
+    purchasePrice,
     category,
     barcode,
     rackLocation,
@@ -173,6 +177,7 @@ export const updateMedicine = async (req, res, next) => {
     medicine.quantity = quantity !== undefined ? quantity : medicine.quantity;
     medicine.reorderLevel = reorderLevel !== undefined ? reorderLevel : medicine.reorderLevel;
     medicine.price = price !== undefined ? price : medicine.price;
+    medicine.purchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
     medicine.category = category !== undefined ? category : medicine.category;
     medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
     medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
@@ -240,30 +245,39 @@ export const bulkImportMedicines = async (req, res, next) => {
         quantity,
         reorderLevel,
         price,
+        purchasePrice,
         category,
         barcode,
         rackLocation,
         labelImageUrl,
       } = med;
 
-      if (!name || !genericName || !manufacturer || !expiryDate || price === undefined) {
+      // Only name and price are truly required; everything else is optional
+      if (!name) {
         skippedCount++;
-        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing required fields' });
+        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing medicine name' });
+        continue;
+      }
+
+      if (price === undefined || price === null || price === '') {
+        skippedCount++;
+        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing price' });
         continue;
       }
 
       await Medicine.create({
-        name,
-        genericName,
-        manufacturer,
-        expiryDate,
-        quantity: quantity || 0,
-        reorderLevel: reorderLevel || 10,
-        price,
-        category,
-        barcode,
-        rackLocation,
-        labelImageUrl,
+        name: String(name).trim(),
+        genericName: genericName ? String(genericName).trim() : '',
+        manufacturer: manufacturer ? String(manufacturer).trim() : '',
+        expiryDate: expiryDate || null,
+        quantity: quantity !== undefined ? Number(quantity) : 0,
+        reorderLevel: reorderLevel !== undefined ? Number(reorderLevel) : 10,
+        price: Number(price),
+        purchasePrice: purchasePrice !== undefined ? Number(purchasePrice) : 0,
+        category: category ? String(category).trim() : '',
+        barcode: barcode ? String(barcode).trim() : '',
+        rackLocation: rackLocation ? String(rackLocation).trim() : '',
+        labelImageUrl: labelImageUrl ? String(labelImageUrl).trim() : '',
         createdBy: req.user._id,
       });
 
@@ -606,3 +620,97 @@ export const scanLabel = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Adjust medicine stock level with reason
+// @route   POST /api/medicines/:id/adjust-stock
+// @access  Private/Pharmacist,Superadmin
+export const adjustStock = async (req, res, next) => {
+  const { id } = req.params;
+  const { adjustmentType, amount, reason } = req.body;
+
+  try {
+    const medicine = await Medicine.findById(id);
+
+    if (!medicine) {
+      res.status(404);
+      return next(new Error('Medicine not found'));
+    }
+
+    if (!reason || !reason.trim()) {
+      res.status(400);
+      return next(new Error('Adjustment reason is required'));
+    }
+
+    const qtyAmount = Number(amount);
+    if (isNaN(qtyAmount) || qtyAmount <= 0) {
+      res.status(400);
+      return next(new Error('Amount must be a positive number'));
+    }
+
+    const previousQuantity = medicine.quantity;
+    let newQuantity = previousQuantity;
+    let quantityChanged = 0;
+
+    if (adjustmentType === 'ADD') {
+      newQuantity = previousQuantity + qtyAmount;
+      quantityChanged = qtyAmount;
+    } else if (adjustmentType === 'SUBTRACT') {
+      if (qtyAmount > previousQuantity) {
+        res.status(400);
+        return next(new Error(`Cannot subtract ${qtyAmount} items. Current stock is only ${previousQuantity}.`));
+      }
+      newQuantity = previousQuantity - qtyAmount;
+      quantityChanged = -qtyAmount;
+    } else if (adjustmentType === 'SET') {
+      newQuantity = qtyAmount;
+      quantityChanged = newQuantity - previousQuantity;
+    } else {
+      res.status(400);
+      return next(new Error('Invalid adjustmentType. Must be ADD, SUBTRACT, or SET.'));
+    }
+
+    medicine.quantity = newQuantity;
+    await medicine.save();
+
+    // Create Log Record
+    const adjustmentLog = await StockAdjustment.create({
+      medicineId: medicine._id,
+      medicineName: medicine.name,
+      previousQuantity,
+      newQuantity,
+      adjustmentType,
+      quantityChanged,
+      reason: reason.trim(),
+      adjustedBy: req.user._id,
+    });
+
+    const populatedLog = await StockAdjustment.findById(adjustmentLog._id).populate('adjustedBy', 'name email role');
+
+    res.json({
+      success: true,
+      message: `Stock successfully updated from ${previousQuantity} to ${newQuantity}`,
+      medicine,
+      adjustmentLog: populatedLog,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get stock adjustment history logs
+// @route   GET /api/medicines/stock-adjustments
+// @access  Private/Pharmacist,Superadmin
+export const getStockAdjustments = async (req, res, next) => {
+  try {
+    const logs = await StockAdjustment.find({})
+      .populate('medicineId', 'name genericName rackLocation')
+      .populate('adjustedBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    res.json(logs);
+  } catch (error) {
+    next(error);
+  }
+};
+

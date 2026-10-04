@@ -1,26 +1,10 @@
 import axios from 'axios';
 
-const DEFAULT_API_URL = 'http://localhost:5000';
-
-const normalizeBaseUrl = (url) => {
-  if (url === '') return '';
-  const normalizedUrl = (url || DEFAULT_API_URL).trim();
-
-  return normalizedUrl.endsWith('/')
-    ? normalizedUrl.slice(0, -1)
-    : normalizedUrl;
-};
-
-const apiBaseUrl = normalizeBaseUrl(
-  import.meta.env.VITE_API_URL
-);
-
+// Use relative URL so Vite proxy forwards to backend (no CORS issues)
 const api = axios.create({
-  baseURL: `${apiBaseUrl}/api`,
+  baseURL: '/api',
   withCredentials: true,
-
   timeout: 15000,
-
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
