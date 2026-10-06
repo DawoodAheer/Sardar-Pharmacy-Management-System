@@ -93,7 +93,11 @@ const medicineSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Alert tracking flags to ensure timely notifications (10 days & 1 day before expiry)
+    // Alert tracking flags for expiry notifications.
+    expiryAlert180Sent: {
+      type: Boolean,
+      default: false,
+    },
     expiryAlert10Sent: {
       type: Boolean,
       default: false,

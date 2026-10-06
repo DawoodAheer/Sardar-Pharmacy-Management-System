@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { X, Sliders, History, AlertTriangle, CheckCircle, PlusCircle, MinusCircle, RefreshCw } from 'lucide-react';
@@ -51,8 +51,18 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
       return;
     }
 
-    if (!amount || Number(amount) <= 0) {
-      setError('Please enter a valid positive quantity');
+    const quantity = Number(amount);
+    if (
+      amount === '' ||
+      !Number.isInteger(quantity) ||
+      quantity < 0 ||
+      (adjustmentType !== 'SET' && quantity === 0)
+    ) {
+      setError(
+        adjustmentType === 'SET'
+          ? 'Please enter a valid whole stock quantity'
+          : 'Please enter a positive whole quantity'
+      );
       return;
     }
 
@@ -210,7 +220,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min={adjustmentType === 'SET' ? '0' : '1'}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="e.g. 10"

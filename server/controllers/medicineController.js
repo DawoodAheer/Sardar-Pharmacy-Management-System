@@ -1,11 +1,21 @@
+import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
 import StockAdjustment from '../models/StockAdjustment.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
+import { parseExplicitDecimalPrice } from '../utils/ocrParsing.js';
+import { getStockStatus } from '../utils/stockStatus.js';
 import { checkAndSendExpiryAlerts } from '../utils/notificationScheduler.js';
 import Tesseract from 'tesseract.js';
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const controllerDirectory = path.dirname(fileURLToPath(import.meta.url));
+const englishOcrDataPath = path.resolve(
+  controllerDirectory,
+  '../node_modules/@tesseract.js-data/eng/4.0.0_best_int'
+);
 
 // Configure Cloudinary
 cloudinary.config({
@@ -47,24 +57,26 @@ export const getAllMedicines = async (req, res, next) => {
       const msInDay = 24 * 60 * 60 * 1000;
       const thirtyDays = new Date(today.getTime() + 30 * msInDay);
       const sixtyDays = new Date(today.getTime() + 60 * msInDay);
-      const ninetyDays = new Date(today.getTime() + 90 * msInDay);
+      const sixMonths = new Date(today.getTime() + 180 * msInDay);
 
       if (status === 'EXPIRED') {
         query.expiryDate = { $lt: today };
+      } else if (status === 'EXPIRING') {
+        query.expiryDate = { $gte: today, $lte: sixMonths };
       } else if (status === 'CRITICAL') {
         query.expiryDate = { $gte: today, $lte: thirtyDays };
       } else if (status === 'WARNING') {
         query.expiryDate = { $gt: thirtyDays, $lte: sixtyDays };
       } else if (status === 'CAUTION') {
-        query.expiryDate = { $gt: sixtyDays, $lte: ninetyDays };
+        query.expiryDate = { $gt: sixtyDays, $lte: sixMonths };
       } else if (status === 'SAFE') {
-        query.expiryDate = { $gt: ninetyDays };
+        query.expiryDate = { $gt: sixMonths };
       }
     }
 
     // 4. Reorder level filter (quantity <= reorderLevel)
     if (reorder === 'true') {
-      query.$expr = { $lte: ['$quantity', '$reorderLevel'] };
+      query.quantity = { $lt: 5 };
     }
 
     const medicines = await Medicine.find(query)
@@ -75,6 +87,7 @@ export const getAllMedicines = async (req, res, next) => {
     const medicinesWithStatus = medicines.map((med) => {
       const medObj = med.toObject();
       medObj.expiryStatus = checkExpiryStatus(med.expiryDate);
+      medObj.stockStatus = getStockStatus(med.quantity);
       return medObj;
     });
 
@@ -104,6 +117,14 @@ export const createMedicine = async (req, res, next) => {
   } = req.body;
 
   try {
+    const numericPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : 0;
+    const numericPrice = price !== undefined ? Number(price) : 0;
+
+    if (Number.isFinite(numericPrice) && Number.isFinite(numericPurchasePrice) && numericPrice < numericPurchasePrice) {
+      res.status(400);
+      return next(new Error('Sale price cannot be lower than the purchase price'));
+    }
+
     const medicine = await Medicine.create({
       name,
       genericName,
@@ -112,7 +133,7 @@ export const createMedicine = async (req, res, next) => {
       quantity,
       reorderLevel,
       price,
-      purchasePrice: purchasePrice !== undefined ? Number(purchasePrice) : 0,
+      purchasePrice: numericPurchasePrice,
       category,
       barcode,
       rackLocation,
@@ -124,7 +145,7 @@ export const createMedicine = async (req, res, next) => {
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
 
-    // Real-time check: if newly created medicine is expiring within 10 days, 1 day, or expired, dispatch alert immediately
+    // Evaluate new inventory immediately so six-month expiry warnings are not delayed.
     checkAndSendExpiryAlerts({ medicineId: medicine._id }).catch((err) => {
       console.error('[New Medicine Alert Error]:', err.message);
     });
@@ -163,6 +184,14 @@ export const updateMedicine = async (req, res, next) => {
       throw new Error('Medicine not found');
     }
 
+    const nextPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
+    const nextSalePrice = price !== undefined ? Number(price) : Number(medicine.price);
+
+    if (Number.isFinite(nextSalePrice) && Number.isFinite(nextPurchasePrice) && nextSalePrice < nextPurchasePrice) {
+      res.status(400);
+      throw new Error('Sale price cannot be lower than the purchase price');
+    }
+
     medicine.name = name !== undefined ? name : medicine.name;
     medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
     medicine.manufacturer = manufacturer !== undefined ? manufacturer : medicine.manufacturer;
@@ -171,13 +200,14 @@ export const updateMedicine = async (req, res, next) => {
       // Reset alert flags so that alerts fire appropriately for the new date
       medicine.expiryAlert10Sent = false;
       medicine.expiryAlert1Sent = false;
+      medicine.expiryAlert180Sent = false;
       medicine.expiryAlertExpiredSent = false;
     }
 
     medicine.quantity = quantity !== undefined ? quantity : medicine.quantity;
     medicine.reorderLevel = reorderLevel !== undefined ? reorderLevel : medicine.reorderLevel;
     medicine.price = price !== undefined ? price : medicine.price;
-    medicine.purchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
+    medicine.purchasePrice = nextPurchasePrice;
     medicine.category = category !== undefined ? category : medicine.category;
     medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
     medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
@@ -314,8 +344,15 @@ export const processBill = async (req, res, next) => {
   try {
     const checkedItems = [];
     let subtotal = 0;
+    const stockRequirements = new Map();
 
     for (const item of items) {
+      const requestedQty = Number(item.quantity);
+      if (!Number.isInteger(requestedQty) || requestedQty < 1) {
+        res.status(400);
+        return next(new Error('Medicine quantities must be positive whole units'));
+      }
+
       const medicine = await Medicine.findById(item.medicineId);
 
       if (!medicine) {
@@ -332,18 +369,38 @@ export const processBill = async (req, res, next) => {
         });
       }
 
-      if (medicine.quantity < item.quantity) {
+      if (medicine.quantity < requestedQty) {
         res.status(400);
-        return next(new Error(`Insufficient stock for '${medicine.name}'. Available: ${medicine.quantity}, Requested: ${item.quantity}`));
+        return next(new Error(`Insufficient stock for '${medicine.name}'. Available: ${medicine.quantity}, Requested: ${requestedQty}`));
       }
 
-      subtotal += medicine.price * item.quantity;
-      checkedItems.push({ medicine, requestedQty: item.quantity });
+      subtotal += medicine.price * requestedQty;
+      const medicineId = String(medicine._id);
+      stockRequirements.set(
+        medicineId,
+        (stockRequirements.get(medicineId) || 0) + requestedQty
+      );
+      checkedItems.push({ medicine, requestedQty });
     }
 
-    for (const checked of checkedItems) {
-      checked.medicine.quantity -= checked.requestedQty;
-      await checked.medicine.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const [medicineId, quantity] of stockRequirements) {
+          const result = await Medicine.updateOne(
+            { _id: medicineId, quantity: { $gte: quantity } },
+            { $inc: { quantity: -quantity } },
+            { session }
+          );
+          if (!result.modifiedCount) {
+            const error = new Error('Stock changed during billing. Please refresh and try again.');
+            error.statusCode = 409;
+            throw error;
+          }
+        }
+      });
+    } finally {
+      await session.endSession();
     }
 
     res.json({
@@ -375,7 +432,11 @@ export const scanLabel = async (req, res, next) => {
 
   try {
     // 1. Run Tesseract OCR on local image
-    const result = await Tesseract.recognize(filePath, 'eng');
+    const result = await Tesseract.recognize(filePath, 'eng', {
+      langPath: englishOcrDataPath,
+      gzip: true,
+      cacheMethod: 'none',
+    });
     const rawText = result.data.text;
 
     // 2. Parse raw text
@@ -495,87 +556,25 @@ export const scanLabel = async (req, res, next) => {
       }
     }
 
-    // 4) Heuristic fallback for Brand/Generic names
-    const excludeKeywords = [
-      'ltd', 'limited', 'labs', 'pharma', 'industries', 'corp', 'co', 'incorporated',
-      'mfg', 'lic', 'no', 'dosage', 'directed', 'physician', 'store', 'dry', 'dark',
-      'temperature', 'exceeding', 'overdose', 'injurious', 'liver', 'made in', 'marketed',
-      'distributor', 'warning', 'address', 'road', 'sikkim'
-    ];
-
-    const candidates = [];
-    for (const line of lines) {
-      const cleaned = cleanLine(line);
-      if (cleaned.length < 3) continue;
-
-      const lowerCleaned = cleaned.toLowerCase();
-      if (excludeKeywords.some(kw => lowerCleaned.includes(kw))) {
-        continue;
-      }
-
-      let score = 0;
-      if (/\b(tablets?|capsules?|tabs?|caps?|ip|bp|usp|injection|syrup|suspension|gel|cream|ointment)\b/i.test(cleaned)) {
-        score += 15;
-      }
-      if (/\b\d+\s*(?:mg|g|ml)?\b/i.test(cleaned)) {
-        score += 10;
-      }
-
-      const words = cleaned.split(/\s+/).filter(w => /[a-zA-Z]/.test(w));
-      if (words.length > 0) {
-        if (words.every(w => /^[A-Z]/.test(w))) {
-          score += 8;
-        }
-        if (cleaned === cleaned.toUpperCase()) {
-          score += 5;
-        }
-      }
-
-      if (cleaned.length > 5 && cleaned.length < 25) {
-        score += 5;
-      } else if (cleaned.length > 35) {
-        score -= 10;
-      }
-
-      candidates.push({ original: line, cleaned, score });
-    }
-
-    candidates.sort((a, b) => b.score - a.score);
-
-    let medicineName = foundBrand ? titleCase(foundBrand) : '';
+    // Only auto-fill names recognized by the explicit medicine-name patterns.
+    let medicineName = foundBrand
+      ? titleCase(foundBrand)
+      : foundGeneric
+        ? titleCase(foundGeneric)
+        : '';
     let genericName = foundGeneric ? titleCase(foundGeneric) : '';
-
-    if (candidates.length > 0) {
-      if (!medicineName && !genericName) {
-        const top = candidates[0];
-        if (/\b(tablets?|capsules?|ip|bp|usp)\b/i.test(top.cleaned)) {
-          genericName = titleCase(top.cleaned);
-          const brandCand = candidates.find(c => c !== top && !/\b(tablets?|capsules?|ip|bp|usp)\b/i.test(c.cleaned));
-          medicineName = brandCand ? titleCase(brandCand.cleaned) : titleCase(top.cleaned);
-        } else {
-          medicineName = titleCase(top.cleaned);
-          const genericCand = candidates.find(c => c !== top && /\b(tablets?|capsules?|ip|bp|usp)\b/i.test(c.cleaned));
-          genericName = genericCand ? titleCase(genericCand.cleaned) : titleCase(top.cleaned);
-        }
-      } else if (!medicineName) {
-        const brandCand = candidates.find(c => c.cleaned.toLowerCase() !== genericName.toLowerCase() && !/\b(tablets?|capsules?|ip|bp|usp)\b/i.test(c.cleaned));
-        medicineName = brandCand ? titleCase(brandCand.cleaned) : genericName;
-      } else if (!genericName) {
-        const genericCand = candidates.find(c => c.cleaned.toLowerCase() !== medicineName.toLowerCase() && /\b(tablets?|capsules?|ip|bp|usp)\b/i.test(c.cleaned));
-        genericName = genericCand ? titleCase(genericCand.cleaned) : medicineName;
-      }
-    }
-
-    // Format final clean fallbacks
-    medicineName = medicineName || titleCase(foundBrand) || 'Unknown';
-    genericName = genericName || titleCase(foundGeneric) || 'Unknown';
-    manufacturer = manufacturer || 'Unknown Manufacturer';
 
     // Calculate confidence based on how many fields were found
     let foundCount = 0;
-    if (medicineName && medicineName !== 'Unknown') foundCount++;
+    if (medicineName) foundCount++;
     if (expiryDate) foundCount++;
-    if (genericName && genericName !== 'Unknown') foundCount++;
+    if (genericName) foundCount++;
+
+    const scannedPrices = {
+      purchasePrice: parseExplicitDecimalPrice(rawText, 'purchase'),
+      salePrice: parseExplicitDecimalPrice(rawText, 'sale'),
+      mrp: parseExplicitDecimalPrice(rawText, 'mrp'),
+    };
 
     let confidence = 'low';
     if (foundCount === 3) confidence = 'high';
@@ -608,6 +607,7 @@ export const scanLabel = async (req, res, next) => {
       genericName,
       manufacturer,
       expiryDate,
+      scannedPrices,
       labelImageUrl,
       rawText,
       confidence,
@@ -642,9 +642,13 @@ export const adjustStock = async (req, res, next) => {
     }
 
     const qtyAmount = Number(amount);
-    if (isNaN(qtyAmount) || qtyAmount <= 0) {
+    if (
+      !Number.isInteger(qtyAmount) ||
+      qtyAmount < 0 ||
+      (adjustmentType !== 'SET' && qtyAmount === 0)
+    ) {
       res.status(400);
-      return next(new Error('Amount must be a positive number'));
+      return next(new Error('Amount must be a valid whole quantity'));
     }
 
     const previousQuantity = medicine.quantity;
@@ -669,27 +673,45 @@ export const adjustStock = async (req, res, next) => {
       return next(new Error('Invalid adjustmentType. Must be ADD, SUBTRACT, or SET.'));
     }
 
-    medicine.quantity = newQuantity;
-    await medicine.save();
+    const session = await mongoose.startSession();
+    let adjustmentLog;
+    try {
+      await session.withTransaction(async () => {
+        const updatedMedicine = await Medicine.findOneAndUpdate(
+          { _id: medicine._id, quantity: previousQuantity },
+          { $set: { quantity: newQuantity } },
+          { new: true, session }
+        );
+        if (!updatedMedicine) {
+          const error = new Error('Stock changed during adjustment. Refresh and try again.');
+          error.statusCode = 409;
+          throw error;
+        }
 
-    // Create Log Record
-    const adjustmentLog = await StockAdjustment.create({
-      medicineId: medicine._id,
-      medicineName: medicine.name,
-      previousQuantity,
-      newQuantity,
-      adjustmentType,
-      quantityChanged,
-      reason: reason.trim(),
-      adjustedBy: req.user._id,
-    });
+        [adjustmentLog] = await StockAdjustment.create(
+          [{
+            medicineId: medicine._id,
+            medicineName: medicine.name,
+            previousQuantity,
+            newQuantity,
+            adjustmentType,
+            quantityChanged,
+            reason: reason.trim(),
+            adjustedBy: req.user._id,
+          }],
+          { session }
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
 
     const populatedLog = await StockAdjustment.findById(adjustmentLog._id).populate('adjustedBy', 'name email role');
 
     res.json({
       success: true,
       message: `Stock successfully updated from ${previousQuantity} to ${newQuantity}`,
-      medicine,
+      medicine: await Medicine.findById(medicine._id),
       adjustmentLog: populatedLog,
     });
   } catch (error) {
@@ -713,4 +735,3 @@ export const getStockAdjustments = async (req, res, next) => {
     next(error);
   }
 };
-

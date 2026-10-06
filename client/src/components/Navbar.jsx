@@ -1,11 +1,15 @@
 
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LogOut, Moon, Sun, Stethoscope } from 'lucide-react';
+import { LogOut, Moon, Sun, Stethoscope, RefreshCw } from 'lucide-react';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
 
   const getRoleBadgeStyle = (role) => {
     switch (role) {
@@ -40,6 +44,22 @@ const Navbar = () => {
 
       {user && (
         <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200 sm:flex">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" aria-hidden="true" />
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em]">Server online</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-500 dark:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            title="Refresh the current page"
+            aria-label="Refresh page"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
           <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800 sm:flex">
             <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getRoleBadgeStyle(user.role)}`}>
               {getRoleLabel(user.role)}

@@ -60,14 +60,14 @@ const toNumber = (value) => {
 };
 
 const getCustomerName = (bill) =>
-  bill?.customerId?.name ||
   bill?.customerName ||
+  bill?.customerId?.name ||
   'Guest Customer';
 
 const getCustomerPhone = (bill) =>
-  bill?.customerId?.phone ||
   bill?.customerPhone ||
   bill?.guestPhone ||
+  bill?.customerId?.phone ||
   'N/A';
 
 const getPharmacistName = (bill) =>
@@ -205,6 +205,8 @@ const PrintReceipt = () => {
     bill.total !== undefined
       ? toNumber(bill.total)
       : Math.max(0, subtotal - discount);
+  const totalRefunded = toNumber(bill.totalRefunded);
+  const netTotal = Math.max(0, total - totalRefunded);
 
   const customerName = getCustomerName(bill);
   const customerPhone = getCustomerPhone(bill);
@@ -446,8 +448,27 @@ const PrintReceipt = () => {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 print:divide-slate-300">
                     {items.map((item, index) => {
                       const quantity = toNumber(item.quantity);
-                      const unitPrice = toNumber(item.unitPrice);
+                      const unitPrice = toNumber(item.salePrice ?? item.unitPrice);
                       const lineTotal = quantity * unitPrice;
+                      const itemReturns = (bill.returns || []).filter(
+                        (returnItem) =>
+                          String(returnItem.medicineId) === String(item.medicineId)
+                      );
+                      const returnedQuantity = itemReturns.reduce(
+                        (sum, returnItem) => sum + toNumber(returnItem.quantityReturned),
+                        0
+                      );
+                      const netQuantity = Math.max(0, quantity - returnedQuantity);
+                      const itemRefund = itemReturns.reduce(
+                        (sum, returnItem) => sum + toNumber(returnItem.refundAmount),
+                        0
+                      );
+                      const itemDiscount =
+                        subtotal > 0 ? (discount * lineTotal) / subtotal : 0;
+                      const netLineTotal = Math.max(
+                        0,
+                        lineTotal - itemDiscount - itemRefund
+                      );
 
                       return (
                         <tr
@@ -475,7 +496,12 @@ const PrintReceipt = () => {
                           </td>
 
                           <td className="px-3 py-3 text-right text-xs font-semibold text-slate-700 dark:text-slate-200 print:text-black sm:px-4">
-                            {quantity}
+                            <div>{quantity}</div>
+                            {returnedQuantity > 0 && (
+                              <div className="text-[9px] font-medium text-amber-600">
+                                {returnedQuantity} returned · {netQuantity} net sold
+                              </div>
+                            )}
                           </td>
 
                           <td className="whitespace-nowrap px-3 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-300 print:text-slate-700 sm:px-4">
@@ -483,7 +509,7 @@ const PrintReceipt = () => {
                           </td>
 
                           <td className="whitespace-nowrap px-3 py-3 text-right text-xs font-bold text-slate-900 dark:text-white print:text-black sm:px-4">
-                            {formatPKR(lineTotal)}
+                            {formatPKR(netLineTotal)}
                           </td>
                         </tr>
                       );
@@ -525,11 +551,32 @@ const PrintReceipt = () => {
                 </div>
               )}
 
+              {totalRefunded > 0 && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500 dark:text-slate-400">
+                      Original Total
+                    </span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 print:text-black">
+                      {formatPKR(total)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-rose-600 dark:text-rose-400">
+                      Refunds
+                    </span>
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">
+                      - {formatPKR(totalRefunded)}
+                    </span>
+                  </div>
+                </>
+              )}
+
               <div className="border-t border-slate-200 pt-3 dark:border-slate-700 print:border-slate-300">
                 <div className="flex items-end justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Total Paid
+                      {totalRefunded > 0 ? 'Net Sale Amount' : 'Total Paid'}
                     </p>
 
                     <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -538,7 +585,7 @@ const PrintReceipt = () => {
                   </div>
 
                   <p className="text-2xl font-extrabold text-blue-600 dark:text-blue-400 print:text-black">
-                    {formatPKR(total)}
+                    {formatPKR(netTotal)}
                   </p>
                 </div>
               </div>

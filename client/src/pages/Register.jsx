@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,22 +19,6 @@ const Register = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
-
-  // Load Sora font
-  useEffect(() => {
-    const link = document.createElement('link');
-
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap';
-    link.rel = 'stylesheet';
-
-    document.head.appendChild(link);
-
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
-
   // Password strength
   const getPasswordStrength = (pass) => {
     if (!pass) {
@@ -266,7 +250,7 @@ const Register = () => {
             <span>Join the platform</span>
           </div>
 
-          <h1 className="font-['Sora'] font-extrabold text-4xl lg:text-5xl leading-tight text-white tracking-tight">
+          <h1 className="font-sans font-extrabold text-4xl lg:text-5xl leading-tight text-white tracking-tight">
             <span className="block">Your account,</span>
             <span className="block">your medicines,</span>
             <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">

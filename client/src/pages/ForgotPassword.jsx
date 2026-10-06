@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -23,19 +23,6 @@ const ForgotPassword = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [offlineData, setOfflineData] = useState(null);
   const [copied, setCopied] = useState(false);
-
-  // Load Sora Font
-  useEffect(() => {
-    const existingLink = document.querySelector('link[data-pharmadesk-sora="true"]');
-    if (existingLink) return;
-
-    const link = document.createElement('link');
-    link.setAttribute('data-pharmadesk-sora', 'true');
-    link.href = 'https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-  }, []);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -93,7 +80,7 @@ const ForgotPassword = () => {
             <Activity className="h-7 w-7" />
           </div>
           <h1
-            style={{ fontFamily: "'Sora', sans-serif" }}
+
             className="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl"
           >
             Pharma Desk

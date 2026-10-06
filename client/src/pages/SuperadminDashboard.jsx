@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import api from '../utils/api';
+import { downloadMedicineInventory } from '../utils/medicineExport';
 import { useAuth } from '../context/AuthContext';
 import ProfitDetailsModal from '../components/ProfitDetailsModal';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
@@ -19,6 +20,7 @@ import {
   CheckCircle,
   ChevronRight,
   Clock3,
+  Download,
   Eye,
   Loader2,
   Package,
@@ -223,15 +225,6 @@ const getMedicineStock = (medicine) => {
   );
 };
 
-const getLowStockLimit = (medicine) => {
-  return Number(
-    medicine?.lowStockThreshold ??
-      medicine?.minimumStock ??
-      medicine?.reorderLevel ??
-      10
-  );
-};
-
 const getMedicinePrice = (medicine) => {
   return Number(
     medicine?.price ??
@@ -241,6 +234,9 @@ const getMedicinePrice = (medicine) => {
       0
   );
 };
+
+const getMedicinePurchasePrice = (medicine) =>
+  Number(medicine?.purchasePrice ?? 0);
 
 const getExpiryDate = (medicine) => {
   return (
@@ -634,12 +630,7 @@ export default function SuperadminDashboard() {
               medicine
             );
 
-          const limit =
-            getLowStockLimit(
-              medicine
-            );
-
-          return stock <= limit;
+          return stock < 5;
         }
       );
     }, [medicines]);
@@ -661,7 +652,7 @@ export default function SuperadminDashboard() {
       );
     }, [medicines]);
 
-  const expiringWithin30Days =
+  const expiringWithinSixMonths =
     useMemo(() => {
       return medicines
         .filter((medicine) => {
@@ -673,7 +664,7 @@ export default function SuperadminDashboard() {
           return (
             daysLeft !== null &&
             daysLeft >= 0 &&
-            daysLeft <= 30
+            daysLeft <= 180
           );
         })
         .sort((a, b) => {
@@ -1003,6 +994,14 @@ export default function SuperadminDashboard() {
     );
   };
 
+  const exportMedicinesToExcel = () => {
+    try {
+      downloadMedicineInventory(medicines);
+    } catch (exportError) {
+      setMessage(`Unable to export medicines: ${exportError.message}`);
+    }
+  };
+
   /* =======================================================
      SEARCH
   ======================================================= */
@@ -1092,7 +1091,7 @@ export default function SuperadminDashboard() {
           return expiredMedicines;
 
         case 'expiring':
-          return expiringWithin30Days;
+          return expiringWithinSixMonths;
 
         default:
           return [];
@@ -1104,7 +1103,7 @@ export default function SuperadminDashboard() {
       medicines,
       lowStockMedicines,
       expiredMedicines,
-      expiringWithin30Days,
+      expiringWithinSixMonths,
     ]);
 
   /* =======================================================
@@ -1175,14 +1174,24 @@ export default function SuperadminDashboard() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <RefreshCw size={18} />
-            Refresh
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportMedicinesToExcel}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <Download size={18} />
+              Export Medicines
+            </button>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <RefreshCw size={18} />
+              Refresh
+            </button>
+          </div>
 
         </div>
 
@@ -1564,11 +1573,11 @@ export default function SuperadminDashboard() {
             />
 
             <StatCard
-              title="Expiring Within 30 Days"
+              title="Expiring Within 6 Months"
               value={
-                expiringWithin30Days.length
+                expiringWithinSixMonths.length
               }
-              description="Expiry needs attention"
+              description="Expiry within 180 days"
               icon={Clock3}
               iconWrapperClass="bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
               valueClass="text-orange-600 dark:text-orange-400"
@@ -1928,7 +1937,7 @@ export default function SuperadminDashboard() {
                   </th>
 
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                    Price
+                    Sale / Cost per unit
                   </th>
 
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase text-slate-500">
@@ -2022,11 +2031,12 @@ export default function SuperadminDashboard() {
                         </td>
 
                         <td className="px-5 py-4 text-sm font-semibold">
-                          {getCurrency(
-                            getMedicinePrice(
-                              medicine
-                            )
-                          )}
+                          <div className="font-semibold">
+                            Sale: {getCurrency(getMedicinePrice(medicine))}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            Cost: {getCurrency(getMedicinePurchasePrice(medicine))}
+                          </div>
                         </td>
 
                         <td className="px-5 py-4 text-sm">
@@ -2140,7 +2150,7 @@ export default function SuperadminDashboard() {
 
                   {selectedView ===
                     'expiring' &&
-                    'Medicines Expiring Within 30 Days'}
+                    'Medicines Expiring Within 6 Months'}
 
                 </h3>
 
@@ -3075,7 +3085,7 @@ export default function SuperadminDashboard() {
                         </th>
 
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Price
+                          Sale / Cost per unit
                         </th>
 
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
@@ -3112,11 +3122,6 @@ export default function SuperadminDashboard() {
 
                             const stock =
                               getMedicineStock(
-                                medicine
-                              );
-
-                            const lowLimit =
-                              getLowStockLimit(
                                 medicine
                               );
 
@@ -3170,11 +3175,12 @@ export default function SuperadminDashboard() {
                                 </td>
 
                                 <td className="px-4 py-3 text-sm font-semibold">
-                                  {getCurrency(
-                                    getMedicinePrice(
-                                      medicine
-                                    )
-                                  )}
+                                  <div className="font-semibold">
+                                    Sale: {getCurrency(getMedicinePrice(medicine))}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    Cost: {getCurrency(getMedicinePurchasePrice(medicine))}
+                                  </div>
                                 </td>
 
                                 <td className="px-4 py-3 text-sm">
@@ -3186,35 +3192,26 @@ export default function SuperadminDashboard() {
                                 </td>
 
                                 <td className="px-4 py-3">
-
-                                  {daysLeft !==
-                                    null &&
-                                  daysLeft <
-                                    0 ? (
-                                    <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
-                                      Expired
+                                  <div className="flex flex-wrap gap-1.5">
+                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                      stock <= 0
+                                        ? 'bg-red-100 text-red-700'
+                                        : stock < 5
+                                          ? 'bg-amber-100 text-amber-700'
+                                          : stock > 20
+                                            ? 'bg-blue-100 text-blue-700'
+                                            : 'bg-emerald-100 text-emerald-700'
+                                    }`}>
+                                      {stock <= 0 ? 'End Stock' : stock < 5 ? 'Low Stock' : stock > 20 ? 'High Stock' : 'Stock Available'}
                                     </span>
-                                  ) : daysLeft !==
-                                      null &&
-                                    daysLeft <=
-                                      30 ? (
-                                    <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">
-                                      {daysLeft ===
-                                      0
-                                        ? 'Today'
-                                        : `${daysLeft} days left`}
-                                    </span>
-                                  ) : stock <=
-                                    lowLimit ? (
-                                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                                      Low Stock
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                                      Normal
-                                    </span>
-                                  )}
-
+                                    {daysLeft !== null && daysLeft < 0 ? (
+                                      <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">Expired</span>
+                                    ) : daysLeft !== null && daysLeft <= 180 ? (
+                                      <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-700">
+                                        Expires in {daysLeft} days
+                                      </span>
+                                    ) : null}
+                                  </div>
                                 </td>
 
                               </tr>
@@ -3271,6 +3268,7 @@ export default function SuperadminDashboard() {
       />
 
       <SalesReturnModal
+        key={returnModalBill?._id || 'no-return-bill'}
         isOpen={Boolean(returnModalBill)}
         onClose={() => setReturnModalBill(null)}
         bill={returnModalBill}

@@ -7,7 +7,8 @@ const RETRY_INTERVAL_MS = 3000;
 
 const connectDB = async (retryCount = 0) => {
   const mongoUri =
-    process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pharmadesk';
+    process.env.MONGO_URI ||
+    'mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true';
 
   try {
     const conn = await mongoose.connect(mongoUri, {

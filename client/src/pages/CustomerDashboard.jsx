@@ -104,7 +104,7 @@ const CustomerDashboard = () => {
         return sum;
       }
 
-      return sum + (Number(bill.total) || 0);
+      return sum + Math.max(0, (Number(bill.total) || 0) - (Number(bill.totalRefunded) || 0));
     }, 0);
   }, [bills]);
 
@@ -116,7 +116,7 @@ const CustomerDashboard = () => {
         return;
       }
 
-      bill.items.forEach((item) => {
+      (bill.netItems || bill.items).forEach((item) => {
         const importantStatuses = ['CRITICAL', 'WARNING', 'CAUTION'];
 
         if (!importantStatuses.includes(item.expiryStatus)) {
@@ -131,7 +131,7 @@ const CustomerDashboard = () => {
           expiryDate: item.expiryDate,
           qtyPurchased:
             (uniqueMeds[medicineKey]?.qtyPurchased || 0) +
-            (Number(item.quantity) || 0),
+            (Number(item.netQuantity ?? item.quantity) || 0),
         };
       });
     });
@@ -375,7 +375,7 @@ const CustomerDashboard = () => {
                       </div>
 
                       <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatPKR(bill.total)}
+                        {formatPKR(Math.max(0, Number(bill.total || 0) - Number(bill.totalRefunded || 0)))}
                       </span>
                     </div>
                   </div>

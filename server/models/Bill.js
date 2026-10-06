@@ -134,6 +134,12 @@ const billSchema = new mongoose.Schema(
       default: null,
     },
 
+    customerName: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+
     shippingAddress: {
       type: String,
       default: '',
@@ -167,13 +173,19 @@ const billSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: true,
+      // Keep legacy values valid when updating old bills; current bill endpoints only write Cash.
       enum: ['Cash', 'Card', 'UPI'],
-      default: 'Card',
+      default: 'Cash',
     },
 
     returns: [returnItemSchema],
 
     isReturned: {
+      type: Boolean,
+      default: false,
+    },
+
+    isFullyReturned: {
       type: Boolean,
       default: false,
     },

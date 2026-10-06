@@ -1,8 +1,15 @@
+import mongoose from 'mongoose';
 import Bill from '../models/Bill.js';
 import Medicine from '../models/Medicine.js';
 import User from '../models/User.js';
 import StockAdjustment from '../models/StockAdjustment.js';
+import { getBillReturnSummary } from '../utils/billReturnSummary.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
+import {
+  getDiscountedReturnRefund,
+  getNetItemAmounts,
+  getSalePrice,
+} from '../utils/billCalculations.js';
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
 
@@ -81,7 +88,6 @@ export const createBill = async (req, res, next) => {
     shippingAddress,
     items,
     discount,
-    paymentMethod,
   } = req.body;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -120,6 +126,7 @@ export const createBill = async (req, res, next) => {
     const expiredItems = [];
     const insufficientStockItems = [];
     const validatedItems = [];
+    const stockRequirements = new Map();
 
     let subtotal = 0;
 
@@ -168,11 +175,23 @@ export const createBill = async (req, res, next) => {
       }
 
       // Use custom salePrice from request if pharmacist set it, otherwise default to medicine.price
-      const effectivePrice = (item.salePrice !== undefined && item.salePrice !== null && item.salePrice !== '')
-        ? Number(item.salePrice)
-        : medicine.price;
+      let effectivePrice;
+      try {
+        effectivePrice = getSalePrice(
+          req.user.role === 'customer' ? undefined : item.salePrice,
+          medicine.price
+        );
+      } catch (error) {
+        res.status(400);
+        return next(error);
+      }
 
       subtotal += effectivePrice * requestedQuantity;
+      const medicineId = String(medicine._id);
+      stockRequirements.set(
+        medicineId,
+        (stockRequirements.get(medicineId) || 0) + requestedQuantity
+      );
 
       validatedItems.push({
         medicineId: medicine._id,
@@ -210,67 +229,73 @@ export const createBill = async (req, res, next) => {
       );
     }
 
-    const finalDiscount = Number(discount) || 0;
+    const finalDiscount =
+      discount === undefined || discount === '' ? 0 : Number(discount);
+    if (
+      !Number.isFinite(finalDiscount) ||
+      finalDiscount < 0 ||
+      finalDiscount > subtotal
+    ) {
+      res.status(400);
+      return next(new Error('Discount must be between zero and the bill subtotal'));
+    }
     const total = Math.max(
       0,
       subtotal - finalDiscount
     );
 
-    const bill = await Bill.create({
-      pharmacistId: finalPharmacistId,
-      customerId: finalCustomerId,
+    let bill;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        [bill] = await Bill.create(
+          [{
+            pharmacistId: finalPharmacistId,
+            customerId: finalCustomerId,
+            customerPhone: customerPhone || customer.phone || null,
+            shippingAddress: shippingAddress || '',
+            billType: 'ONLINE',
+            orderStatus: isCustomerOrder ? 'PENDING' : 'ACCEPTED',
+            reviewedBy: isCustomerOrder ? null : finalPharmacistId,
+            reviewedAt: isCustomerOrder ? null : new Date(),
+            items: validatedItems.map((item) => ({
+              medicineId: item.medicineId,
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              salePrice: item.salePrice,
+              purchasePrice: item.purchasePrice,
+              expiryStatus: item.expiryStatus,
+              expiryDate: item.expiryDate,
+              rackLocation: item.rackLocation,
+            })),
+            subtotal,
+            discount: finalDiscount,
+            total,
+            paymentMethod: 'Cash',
+          }],
+          { session }
+        );
 
-      customerPhone:
-        customerPhone || customer.phone || null,
-
-      shippingAddress: shippingAddress || '',
-
-      billType: 'ONLINE',
-
-      orderStatus: isCustomerOrder
-        ? 'PENDING'
-        : 'ACCEPTED',
-
-      reviewedBy: isCustomerOrder
-        ? null
-        : finalPharmacistId,
-
-      reviewedAt: isCustomerOrder
-        ? null
-        : new Date(),
-
-      items: validatedItems.map((item) => ({
-        medicineId: item.medicineId,
-        name: item.name,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        salePrice: item.salePrice,
-        purchasePrice: item.purchasePrice,
-        expiryStatus: item.expiryStatus,
-        expiryDate: item.expiryDate,
-        rackLocation: item.rackLocation,
-      })),
-
-      subtotal,
-      discount: finalDiscount,
-      total,
-
-      paymentMethod:
-        paymentMethod || 'Cash',
-    });
-
-    /*
-     * Customer online orders remain PENDING.
-     * Stock is NOT deducted here.
-     *
-     * Pharmacist-created online bills are accepted
-     * immediately and stock is deducted here.
-     */
-    if (!isCustomerOrder) {
-      for (const item of validatedItems) {
-        item.ref.quantity -= item.quantity;
-        await item.ref.save();
-      }
+        if (!isCustomerOrder) {
+          for (const [medicineId, quantity] of stockRequirements) {
+            const result = await Medicine.updateOne(
+              { _id: medicineId, quantity: { $gte: quantity } },
+              { $inc: { quantity: -quantity } },
+              { session }
+            );
+            if (!result.modifiedCount) {
+              const error = new Error(
+                'Stock changed during billing. Please refresh and try again.'
+              );
+              error.statusCode = 409;
+              throw error;
+            }
+          }
+        }
+      });
+    } finally {
+      await session.endSession();
     }
 
     const populatedBill = await Bill.findById(
@@ -332,7 +357,11 @@ export const getCustomerBills = async (
         createdAt: -1,
       });
 
-    res.json(bills);
+    res.json(
+      bills
+        .map((bill) => getBillReturnSummary(bill))
+        .filter((bill) => !bill.isFullyReturned)
+    );
   } catch (error) {
     next(error);
   }
@@ -475,9 +504,8 @@ export const generateBillPDF = async (
       .lineTo(550, 135)
       .stroke();
 
-    const customerName = bill.customerId
-      ? bill.customerId.name
-      : 'Guest Customer';
+    const customerName =
+      bill.customerName || bill.customerId?.name || 'Guest Customer';
 
     const customerEmail = bill.customerId
       ? bill.customerId.email
@@ -485,8 +513,8 @@ export const generateBillPDF = async (
 
     const customerPhone = bill.customerId
       ? (
-          bill.customerId.phone ||
           bill.customerPhone ||
+          bill.customerId.phone ||
           'N/A'
         )
       : (
@@ -566,7 +594,7 @@ export const generateBillPDF = async (
         }
       )
       .text(
-        'Quantity',
+        'Qty / Net',
         420,
         tableTop,
         {
@@ -596,6 +624,25 @@ export const generateBillPDF = async (
     let y = tableTop + 25;
 
     bill.items.forEach((item) => {
+      const quantity = Number(item.quantity) || 0;
+      const salePrice = Number(item.salePrice ?? item.unitPrice) || 0;
+      const grossLineTotal = salePrice * quantity;
+      const itemReturns = (bill.returns || []).filter(
+        (returnItem) => String(returnItem.medicineId) === String(item.medicineId)
+      );
+      const returnedQuantity = itemReturns.reduce(
+        (sum, returnItem) => sum + (Number(returnItem.quantityReturned) || 0),
+        0
+      );
+      const netQuantity = Math.max(0, quantity - returnedQuantity);
+      const itemRefund = itemReturns.reduce(
+        (sum, returnItem) => sum + (Number(returnItem.refundAmount) || 0),
+        0
+      );
+      const itemDiscount = bill.subtotal > 0
+        ? (Number(bill.discount || 0) * grossLineTotal) / bill.subtotal
+        : 0;
+      const netLineTotal = Math.max(0, grossLineTotal - itemDiscount - itemRefund);
       const expDate = item.expiryDate
         ? new Date(
             item.expiryDate
@@ -624,7 +671,7 @@ export const generateBillPDF = async (
           y
         )
         .text(
-          `PKR ${item.unitPrice.toFixed(
+          `PKR ${salePrice.toFixed(
             2
           )}`,
           340,
@@ -635,7 +682,7 @@ export const generateBillPDF = async (
           }
         )
         .text(
-          item.quantity.toString(),
+          `${quantity} / ${netQuantity}`,
           420,
           y,
           {
@@ -644,10 +691,7 @@ export const generateBillPDF = async (
           }
         )
         .text(
-          `PKR ${(
-            item.unitPrice *
-            item.quantity
-          ).toFixed(2)}`,
+          `PKR ${netLineTotal.toFixed(2)}`,
           500,
           y,
           {
@@ -714,7 +758,7 @@ export const generateBillPDF = async (
       .fillColor('#0ea5e9')
       .fontSize(12)
       .text(
-        'Grand Total:',
+        'Net Sale Amount:',
         340,
         subtotalY + 45,
         {
@@ -724,9 +768,7 @@ export const generateBillPDF = async (
         }
       )
       .text(
-        `PKR ${bill.total.toFixed(
-          2
-        )}`,
+        `PKR ${Math.max(0, bill.total - (bill.totalRefunded || 0)).toFixed(2)}`,
         480,
         subtotalY + 45,
         {
@@ -735,6 +777,22 @@ export const generateBillPDF = async (
           width: 70,
         }
       );
+
+    if ((bill.totalRefunded || 0) > 0) {
+      doc
+        .fillColor('#dc2626')
+        .fontSize(10)
+        .text('Total Refunded:', 340, subtotalY + 65, {
+          align: 'right',
+          width: 130,
+        })
+        .text(
+          `-PKR ${Number(bill.totalRefunded).toFixed(2)}`,
+          480,
+          subtotalY + 65,
+          { align: 'right', width: 70 }
+        );
+    }
 
     doc
       .fillColor('#64748b')
@@ -799,7 +857,12 @@ export const getAllBills = async (
         createdAt: -1,
       });
 
-    res.json(bills);
+    const summarizedBills = bills.map((bill) => getBillReturnSummary(bill));
+    res.json(
+      req.query.includeReturned === 'true'
+        ? summarizedBills
+        : summarizedBills.filter((bill) => !bill.isFullyReturned)
+    );
   } catch (error) {
     next(error);
   }
@@ -853,127 +916,75 @@ export const acceptOnlineOrder = async (
   const { id } = req.params;
 
   try {
-    const bill = await Bill.findOne({
-      _id: id,
-      billType: 'ONLINE',
-      orderStatus: 'PENDING',
-    }).populate(
-      'customerId',
-      'name email phone'
-    );
-
-    if (!bill) {
-      res.status(404);
-
-      throw new Error(
-        'Pending online order not found'
-      );
-    }
-
-    const validatedMedicines = [];
-
-    for (const item of bill.items) {
-      const medicine = await Medicine.findById(
-        item.medicineId
-      );
-
-      if (!medicine) {
-        res.status(404);
-
-        throw new Error(
-          `Medicine not found: ${item.name}`
-        );
-      }
-
-      const expiryStatus = checkExpiryStatus(
-        medicine.expiryDate
-      );
-
-      if (expiryStatus === 'EXPIRED') {
-        res.status(403);
-
-        throw new Error(
-          `${medicine.name} is expired and cannot be accepted`
-        );
-      }
-
-      if (
-        medicine.quantity < item.quantity
-      ) {
-        res.status(400);
-
-        throw new Error(
-          `${medicine.name} has insufficient stock. Requested: ${item.quantity}, Available: ${medicine.quantity}`
-        );
-      }
-
-      validatedMedicines.push({
-        medicine,
-        quantity: item.quantity,
-      });
-    }
-
-    const changedMedicines = [];
-
+    const session = await mongoose.startSession();
     try {
-      for (const item of validatedMedicines) {
-        const updatedMedicine =
-          await Medicine.findOneAndUpdate(
-            {
-              _id: item.medicine._id,
-              quantity: {
-                $gte: item.quantity,
-              },
-            },
-            {
-              $inc: {
-                quantity: -item.quantity,
-              },
-            },
-            {
-              new: true,
-            }
-          );
+      await session.withTransaction(async () => {
+        const bill = await Bill.findOne({
+          _id: id,
+          billType: 'ONLINE',
+          orderStatus: 'PENDING',
+        }).session(session);
 
-        if (!updatedMedicine) {
-          throw new Error(
-            `${item.medicine.name} no longer has enough stock. Please refresh and try again.`
+        if (!bill) {
+          const error = new Error('Pending online order not found');
+          error.statusCode = 404;
+          throw error;
+        }
+
+        const requirements = new Map();
+        for (const item of bill.items) {
+          const quantity = Number(item.quantity);
+          if (!Number.isInteger(quantity) || quantity < 1) {
+            throw new Error(`Invalid quantity in order for ${item.name}`);
+          }
+
+          const medicine = await Medicine.findById(item.medicineId).session(session);
+          if (!medicine) {
+            const error = new Error(`Medicine not found: ${item.name}`);
+            error.statusCode = 404;
+            throw error;
+          }
+          if (checkExpiryStatus(medicine.expiryDate) === 'EXPIRED') {
+            const error = new Error(`${medicine.name} is expired and cannot be accepted`);
+            error.statusCode = 403;
+            throw error;
+          }
+
+          const medicineId = String(medicine._id);
+          requirements.set(
+            medicineId,
+            (requirements.get(medicineId) || 0) + quantity
           );
         }
 
-        changedMedicines.push({
-          medicineId:
-            item.medicine._id,
-          quantity:
-            item.quantity,
-        });
-      }
-
-      bill.orderStatus = 'ACCEPTED';
-      bill.pharmacistId = req.user._id;
-      bill.reviewedBy = req.user._id;
-      bill.reviewedAt = new Date();
-      bill.rejectionReason = '';
-
-      await bill.save();
-    } catch (error) {
-      for (const changed of changedMedicines) {
-        await Medicine.findByIdAndUpdate(
-          changed.medicineId,
-          {
-            $inc: {
-              quantity:
-                changed.quantity,
-            },
+        for (const [medicineId, quantity] of requirements) {
+          const result = await Medicine.updateOne(
+            { _id: medicineId, quantity: { $gte: quantity } },
+            { $inc: { quantity: -quantity } },
+            { session }
+          );
+          if (!result.modifiedCount) {
+            const error = new Error(
+              'Stock changed during order acceptance. Refresh and try again.'
+            );
+            error.statusCode = 409;
+            throw error;
           }
-        );
-      }
+        }
 
-      throw error;
+        bill.orderStatus = 'ACCEPTED';
+        bill.pharmacistId = req.user._id;
+        bill.reviewedBy = req.user._id;
+        bill.reviewedAt = new Date();
+        bill.rejectionReason = '';
+        await bill.save({ session });
+      });
+    } finally {
+      await session.endSession();
     }
 
     const populatedBill =
-      await Bill.findById(bill._id)
+      await Bill.findById(id)
         .populate(
           'customerId',
           'name email phone'
@@ -1138,7 +1149,7 @@ export const getBillById = async (
       );
     }
 
-    res.json(bill);
+    res.json(getBillReturnSummary(bill));
   } catch (error) {
     next(error);
   }
@@ -1198,9 +1209,9 @@ export const createInstoreBill = async (
   next
 ) => {
   const {
+    customerName,
     customerPhone,
     customerId,
-    paymentMethod,
     discount,
     items,
   } = req.body;
@@ -1230,17 +1241,38 @@ export const createInstoreBill = async (
   }
 
   try {
+    const linkedCustomer = customerId
+      ? await User.findById(customerId)
+      : null;
+    if (customerId && !linkedCustomer) {
+      res.status(404);
+      return next(new Error('Customer not found'));
+    }
+
+    const normalizedCustomerName =
+      (typeof customerName === 'string' ? customerName : '').trim() ||
+      linkedCustomer?.name ||
+      null;
+    const normalizedCustomerPhone =
+      (typeof customerPhone === 'string' ? customerPhone : '').trim() ||
+      linkedCustomer?.phone ||
+      null;
+
     const expiredItems = [];
     const insufficientStockItems = [];
     const validatedItems = [];
+    const stockRequirements = new Map();
 
     let subtotal = 0;
 
     for (const item of items) {
-      const medicine =
-        await Medicine.findById(
-          item.medicineId
-        );
+      const quantity = Number(item.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        res.status(400);
+        return next(new Error('Medicine quantities must be positive whole units'));
+      }
+
+      const medicine = await Medicine.findById(item.medicineId);
 
       if (!medicine) {
         res.status(404);
@@ -1268,25 +1300,39 @@ export const createInstoreBill = async (
 
       if (
         medicine.quantity <
-        item.quantity
+        quantity
       ) {
         insufficientStockItems.push(
-          `${medicine.name} (Requested: ${item.quantity}, Available: ${medicine.quantity})`
+          `${medicine.name} (Requested: ${quantity}, Available: ${medicine.quantity})`
         );
       }
 
-      subtotal +=
-        medicine.price *
-        item.quantity;
+      let salePrice;
+      try {
+        salePrice = getSalePrice(item.salePrice, medicine.price, medicine.purchasePrice);
+      } catch (error) {
+        res.status(400);
+        return next(error);
+      }
+
+      subtotal += salePrice * quantity;
+      const medicineId = String(medicine._id);
+      stockRequirements.set(
+        medicineId,
+        (stockRequirements.get(medicineId) || 0) + quantity
+      );
 
       validatedItems.push({
         medicineId: medicine._id,
         name: medicine.name,
-        quantity: item.quantity,
-        unitPrice: medicine.price,
+        quantity,
+        unitPrice: salePrice,
+        salePrice,
+        purchasePrice: Number(medicine.purchasePrice) || 0,
         expiryStatus,
         expiryDate:
           medicine.expiryDate,
+        rackLocation: medicine.rackLocation || '',
         ref: medicine,
       });
     }
@@ -1318,77 +1364,72 @@ export const createInstoreBill = async (
     }
 
     const finalDiscount =
-      Number(discount) || 0;
+      discount === undefined || discount === '' ? 0 : Number(discount);
+    if (
+      !Number.isFinite(finalDiscount) ||
+      finalDiscount < 0 ||
+      finalDiscount > subtotal
+    ) {
+      res.status(400);
+      return next(new Error('Discount must be between zero and the bill subtotal'));
+    }
 
     const total = Math.max(
       0,
       subtotal - finalDiscount
     );
 
-    const bill =
-      await Bill.create({
-        pharmacistId:
-          req.user._id,
+    let bill;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        [bill] = await Bill.create(
+          [{
+            pharmacistId: req.user._id,
+            customerId: customerId || null,
+            customerName: normalizedCustomerName,
+            customerPhone: normalizedCustomerPhone,
+            guestPhone: customerId ? null : normalizedCustomerPhone,
+            billType: 'INSTORE',
+            orderStatus: 'ACCEPTED',
+            reviewedBy: req.user._id,
+            reviewedAt: new Date(),
+            items: validatedItems.map((item) => ({
+              medicineId: item.medicineId,
+              name: item.name,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              salePrice: item.salePrice,
+              purchasePrice: item.purchasePrice,
+              expiryStatus: item.expiryStatus,
+              expiryDate: item.expiryDate,
+              rackLocation: item.rackLocation,
+            })),
+            subtotal,
+            discount: finalDiscount,
+            total,
+            paymentMethod: 'Cash',
+          }],
+          { session }
+        );
 
-        customerId:
-          customerId || null,
-
-        customerPhone:
-          customerId
-            ? customerPhone || null
-            : null,
-
-        guestPhone:
-          customerId
-            ? null
-            : customerPhone,
-
-        billType: 'INSTORE',
-
-        orderStatus:
-          'ACCEPTED',
-
-        reviewedBy:
-          req.user._id,
-
-        reviewedAt:
-          new Date(),
-
-        items:
-          validatedItems.map(
-            (item) => ({
-              medicineId:
-                item.medicineId,
-              name:
-                item.name,
-              quantity:
-                item.quantity,
-              unitPrice:
-                item.unitPrice,
-              expiryStatus:
-                item.expiryStatus,
-              expiryDate:
-                item.expiryDate,
-              rackLocation:
-                item.rackLocation,
-            })
-          ),
-
-        subtotal,
-        discount:
-          finalDiscount,
-        total,
-
-        paymentMethod:
-          paymentMethod ||
-          'Cash',
+        for (const [medicineId, quantity] of stockRequirements) {
+          const result = await Medicine.updateOne(
+            { _id: medicineId, quantity: { $gte: quantity } },
+            { $inc: { quantity: -quantity } },
+            { session }
+          );
+          if (!result.modifiedCount) {
+            const error = new Error(
+              'Stock changed during billing. Please refresh and try again.'
+            );
+            error.statusCode = 409;
+            throw error;
+          }
+        }
       });
-
-    for (const item of validatedItems) {
-      item.ref.quantity -=
-        item.quantity;
-
-      await item.ref.save();
+    } finally {
+      await session.endSession();
     }
 
     res.status(201).json({
@@ -1466,89 +1507,41 @@ export const getSalesSummary = async (
       },
     };
 
-    const todayResult =
-      await Bill.aggregate([
-        {
-          $match: {
-            ...acceptedMatch,
-            createdAt: {
-              $gte: startOfDay,
-              $lt: startOfTomorrow,
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalSales: {
-              $sum: '$total',
-            },
-            totalBills: {
-              $sum: 1,
-            },
-          },
-        },
-      ]);
-
-    const monthlyResult =
-      await Bill.aggregate([
-        {
-          $match: {
-            ...acceptedMatch,
-            createdAt: {
-              $gte: startOfMonth,
-              $lt: startOfNextMonth,
-            },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            totalSales: {
-              $sum: '$total',
-            },
-            totalBills: {
-              $sum: 1,
-            },
-          },
-        },
-      ]);
-
-    const todaySales =
-      todayResult.length > 0
-        ? todayResult[0].totalSales
-        : 0;
-
-    const todayBills =
-      todayResult.length > 0
-        ? todayResult[0].totalBills
-        : 0;
-
-    const monthlySales =
-      monthlyResult.length > 0
-        ? monthlyResult[0].totalSales
-        : 0;
-
-    const monthlyBills =
-      monthlyResult.length > 0
-        ? monthlyResult[0].totalBills
-        : 0;
+    const [todayBills, monthBills] = await Promise.all([
+      Bill.find({
+        ...acceptedMatch,
+        createdAt: { $gte: startOfDay, $lt: startOfTomorrow },
+      }).lean(),
+      Bill.find({
+        ...acceptedMatch,
+        createdAt: { $gte: startOfMonth, $lt: startOfNextMonth },
+      }).lean(),
+    ]);
+    const summarizeSales = (records) =>
+      records
+        .map((bill) => getBillReturnSummary(bill))
+        .filter((bill) => !bill.isFullyReturned)
+        .reduce(
+          (summary, bill) => ({
+            totalSales: summary.totalSales + bill.netTotal,
+            totalBills: summary.totalBills + 1,
+          }),
+          { totalSales: 0, totalBills: 0 }
+        );
+    const todaySummary = summarizeSales(todayBills);
+    const monthlySummary = summarizeSales(monthBills);
 
     res.json({
       success: true,
 
       today: {
-        totalSales:
-          todaySales,
-        totalBills:
-          todayBills,
+        totalSales: todaySummary.totalSales,
+        totalBills: todaySummary.totalBills,
       },
 
       month: {
-        totalSales:
-          monthlySales,
-        totalBills:
-          monthlyBills,
+        totalSales: monthlySummary.totalSales,
+        totalBills: monthlySummary.totalBills,
       },
     });
   } catch (error) {
@@ -1577,7 +1570,16 @@ export const getProfitSummary = async (req, res, next) => {
       };
     }
 
-    const bills = await Bill.find(matchStage);
+    const [bills, medicines] = await Promise.all([
+      Bill.find(matchStage).lean(),
+      Medicine.find().select('_id purchasePrice').lean(),
+    ]);
+    const purchasePriceByMedicine = new Map(
+      medicines.map((medicine) => [
+        String(medicine._id),
+        Number(medicine.purchasePrice) || 0,
+      ])
+    );
 
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1592,12 +1594,17 @@ export const getProfitSummary = async (req, res, next) => {
 
     bills.forEach((bill) => {
       let totalCost = 0;
-      bill.items.forEach((item) => {
-        const returnedQty = (bill.returns || [])
-          .filter((r) => String(r.medicineId) === String(item.medicineId))
-          .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
-        const netQty = Math.max(0, (item.quantity || 0) - returnedQty);
-        totalCost += (item.purchasePrice || 0) * netQty;
+      getBillReturnSummary(bill).netItems.forEach((item) => {
+        const netQty = item.netQuantity;
+        if (netQty === 0) return;
+        const savedPurchasePrice = Number(item.purchasePrice);
+        const purchasePrice =
+          item.purchasePrice !== undefined &&
+          item.purchasePrice !== null &&
+          Number.isFinite(savedPurchasePrice)
+            ? savedPurchasePrice
+            : purchasePriceByMedicine.get(String(item.medicineId)) || 0;
+        totalCost += purchasePrice * netQty;
       });
 
       const netTotal = Math.max(0, (bill.total || 0) - (bill.totalRefunded || 0));
@@ -1648,7 +1655,7 @@ export const getProfitDetails = async (req, res, next) => {
       };
     }
 
-    const bills = await Bill.find(matchStage);
+    const bills = await Bill.find(matchStage).lean();
     const medicines = await Medicine.find().lean();
     const medMap = {};
     medicines.forEach((m) => {
@@ -1663,43 +1670,60 @@ export const getProfitDetails = async (req, res, next) => {
       const subtotal = bill.subtotal || bill.total;
       const discountRatio = (bill.discount > 0 && subtotal > 0) ? (bill.discount / subtotal) : 0;
 
-      bill.items.forEach((item) => {
-        const returnedQty = (bill.returns || [])
-          .filter((r) => String(r.medicineId) === String(item.medicineId))
-          .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
-        const netQty = Math.max(0, (item.quantity || 0) - returnedQty);
+      getBillReturnSummary(bill).netItems.forEach((item) => {
+        const netQty = item.netQuantity;
 
         if (netQty === 0) return;
 
         const medObj = medMap[String(item.medicineId)];
         const itemPurchasePrice = item.purchasePrice ?? (medObj ? medObj.purchasePrice : 0);
-        const itemSalePrice = item.salePrice || item.unitPrice || (medObj ? medObj.price : 0);
+        const itemSalePrice =
+          item.salePrice ?? item.unitPrice ?? (medObj ? medObj.price : 0);
 
         if (!medicineProfitMap[item.medicineId]) {
           medicineProfitMap[item.medicineId] = {
             medicineId: item.medicineId,
             name: item.name,
-            purchasePrice: itemPurchasePrice,
-            salePrice: itemSalePrice,
+            purchasePrice: 0,
+            salePrice: 0,
             remainingStock: medObj ? medObj.quantity : 0,
             quantitySold: 0,
             totalCost: 0,
+            totalDiscount: 0,
+            grossSales: 0,
             totalSales: 0,
             totalProfit: 0,
           };
         }
 
-        const cost = itemPurchasePrice * netQty;
-        const grossSales = itemSalePrice * netQty;
-        const itemDiscount = grossSales * discountRatio;
-        const netSales = grossSales - itemDiscount;
-        const profit = netSales - cost;
+        const {
+          cost,
+          grossSales,
+          discountAmount,
+          netSales,
+          profit,
+        } = getNetItemAmounts({
+          purchasePrice: itemPurchasePrice,
+          salePrice: itemSalePrice,
+          quantity: netQty,
+          discountRatio,
+        });
 
         medicineProfitMap[item.medicineId].quantitySold += netQty;
         medicineProfitMap[item.medicineId].totalCost += cost;
+        medicineProfitMap[item.medicineId].totalDiscount += discountAmount;
+        medicineProfitMap[item.medicineId].grossSales += grossSales;
         medicineProfitMap[item.medicineId].totalSales += netSales;
         medicineProfitMap[item.medicineId].totalProfit += profit;
       });
+    });
+
+    Object.values(medicineProfitMap).forEach((item) => {
+      if (item.quantitySold > 0) {
+        item.purchasePrice = item.totalCost / item.quantitySold;
+        item.salePrice = item.grossSales / item.quantitySold;
+      }
+      delete item.grossSales;
     });
 
     const profitDetails = Object.values(medicineProfitMap).sort((a, b) => b.totalProfit - a.totalProfit);
@@ -1718,7 +1742,7 @@ export const getProfitDetails = async (req, res, next) => {
 // @access  Private/Pharmacist,Superadmin
 export const processSalesReturn = async (req, res, next) => {
   const { id } = req.params;
-  const { returns } = req.body; // Array of { medicineId, quantityReturned, reason }
+  const { returns } = req.body;
 
   try {
     if (!returns || !Array.isArray(returns) || returns.length === 0) {
@@ -1726,99 +1750,140 @@ export const processSalesReturn = async (req, res, next) => {
       return next(new Error('Please provide at least one medicine item to return'));
     }
 
-    const bill = await Bill.findById(id);
-    if (!bill) {
-      res.status(404);
-      return next(new Error('Bill not found'));
-    }
-
-    if (bill.orderStatus === 'REJECTED') {
+    const returnIds = returns.map((item) => String(item.medicineId || ''));
+    if (returnIds.some((medicineId) => !medicineId) || new Set(returnIds).size !== returnIds.length) {
       res.status(400);
-      return next(new Error('Cannot process return on a rejected order'));
+      return next(new Error('Each medicine can only appear once in a return request'));
     }
 
     let totalRefundThisCall = 0;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const bill = await Bill.findById(id).session(session);
+        if (!bill) {
+          const error = new Error('Bill not found');
+          error.statusCode = 404;
+          throw error;
+        }
+        if (bill.orderStatus === 'REJECTED') {
+          const error = new Error('Cannot process return on a rejected order');
+          error.statusCode = 400;
+          throw error;
+        }
 
-    for (const returnItem of returns) {
-      const { medicineId, quantityReturned, reason } = returnItem;
-      const qtyToReturn = Number(quantityReturned);
+        totalRefundThisCall = 0;
+        for (const returnItem of returns) {
+          const { medicineId, quantityReturned, reason } = returnItem;
+          const qtyToReturn = Number(quantityReturned);
+          if (!Number.isInteger(qtyToReturn) || qtyToReturn <= 0) {
+            const error = new Error('Return quantities must be positive whole units');
+            error.statusCode = 400;
+            throw error;
+          }
 
-      if (!medicineId || isNaN(qtyToReturn) || qtyToReturn <= 0) {
-        res.status(400);
-        return next(new Error('Invalid return item details'));
-      }
+          const matchingItems = bill.items.filter(
+            (item) => String(item.medicineId) === String(medicineId)
+          );
+          if (matchingItems.length === 0) {
+            const error = new Error(`Medicine item not found in bill ${bill.billNumber}`);
+            error.statusCode = 404;
+            throw error;
+          }
+          const billItem = matchingItems[0];
 
-      // Find original item in bill
-      const billItem = bill.items.find(
-        (item) => item.medicineId.toString() === medicineId.toString()
-      );
+          const itemReturns = (bill.returns || []).filter(
+            (item) => String(item.medicineId) === String(medicineId)
+          );
+          const previouslyReturned = itemReturns.reduce(
+            (sum, item) => sum + item.quantityReturned,
+            0
+          );
+          const totalItemQuantity = matchingItems.reduce(
+            (sum, item) => sum + item.quantity,
+            0
+          );
+          const availableToReturn = totalItemQuantity - previouslyReturned;
+          if (qtyToReturn > availableToReturn) {
+            const error = new Error(
+              `Cannot return ${qtyToReturn} of "${billItem.name}". Maximum available to return is ${availableToReturn}.`
+            );
+            error.statusCode = 400;
+            throw error;
+          }
 
-      if (!billItem) {
-        res.status(404);
-        return next(new Error(`Medicine item not found in bill ${bill.billNumber}`));
-      }
+          const itemSalePrice =
+            matchingItems.reduce(
+              (sum, item) =>
+                sum +
+                Number(item.salePrice ?? item.unitPrice ?? 0) *
+                  Number(item.quantity || 0),
+              0
+            ) / totalItemQuantity;
+          const previousItemRefunds = itemReturns.reduce(
+            (sum, item) => sum + item.refundAmount,
+            0
+          );
+          const refundAmount = getDiscountedReturnRefund({
+            itemSalePrice,
+            itemQuantity: totalItemQuantity,
+            quantityAlreadyReturned: previouslyReturned,
+            quantityToReturn: qtyToReturn,
+            subtotal: Number(bill.subtotal) || 0,
+            discount: Number(bill.discount) || 0,
+            previousItemRefunds,
+          });
 
-      // Calculate how many items of this medicine were already returned previously
-      const previouslyReturned = (bill.returns || [])
-        .filter((r) => r.medicineId.toString() === medicineId.toString())
-        .reduce((sum, r) => sum + r.quantityReturned, 0);
+          const medicine = await Medicine.findById(medicineId).session(session);
+          if (!medicine) {
+            const error = new Error(`Cannot restock missing medicine: ${billItem.name}`);
+            error.statusCode = 404;
+            throw error;
+          }
 
-      const availableToReturn = billItem.quantity - previouslyReturned;
+          const previousQuantity = medicine.quantity;
+          const updatedMedicine = await Medicine.findOneAndUpdate(
+            { _id: medicineId },
+            { $inc: { quantity: qtyToReturn } },
+            { new: true, session }
+          );
+          await StockAdjustment.create(
+            [{
+              medicineId: medicine._id,
+              medicineName: medicine.name,
+              previousQuantity,
+              newQuantity: updatedMedicine.quantity,
+              adjustmentType: 'ADD',
+              quantityChanged: qtyToReturn,
+              reason: `Sales Return (Bill #${bill.billNumber}): ${String(reason || 'Customer Return').trim()}`,
+              adjustedBy: req.user._id,
+            }],
+            { session }
+          );
 
-      if (qtyToReturn > availableToReturn) {
-        res.status(400);
-        return next(
-          new Error(
-            `Cannot return ${qtyToReturn} of "${billItem.name}". Maximum available to return is ${availableToReturn}.`
-          )
-        );
-      }
+          bill.returns.push({
+            medicineId: billItem.medicineId,
+            name: billItem.name,
+            quantityReturned: qtyToReturn,
+            unitPrice: refundAmount / qtyToReturn,
+            refundAmount,
+            reason: String(reason || '').trim() || 'Customer Sale Return',
+            returnedAt: new Date(),
+            returnedBy: req.user._id,
+          });
+          totalRefundThisCall += refundAmount;
+        }
 
-      // Price calculation
-      const itemUnitPrice = billItem.salePrice || billItem.unitPrice || 0;
-      const refundAmount = itemUnitPrice * qtyToReturn;
-
-      // Restock medicine in Database
-      const medicine = await Medicine.findById(medicineId);
-      if (medicine) {
-        const prevQty = medicine.quantity;
-        medicine.quantity += qtyToReturn;
-        await medicine.save();
-
-        // Create StockAdjustment record
-        await StockAdjustment.create({
-          medicineId: medicine._id,
-          medicineName: medicine.name,
-          previousQuantity: prevQty,
-          newQuantity: medicine.quantity,
-          adjustmentType: 'ADD',
-          quantityChanged: qtyToReturn,
-          reason: `Sales Return (Bill #${bill.billNumber}): ${reason || 'Customer Return'}`,
-          adjustedBy: req.user._id,
-        });
-      }
-
-      // Push return item to bill
-      const returnRecord = {
-        medicineId: billItem.medicineId,
-        name: billItem.name,
-        quantityReturned: qtyToReturn,
-        unitPrice: itemUnitPrice,
-        refundAmount,
-        reason: reason?.trim() || 'Customer Sale Return',
-        returnedAt: new Date(),
-        returnedBy: req.user._id,
-      };
-
-      bill.returns.push(returnRecord);
-      totalRefundThisCall += refundAmount;
+        bill.totalRefunded = (bill.totalRefunded || 0) + totalRefundThisCall;
+        bill.isReturned = true;
+        bill.isFullyReturned = getBillReturnSummary(bill).isFullyReturned;
+        await bill.save({ session });
+      });
+    } finally {
+      await session.endSession();
     }
 
-    bill.totalRefunded = (bill.totalRefunded || 0) + totalRefundThisCall;
-    bill.isReturned = true;
-    await bill.save();
-
-    const updatedBill = await Bill.findById(bill._id)
+    const updatedBill = await Bill.findById(id)
       .populate('pharmacistId', 'name email')
       .populate('customerId', 'name email phone')
       .populate('returns.returnedBy', 'name email role');
@@ -1826,11 +1891,10 @@ export const processSalesReturn = async (req, res, next) => {
     res.json({
       success: true,
       message: `Sales return processed successfully! Refunded: PKR ${totalRefundThisCall.toFixed(2)}`,
-      bill: updatedBill,
+      bill: getBillReturnSummary(updatedBill),
       refundedAmount: totalRefundThisCall,
     });
   } catch (error) {
     next(error);
   }
 };
-

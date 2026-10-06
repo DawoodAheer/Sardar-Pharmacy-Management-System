@@ -153,7 +153,7 @@ const CustomerBills = () => {
         ? bill.items.reduce(
             (itemSum, item) =>
               itemSum +
-              Number(item.quantity || 0),
+              Number(item.netQuantity ?? item.quantity ?? 0),
             0
           )
         : 0),
@@ -163,7 +163,7 @@ const CustomerBills = () => {
   const totalSpent = bills.reduce(
     (sum, bill) =>
       sum +
-      Number(bill.total || 0),
+      Math.max(0, Number(bill.total || 0) - Number(bill.totalRefunded || 0)),
     0
   );
 
@@ -565,7 +565,8 @@ const CustomerBills = () => {
                                 ) =>
                                   sum +
                                   Number(
-                                    item.quantity ||
+                                    item.netQuantity ??
+                                      item.quantity ??
                                       0
                                   ),
                                 0
@@ -650,7 +651,11 @@ const CustomerBills = () => {
 
                               <div className="font-bold text-slate-900 dark:text-white">
                                 {getCurrency(
-                                  bill.total
+                                  Math.max(
+                                    0,
+                                    Number(bill.total || 0) -
+                                      Number(bill.totalRefunded || 0)
+                                  )
                                 )}
                               </div>
 
@@ -910,9 +915,9 @@ const CustomerBills = () => {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
 
                         {Array.isArray(
-                          selectedBill.items
+                          selectedBill.netItems || selectedBill.items
                         ) &&
-                          selectedBill.items.map(
+                          (selectedBill.netItems || selectedBill.items).map(
                             (
                               item,
                               index
@@ -920,13 +925,13 @@ const CustomerBills = () => {
 
                               const unitPrice =
                                 Number(
-                                  item.unitPrice ||
-                                    0
+                                  item.salePrice ?? item.unitPrice ?? 0
                                 );
 
                               const quantity =
                                 Number(
-                                  item.quantity ||
+                                  item.netQuantity ??
+                                    item.quantity ??
                                     0
                                 );
 
@@ -1022,15 +1027,31 @@ const CustomerBills = () => {
 
                     </div>
 
+                    {Number(selectedBill.totalRefunded || 0) > 0 && (
+                      <div className="flex items-center justify-between w-full sm:w-72">
+                        <span className="text-rose-600 dark:text-rose-400">
+                          Returned
+                        </span>
+                        <span className="font-mono font-semibold text-rose-600 dark:text-rose-400">
+                          -{getCurrency(selectedBill.totalRefunded)}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="w-full sm:w-72 border-t border-slate-200 dark:border-slate-700 pt-2 mt-1 flex items-center justify-between">
 
                       <span className="font-bold text-sm text-blue-700 dark:text-sky-400">
-                        Order Total
+                        Net Amount Paid
                       </span>
 
                       <span className="font-mono font-extrabold text-lg text-blue-700 dark:text-sky-400">
                         {getCurrency(
-                          selectedBill.total
+                          selectedBill.netTotal ??
+                            Math.max(
+                              0,
+                              Number(selectedBill.total || 0) -
+                                Number(selectedBill.totalRefunded || 0)
+                            )
                         )}
                       </span>
 

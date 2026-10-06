@@ -9,7 +9,8 @@ const createSuperAdmin = async () => {
   try {
     // MongoDB connection
     await mongoose.connect(
-      process.env.MONGO_URI || "mongodb://localhost:27017/pharmadesk"
+      process.env.MONGO_URI ||
+      "mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true"
     );
 
     console.log("MongoDB Connected");

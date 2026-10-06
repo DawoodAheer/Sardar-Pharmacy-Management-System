@@ -212,7 +212,7 @@ async function seedData() {
       subtotal: (medAdvil.price * 2) + medAugmentin.price,
       discount: 2.00,
       total: ((medAdvil.price * 2) + medAugmentin.price) - 2.00,
-      paymentMethod: 'UPI',
+      paymentMethod: 'Cash',
     });
 
     const bill2 = await Bill.create({

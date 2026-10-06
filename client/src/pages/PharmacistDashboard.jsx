@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   useQuery,
@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import api from '../utils/api';
+import { downloadMedicineInventory } from '../utils/medicineExport';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import ProfitDetailsModal from '../components/ProfitDetailsModal';
@@ -50,6 +51,7 @@ import {
   User,
   Menu,
   FileText,
+  Download,
   Play,
   Wallet,
   TrendingUp,
@@ -61,6 +63,7 @@ import {
   ClipboardList,
   ShoppingCart,
   ArrowRight,
+  Camera,
 } from 'lucide-react';
 
 // ============================================================================
@@ -83,6 +86,24 @@ const getDaysLeft = (expiryDate) => {
   return Math.ceil(
     diffTime / (1000 * 60 * 60 * 24)
   );
+};
+
+const getStockStatus = (quantity) => {
+  const stock = Number(quantity) || 0;
+  if (stock <= 0) return 'End Stock';
+  if (stock < 5) return 'Low Stock';
+  if (stock > 20) return 'High Stock';
+  return 'Stock Available';
+};
+
+const getStockBadgeClass = (status) => {
+  if (status === 'End Stock' || status === 'Low Stock') {
+    return 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-500/30';
+  }
+  if (status === 'High Stock') {
+    return 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-500/30';
+  }
+  return 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-500/30';
 };
 
 const getCurrency = (amount = 0) => {
@@ -233,6 +254,10 @@ const PharmacistDashboard = () => {
   const location = useLocation();
 
   const fileInputRef = useRef(null);
+  const billScanInputRef = useRef(null);
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const cameraTargetRef = useRef('medicine');
 
   const [activeTab, setActiveTab] = useState(
     location.state?.activeTab || 'dashboard'
@@ -286,6 +311,8 @@ const PharmacistDashboard = () => {
 
   const [ocrPreview, setOcrPreview] =
     useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState('medicine');
 
   const [error, setError] =
     useState('');
@@ -418,6 +445,8 @@ const PharmacistDashboard = () => {
 
   const [bulkSuccess, setBulkSuccess] =
     useState('');
+  const [isExportingMedicines, setIsExportingMedicines] =
+    useState(false);
 
   // ==========================================================================
   // BILLING
@@ -432,6 +461,9 @@ const PharmacistDashboard = () => {
   const [selectedCustomerId, setSelectedCustomerId] =
     useState('');
 
+  const [customerName, setCustomerName] =
+    useState('');
+
   const [guestPhone, setGuestPhone] =
     useState('');
 
@@ -440,9 +472,6 @@ const PharmacistDashboard = () => {
 
   const [discount, setDiscount] =
     useState('');
-
-  const [paymentMethod, setPaymentMethod] =
-    useState('Card');
 
   const [billError, setBillError] =
     useState('');
@@ -1091,14 +1120,12 @@ const PharmacistDashboard = () => {
     setActiveTab('medicines');
   };
 
-  const showExpiringThisMonth = () => {
+  const showExpiringSixMonths = () => {
     setSearch('');
     setCategoryFilter('');
-    setExpiryStatusFilter('');
+    setExpiryStatusFilter('EXPIRING');
     setReorderFilter(false);
-    setMedicineViewFilter(
-      'EXPIRING_MONTH'
-    );
+    setMedicineViewFilter('ALL');
     setActiveTab('medicines');
   };
 
@@ -1124,9 +1151,9 @@ const PharmacistDashboard = () => {
 
     if (
       !name.trim() ||
-      !genericName.trim() ||
       !manufacturer.trim() ||
       !expiryDate ||
+      purchasePrice === '' ||
       price === '' ||
       quantity === ''
     ) {
@@ -1134,6 +1161,13 @@ const PharmacistDashboard = () => {
         'Please fill all required medicine fields'
       );
 
+      return;
+    }
+
+    const purchaseValue = Number(purchasePrice) || 0;
+    const saleValue = Number(price);
+    if (Number.isFinite(saleValue) && saleValue < purchaseValue) {
+      setError('Sale price cannot be lower than the purchase price.');
       return;
     }
 
@@ -1187,6 +1221,14 @@ const PharmacistDashboard = () => {
         return;
       }
 
+      await processScannedLabel(file, 'medicine');
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+
+  const processScannedLabel = async (file, target) => {
       const formData =
         new FormData();
 
@@ -1218,6 +1260,7 @@ const PharmacistDashboard = () => {
           medicineName: data.medicineName || '',
           genericName: data.genericName || '',
           expiryDate: data.expiryDate || '',
+          scannedPrices: data.scannedPrices || {},
           confidence: data.confidence || 'low',
         });
 
@@ -1263,38 +1306,109 @@ const PharmacistDashboard = () => {
           );
         }
 
-        alert(
-          `OCR Scan Successful!\n\nName: ${
-            data.medicineName ||
-            'N/A'
-          }\nGeneric: ${
-            data.genericName ||
-            'N/A'
-          }\nManufacturer: ${
-            data.manufacturer ||
-            'N/A'
-          }\nExpiry: ${
-            data.expiryDate ||
-            'N/A'
-          }\nConfidence: ${
-            data.confidence ??
-            'N/A'
-          }`
-        );
+        if (target === 'bill') {
+          const scannedName = String(data.medicineName || '').trim().toLowerCase();
+          const scannedGeneric = String(data.genericName || '').trim().toLowerCase();
+          const usableName = scannedName && scannedName !== 'unknown';
+          const usableGeneric = scannedGeneric && scannedGeneric !== 'unknown';
+          const match = medicines.find((medicine) => {
+            const medicineName = String(medicine.name || '').toLowerCase();
+            const genericNameValue = String(medicine.genericName || '').toLowerCase();
+            return (
+              (usableName && (medicineName.includes(scannedName) || scannedName.includes(medicineName))) ||
+              (usableGeneric && (genericNameValue.includes(scannedGeneric) || scannedGeneric.includes(genericNameValue)))
+            );
+          });
+          if (!match) {
+            setBillError(`Could not match "${data.medicineName || data.genericName || 'scanned medicine'}" to inventory. Search by name or barcode instead.`);
+          } else if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
+            setBillError(`${match.name} is expired or out of stock and cannot be added to a bill.`);
+          } else {
+            setBillError('');
+            handleAddToBill(match);
+          }
+        }
       } catch (err) {
-        setError(
-          err.response?.data?.message ||
-            'OCR scan failed'
-        );
+        const message = err.response?.data?.message || 'OCR scan failed';
+        if (target === 'bill') setBillError(message);
+        else setError(message);
       } finally {
         setOcrLoading(false);
-
-        if (fileInputRef.current) {
-          fileInputRef.current.value =
-            '';
-        }
       }
     };
+
+  const stopCamera = () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    setCameraActive(false);
+  };
+
+  const startCamera = async (target) => {
+    cameraTargetRef.current = target;
+    setCameraTarget(target);
+    setError('');
+    setBillError('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const message = 'Live camera access is unavailable. It requires localhost or HTTPS; you can still choose an image. To use a phone camera, open the pharmacy app on the phone itself.';
+      if (target === 'bill') setBillError(message);
+      else setError(message);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' } },
+      });
+      cameraStreamRef.current = stream;
+      setCameraActive(true);
+    } catch (cameraError) {
+      const message = cameraError.name === 'NotAllowedError'
+        ? 'Camera permission was denied. Allow camera access in your browser settings and try again.'
+        : `Unable to open the camera: ${cameraError.message}`;
+      if (target === 'bill') setBillError(message);
+      else setError(message);
+    }
+  };
+
+  useEffect(() => {
+    if (cameraActive && cameraVideoRef.current && cameraStreamRef.current) {
+      cameraVideoRef.current.srcObject = cameraStreamRef.current;
+      cameraVideoRef.current.play().catch((playError) => {
+        console.error('Unable to start camera preview:', playError);
+      });
+    }
+  }, [cameraActive]);
+
+  useEffect(() => () => {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  const captureCameraImage = async () => {
+    const video = cameraVideoRef.current;
+    if (!video?.videoWidth || !video.videoHeight) {
+      const message = 'Camera is not ready yet. Wait for the preview and try again.';
+      if (cameraTargetRef.current === 'bill') setBillError(message);
+      else setError(message);
+      return;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    if (!blob) {
+      const message = 'Could not capture the camera image. Please try again.';
+      if (cameraTargetRef.current === 'bill') setBillError(message);
+      else setError(message);
+      return;
+    }
+
+    const target = cameraTargetRef.current;
+    stopCamera();
+    await processScannedLabel(new File([blob], 'medicine-camera-capture.jpg', { type: 'image/jpeg' }), target);
+  };
 
   // ==========================================================================
   // BULK
@@ -1316,6 +1430,25 @@ const PharmacistDashboard = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Medicines');
     XLSX.writeFile(wb, 'Medicine_Bulk_Import_Template.xlsx');
+  };
+
+  const exportAllMedicines = async () => {
+    setIsExportingMedicines(true);
+    try {
+      const { data } = await api.get('/medicines');
+      if (!Array.isArray(data)) {
+        throw new Error('The server returned an invalid medicine list.');
+      }
+      downloadMedicineInventory(data);
+    } catch (exportError) {
+      setError(
+        exportError.response?.data?.message ||
+          exportError.message ||
+          'Unable to export medicines.'
+      );
+    } finally {
+      setIsExportingMedicines(false);
+    }
   };
 
   const handleFileUpload = (e) => {
@@ -1358,7 +1491,7 @@ const PharmacistDashboard = () => {
 
         setBulkData(parsedData);
         setBulkError('');
-      } catch (err) {
+      } catch {
         setBulkError('Error parsing Excel file. Ensure it matches the template.');
       }
     };
@@ -1468,6 +1601,7 @@ const PharmacistDashboard = () => {
           ...previous,
           {
             ...medicine,
+            salePrice: Number(medicine.price) || 0,
             billQuantity: 1,
           },
         ];
@@ -1551,7 +1685,7 @@ const PharmacistDashboard = () => {
     (sum, item) =>
       sum +
       Number(
-        item.price || 0
+        item.salePrice ?? item.price ?? 0
       ) *
         Number(
           item.billQuantity ||
@@ -1603,6 +1737,21 @@ const PharmacistDashboard = () => {
         return;
       }
 
+      if ((Number(discount) || 0) > subtotal) {
+        setBillError('Discount cannot exceed the invoice subtotal');
+        return;
+      }
+
+      const itemBelowCost = billItems.find(
+        (item) => Number(item.salePrice ?? item.price ?? 0) < Number(item.purchasePrice ?? 0)
+      );
+      if (itemBelowCost) {
+        setBillError(
+          `Sale price for ${itemBelowCost.name} cannot be lower than its purchase cost.`
+        );
+        return;
+      }
+
       setIsBillingPending(true);
 
       try {
@@ -1621,13 +1770,17 @@ const PharmacistDashboard = () => {
                 selectedCustomerId ||
                 null,
 
-              customerPhone:
-                selectedCustomerId
-                  ? customer?.phone ||
-                    ''
-                  : guestPhone.trim(),
+              customerName:
+                customerName.trim() ||
+                customer?.name ||
+                '',
 
-              paymentMethod,
+              customerPhone:
+                guestPhone.trim() ||
+                customer?.phone ||
+                '',
+
+              paymentMethod: 'Cash',
 
               discount:
                 Number(discount) ||
@@ -1646,7 +1799,10 @@ const PharmacistDashboard = () => {
                       item.billQuantity,
 
                     unitPrice:
-                      item.price,
+                      item.salePrice ?? item.price,
+
+                    salePrice:
+                      item.salePrice ?? item.price,
 
                     expiryStatus:
                       item.expiryStatus,
@@ -1663,6 +1819,7 @@ const PharmacistDashboard = () => {
         setBillItems([]);
         setDiscount('');
         setSelectedCustomerId('');
+        setCustomerName('');
         setGuestPhone('');
 
         await refetchMeds();
@@ -1803,12 +1960,6 @@ const PharmacistDashboard = () => {
   const now =
     new Date();
 
-  const currentMonth =
-    now.getMonth();
-
-  const currentYear =
-    now.getFullYear();
-
   const todayString =
     now.toDateString();
 
@@ -1822,34 +1973,10 @@ const PharmacistDashboard = () => {
         'EXPIRED'
     ).length;
 
-  const expiringThisMonth =
-    medicines.filter(
-      (medicine) => {
-        if (!medicine?.expiryDate) {
-          return false;
-        }
-
-        const expiry =
-          new Date(
-            medicine.expiryDate
-          );
-
-        if (
-          Number.isNaN(
-            expiry.getTime()
-          )
-        ) {
-          return false;
-        }
-
-        return (
-          expiry.getMonth() ===
-            currentMonth &&
-          expiry.getFullYear() ===
-            currentYear
-        );
-      }
-    ).length;
+  const expiringWithinSixMonths = medicines.filter((medicine) => {
+    const days = getDaysLeft(medicine?.expiryDate);
+    return days !== null && days >= 0 && days <= 180;
+  }).length;
 
   const billsToday =
     bills.filter(
@@ -1869,11 +1996,7 @@ const PharmacistDashboard = () => {
         Number(
           medicine?.quantity ||
             0
-        ) <=
-        Number(
-          medicine?.reorderLevel ||
-            0
-        )
+        ) < 5
     ).length;
 
   // ==========================================================================
@@ -1891,42 +2014,7 @@ const PharmacistDashboard = () => {
             Number(
               medicine?.quantity ||
                 0
-            ) <=
-            Number(
-              medicine?.reorderLevel ||
-                0
-            )
-          );
-        }
-
-        if (
-          medicineViewFilter ===
-          'EXPIRING_MONTH'
-        ) {
-          if (
-            !medicine?.expiryDate
-          ) {
-            return false;
-          }
-
-          const expiry =
-            new Date(
-              medicine.expiryDate
-            );
-
-          if (
-            Number.isNaN(
-              expiry.getTime()
-            )
-          ) {
-            return false;
-          }
-
-          return (
-            expiry.getMonth() ===
-              currentMonth &&
-            expiry.getFullYear() ===
-              currentYear
+            ) < 5
           );
         }
 
@@ -1941,12 +2029,15 @@ const PharmacistDashboard = () => {
   const expiringMedicines =
     [...medicines]
       .filter(
-        (medicine) =>
-          medicine?.expiryDate &&
-          Number(
-            medicine?.quantity ||
-              0
-          ) > 0
+        (medicine) => {
+          const days = getDaysLeft(medicine?.expiryDate);
+          return (
+            medicine?.expiryDate &&
+            days !== null &&
+            days >= 0 &&
+            days <= 180
+          );
+        }
       )
       .sort(
         (a, b) => {
@@ -1962,8 +2053,7 @@ const PharmacistDashboard = () => {
 
           return aDate - bDate;
         }
-      )
-      .slice(0, 100);
+      );
 
   // ==========================================================================
   // 7 DAY REVENUE
@@ -2085,6 +2175,8 @@ const PharmacistDashboard = () => {
           safeText(
             medicine?.rackLocation
           ).toLowerCase();
+        const barcodeValue =
+          safeText(medicine?.barcode).toLowerCase();
 
         const matchesSearch =
           !query ||
@@ -2094,9 +2186,8 @@ const PharmacistDashboard = () => {
           generic.includes(
             query
           ) ||
-          rack.includes(
-            query
-          );
+          rack.includes(query) ||
+          barcodeValue.includes(query);
 
         const matchesCategory =
           billCategory
@@ -2117,6 +2208,12 @@ const PharmacistDashboard = () => {
 
   const navItems = [
     {
+      name: 'User Control Panel',
+      tab: 'customers',
+      icon: Users,
+    },
+
+    {
       name: 'Home',
       tab: 'dashboard',
       icon: LayoutDashboard,
@@ -2132,12 +2229,6 @@ const PharmacistDashboard = () => {
       name: 'New Bill',
       tab: 'new-bill',
       icon: Receipt,
-    },
-
-    {
-      name: 'Customers',
-      tab: 'customers',
-      icon: Users,
     },
 
     {
@@ -2484,12 +2575,10 @@ const PharmacistDashboard = () => {
 
                 </button>
 
-                {/* EXPIRING THIS MONTH */}
+                {/* EXPIRING WITHIN SIX MONTHS */}
 
                 <button
-                  onClick={
-                    showExpiringThisMonth
-                  }
+                  onClick={showExpiringSixMonths}
                   className="text-left bg-white p-4 rounded-2xl border border-orange-100 shadow-sm hover:shadow-md transition"
                 >
 
@@ -2498,12 +2587,12 @@ const PharmacistDashboard = () => {
                     <div>
 
                       <div className="text-[10px] uppercase font-bold text-orange-500">
-                        Expiring This Month
+                        Expiring Within 6 Months
                       </div>
 
                       <div className="text-2xl font-bold text-orange-600 mt-2">
                         {
-                          expiringThisMonth
+                          expiringWithinSixMonths
                         }
                       </div>
 
@@ -2845,11 +2934,11 @@ const PharmacistDashboard = () => {
                   <div>
 
                     <h3 className="font-bold text-sm">
-                      Top 100 Medicines by Earliest Expiry
+                      Medicines Expiring Within 6 Months
                     </h3>
 
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      Medicines with available stock sorted by expiry date.
+                      All medicines with an expiry date in the next 180 days.
                     </p>
 
                   </div>
@@ -3143,8 +3232,8 @@ const PharmacistDashboard = () => {
 
                               <td className="p-3 text-xs">
                                 {
-                                  bill.customer?.name ||
                                   bill.customerName ||
+                                  bill.customer?.name ||
                                   'Walk-in Guest'
                                 }
                               </td>
@@ -3158,7 +3247,15 @@ const PharmacistDashboard = () => {
 
                               <td className="p-3 text-xs font-bold">
                                 {getCurrency(
-                                  bill.total
+                                  Math.max(
+                                    0,
+                                    (bill.total || 0) - (bill.totalRefunded || 0)
+                                  )
+                                )}
+                                {(bill.totalRefunded || 0) > 0 && (
+                                  <span className="ml-1 text-[10px] font-medium text-amber-600">
+                                    net
+                                  </span>
                                 )}
                               </td>
 
@@ -3390,6 +3487,16 @@ const PharmacistDashboard = () => {
                 <div className="flex flex-wrap gap-2">
 
                   <button
+                    onClick={exportAllMedicines}
+                    disabled={isExportingMedicines}
+                    className="inline-flex items-center gap-2 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50 disabled:opacity-60"
+                    title="Download all medicines as an Excel backup"
+                  >
+                    <Download className="h-4 w-4 !text-emerald-700" />
+                    {isExportingMedicines ? 'Exporting…' : 'Export Excel'}
+                  </button>
+
+                  <button
                     onClick={() => {
                       setMedicineViewFilter(
                         'ALL'
@@ -3473,8 +3580,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              {medicineViewFilter !==
-                'ALL' && (
+              {(medicineViewFilter !== 'ALL' || expiryStatusFilter === 'EXPIRING') && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 flex items-center justify-between">
 
                   <div className="text-xs text-blue-700 font-semibold">
@@ -3483,18 +3589,20 @@ const PharmacistDashboard = () => {
                       'LOW_STOCK' &&
                       'Showing low-stock medicines.'}
 
-                    {medicineViewFilter ===
-                      'EXPIRING_MONTH' &&
-                      'Showing medicines expiring this month.'}
+                    {expiryStatusFilter === 'EXPIRING' &&
+                      'Showing all medicines expiring within six months.'}
 
                   </div>
 
                   <button
-                    onClick={() =>
+                    onClick={() => {
                       setMedicineViewFilter(
                         'ALL'
-                      )
-                    }
+                      );
+                      if (expiryStatusFilter === 'EXPIRING') {
+                        setExpiryStatusFilter('');
+                      }
+                    }}
                     className="text-[10px] bg-white border border-blue-200 px-2 py-1 rounded-lg text-blue-700 font-bold"
                   >
                     Clear View
@@ -3611,6 +3719,10 @@ const PharmacistDashboard = () => {
                     EXPIRED
                   </option>
 
+                  <option value="EXPIRING">
+                    EXPIRING WITHIN 6 MONTHS
+                  </option>
+
                   <option value="CRITICAL">
                     CRITICAL
                   </option>
@@ -3693,7 +3805,7 @@ const PharmacistDashboard = () => {
                         </th>
 
                         <th className="p-3 text-left">
-                          Price
+                          Sale / Cost per unit
                         </th>
 
                         <th className="p-3 text-left">
@@ -3787,28 +3899,18 @@ const PharmacistDashboard = () => {
 
                               </td>
 
-                              <td className="p-3 text-xs font-bold">
-                                {getCurrency(
-                                  medicine.price
-                                )}
+                              <td className="p-3 text-xs">
+                                <div className="font-bold">
+                                  Sale: {getCurrency(medicine.price)}
+                                </div>
+                                <div className="mt-1 text-[10px] font-medium text-slate-500">
+                                  Cost/unit: {getCurrency(medicine.purchasePrice)}
+                                </div>
                               </td>
 
                               <td className="p-3 text-xs">
 
-                                <span
-                                  className={
-                                    Number(
-                                      medicine.quantity ||
-                                        0
-                                    ) <=
-                                    Number(
-                                      medicine.reorderLevel ||
-                                        0
-                                    )
-                                      ? 'text-red-600 font-bold'
-                                      : ''
-                                  }
-                                >
+                                <span className={Number(medicine.quantity || 0) < 5 ? 'text-red-600 font-bold' : ''}>
                                   {
                                     medicine.quantity ??
                                     0
@@ -3832,11 +3934,12 @@ const PharmacistDashboard = () => {
 
                               <td className="p-3">
 
-                                <ExpiryBadge
-                                  status={
-                                    medicine.expiryStatus
-                                  }
-                                />
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className={`rounded px-2 py-1 text-[10px] font-bold whitespace-nowrap ${getStockBadgeClass(getStockStatus(medicine.quantity))}`}>
+                                    {getStockStatus(medicine.quantity)}
+                                  </span>
+                                  <ExpiryBadge status={medicine.expiryStatus} />
+                                </div>
 
                               </td>
 
@@ -3923,16 +4026,45 @@ const PharmacistDashboard = () => {
 
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex flex-col">
 
-                <div className="p-4 border-b">
-
-                  <h3 className="font-bold text-sm">
-                    Medicine Catalog
-                  </h3>
-
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                    Select medicine for the bill.
-                  </p>
-
+                <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-sm">Medicine Catalog</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      {ocrLoading ? 'Scanning image...' : 'Search by name, rack, or barcode; scan a label to add it to this bill.'}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      ref={billScanInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (file) await processScannedLabel(file, 'bill');
+                        event.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => startCamera('bill')}
+                      disabled={ocrLoading}
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"
+                    >
+                      <Camera className="h-4 w-4" />
+                      Open Camera
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => billScanInputRef.current?.click()}
+                      disabled={ocrLoading}
+                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700"
+                    >
+                      <Barcode className="h-4 w-4" />
+                      Scan Image
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-3 border-b flex gap-2">
@@ -3950,7 +4082,7 @@ const PharmacistDashboard = () => {
                           event.target.value
                         )
                       }
-                      placeholder="Search..."
+                      placeholder="Search name, rack, or barcode..."
                       className="w-full pl-9 pr-3 py-2 border rounded-lg text-xs"
                     />
 
@@ -4027,10 +4159,13 @@ const PharmacistDashboard = () => {
 
                           <div className="flex items-center gap-2">
 
-                            <span className="text-xs font-bold">
-                              {getCurrency(
-                                medicine.price
-                              )}
+                            <span className="text-right text-[10px]">
+                              <span className="block text-xs font-bold">
+                                Sale: {getCurrency(medicine.price)}
+                              </span>
+                              <span className="mt-1 block text-slate-500">
+                                Cost: {getCurrency(medicine.purchasePrice)}
+                              </span>
                             </span>
 
                             <button
@@ -4065,7 +4200,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden">
+              <div className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
 
                 <div className="p-4 border-b">
 
@@ -4081,11 +4216,13 @@ const PharmacistDashboard = () => {
                     value={
                       selectedCustomerId
                     }
-                    onChange={(event) =>
-                      setSelectedCustomerId(
-                        event.target.value
-                      )
-                    }
+                    onChange={(event) => {
+                      const nextId = event.target.value;
+                      const customer = customers.find((item) => item._id === nextId);
+                      setSelectedCustomerId(nextId);
+                      setCustomerName(customer?.name || '');
+                      setGuestPhone(customer?.phone || '');
+                    }}
                     className="w-full border rounded-lg px-3 py-2 text-xs"
                   >
 
@@ -4116,24 +4253,31 @@ const PharmacistDashboard = () => {
 
                   </select>
 
-                  {!selectedCustomerId && (
-                    <input
-                      value={
-                        guestPhone
-                      }
-                      onChange={(event) =>
-                        setGuestPhone(
-                          event.target.value
-                        )
-                      }
-                      placeholder="Guest phone"
-                      className="w-full border rounded-lg px-3 py-2 text-xs"
-                    />
-                  )}
+                  <input
+                    value={customerName}
+                    onChange={(event) => setCustomerName(event.target.value)}
+                    placeholder="Customer name (optional)"
+                    className="w-full border rounded-lg px-3 py-2 text-xs"
+                  />
+
+                  <input
+                    value={guestPhone}
+                    onChange={(event) => setGuestPhone(event.target.value)}
+                    placeholder="Customer phone"
+                    className="w-full border rounded-lg px-3 py-2 text-xs"
+                  />
 
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                <button
+                  onClick={handleConfirmBill}
+                  disabled={isBillingPending || billItems.length === 0}
+                  className="mx-4 mt-4 w-[calc(100%-2rem)] py-2.5 bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-40"
+                >
+                  {isBillingPending ? 'Processing...' : 'Commit & Post Bill'}
+                </button>
+
+                <div className="min-h-0 flex-1 overflow-y-auto">
 
                   {billItems.length ===
                   0 ? (
@@ -4176,9 +4320,30 @@ const PharmacistDashboard = () => {
                                 item.billQuantity
                               }{' '}
                               ×{' '}
-                              {getCurrency(
-                                item.price
-                              )}
+                              {getCurrency(item.salePrice ?? item.price)}
+                            </div>
+                            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                              <span>Cost/unit (fixed): {getCurrency(item.purchasePrice)}</span>
+                              <label className="flex items-center gap-1">
+                                Sale/unit:
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.salePrice ?? item.price}
+                                  onChange={(event) => {
+                                    const nextPrice = event.target.value;
+                                    setBillItems((previous) =>
+                                      previous.map((line) =>
+                                        line._id === item._id
+                                          ? { ...line, salePrice: Number(nextPrice) }
+                                          : line
+                                      )
+                                    );
+                                  }}
+                                  className="w-20 rounded border px-1 py-0.5 text-[10px]"
+                                />
+                              </label>
                             </div>
 
                           </div>
@@ -4254,31 +4419,9 @@ const PharmacistDashboard = () => {
                       className="border rounded-lg px-3 py-2 text-xs"
                     />
 
-                    <select
-                      value={
-                        paymentMethod
-                      }
-                      onChange={(event) =>
-                        setPaymentMethod(
-                          event.target.value
-                        )
-                      }
-                      className="border rounded-lg px-3 py-2 text-xs"
-                    >
-
-                      <option value="Card">
-                        Card
-                      </option>
-
-                      <option value="Cash">
-                        Cash
-                      </option>
-
-                      <option value="UPI">
-                        UPI
-                      </option>
-
-                    </select>
+                    <div className="flex items-center rounded-lg border px-3 py-2 text-xs font-semibold">
+                      Cash only
+                    </div>
 
                   </div>
 
@@ -4317,22 +4460,6 @@ const PharmacistDashboard = () => {
                     </span>
 
                   </div>
-
-                  <button
-                    onClick={
-                      handleConfirmBill
-                    }
-                    disabled={
-                      isBillingPending ||
-                      billItems.length ===
-                        0
-                    }
-                    className="w-full py-2.5 bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-40"
-                  >
-                    {isBillingPending
-                      ? 'Processing...'
-                      : 'Commit & Post Bill'}
-                  </button>
 
                 </div>
 
@@ -4410,11 +4537,11 @@ const PharmacistDashboard = () => {
               <div className="p-5 border-b">
 
                 <h3 className="font-bold text-sm">
-                  Customer Records
+                  User Control Panel
                 </h3>
 
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                  Select a customer to start a bill.
+                  Manage customer accounts and approval requests.
                 </p>
 
               </div>
@@ -4890,6 +5017,47 @@ const PharmacistDashboard = () => {
       {/* MEDICINE CREATE / EDIT MODAL */}
       {/* ===================================================================== */}
 
+      {cameraActive && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Camera scan for {cameraTarget === 'bill' ? 'bill item' : 'medicine details'}
+                </h3>
+                <p className="mt-1 text-[10px] text-slate-500">
+                  Position the medicine label in frame and capture a clear, well-lit image.
+                </p>
+              </div>
+              <button type="button" onClick={stopCamera} aria-label="Close camera" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <video
+              ref={cameraVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="max-h-[60vh] w-full rounded-xl bg-black object-contain"
+            />
+            {(cameraTarget === 'bill' ? billError : error) && (
+              <p className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-700">
+                {cameraTarget === 'bill' ? billError : error}
+              </p>
+            )}
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={stopCamera} className="rounded-lg border px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200">
+                Cancel
+              </button>
+              <button type="button" onClick={captureCameraImage} disabled={ocrLoading} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                {ocrLoading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                {ocrLoading ? 'Scanning...' : 'Capture & Scan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {medModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
@@ -4934,7 +5102,7 @@ const PharmacistDashboard = () => {
                 </div>
 
                 <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 mb-3">
-                  Upload a medicine label to extract available information.
+                  Use the camera on this device or choose a label image. For a phone camera, open this app in the phone browser; a laptop browser cannot control a phone camera over USB or Bluetooth.
                 </p>
 
                 {ocrLoading && (
@@ -4960,6 +5128,21 @@ const PharmacistDashboard = () => {
                   className="text-xs"
                 />
 
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startCamera('medicine')}
+                    disabled={ocrLoading}
+                    className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Open Camera
+                  </button>
+                  <span className="self-center text-[10px] text-slate-500">
+                    On a phone, open this app in the mobile browser to use its camera. Remote USB/Bluetooth phone-camera control is not available in standard browsers.
+                  </span>
+                </div>
+
               </div>
             )}
 
@@ -4979,14 +5162,26 @@ const PharmacistDashboard = () => {
                     <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.medicineName || 'Not detected'}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">Generic</span>
-                    <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.genericName || 'Not detected'}</p>
-                  </div>
-                  <div>
                     <span className="text-[10px] text-slate-600 dark:text-slate-400 dark:text-slate-600 dark:text-slate-400">Expiry</span>
                     <p className="font-bold text-slate-900 dark:text-slate-50 dark:text-white">{ocrPreview.expiryDate || 'Not detected'}</p>
                   </div>
+                  {Object.entries(ocrPreview.scannedPrices || {}).some(([, value]) => value !== null) && (
+                    <div className="sm:col-span-3">
+                      <span className="text-[10px] text-slate-600 dark:text-slate-400">
+                        Explicitly labeled prices (review before entry)
+                      </span>
+                      <p className="font-bold text-slate-900 dark:text-white">
+                        {Object.entries(ocrPreview.scannedPrices)
+                          .filter(([, value]) => value !== null)
+                          .map(([label, value]) => `${label}: PKR ${Number(value).toFixed(2)}`)
+                          .join(' · ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
+                <p className="mt-2 text-[10px] text-emerald-800 dark:text-emerald-300">
+                  OCR results are suggestions. Verify every value before saving; names are filled only when a known medicine term is recognized.
+                </p>
               </div>
             )}
 
@@ -5008,20 +5203,6 @@ const PharmacistDashboard = () => {
                     )
                   }
                   placeholder="Medicine Name"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
-
-                <input
-                  required
-                  value={
-                    genericName
-                  }
-                  onChange={(event) =>
-                    setGenericName(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Generic Name"
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
@@ -5078,14 +5259,14 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Purchase Price (PKR)"
+                  placeholder="Purchase cost per tablet / unit (PKR)"
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
                 <input
                   required
                   type="number"
-                  min="0"
+                  min={Number(purchasePrice) || 0}
                   step="0.01"
                   value={
                     price
@@ -5095,7 +5276,7 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Sale Price (PKR)"
+                  placeholder="Default sale price per tablet / unit (PKR)"
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
@@ -5115,66 +5296,9 @@ const PharmacistDashboard = () => {
                   className="border rounded-lg px-3 py-2 text-xs"
                 />
 
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  value={
-                    reorderLevel
-                  }
-                  onChange={(event) =>
-                    setReorderLevel(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Min Level"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
-
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-
-                <select
-                  value={
-                    category
-                  }
-                  onChange={(event) =>
-                    setCategory(
-                      event.target.value
-                    )
-                  }
-                  className="border rounded-lg px-3 py-2 text-xs"
-                >
-
-                  {standardCategories.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {
-                          item
-                        }
-                      </option>
-                    )
-                  )}
-
-                </select>
-
-                <input
-                  value={
-                    barcode
-                  }
-                  onChange={(event) =>
-                    setBarcode(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Barcode"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
-
+              <div className="grid grid-cols-1 gap-3">
                 <input
                   value={
                     rackLocation
@@ -5189,6 +5313,45 @@ const PharmacistDashboard = () => {
                 />
 
               </div>
+
+              {editingMedicine && (
+                <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    Optional existing medicine details
+                  </p>
+                  <input
+                    value={genericName}
+                    onChange={(event) => setGenericName(event.target.value)}
+                    placeholder="Generic Name"
+                    className="border rounded-lg px-3 py-2 text-xs"
+                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      type="number"
+                      min="0"
+                      value={reorderLevel}
+                      onChange={(event) => setReorderLevel(event.target.value)}
+                      placeholder="Reorder Level"
+                      className="border rounded-lg px-3 py-2 text-xs"
+                    />
+                    <select
+                      value={category}
+                      onChange={(event) => setCategory(event.target.value)}
+                      className="border rounded-lg px-3 py-2 text-xs"
+                    >
+                      {standardCategories.map((item) => (
+                        <option key={item} value={item}>{item}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={barcode}
+                      onChange={(event) => setBarcode(event.target.value)}
+                      placeholder="Barcode"
+                      className="border rounded-lg px-3 py-2 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t">
 
@@ -5918,16 +6081,17 @@ const PharmacistDashboard = () => {
 
                           const itemsCount =
                             Array.isArray(
-                              bill?.items
+                              bill?.netItems || bill?.items
                             )
-                              ? bill.items.reduce(
+                              ? (bill.netItems || bill.items).reduce(
                                   (
                                     sum,
                                     item
                                   ) =>
                                     sum +
                                     Number(
-                                      item?.quantity ||
+                                      item?.netQuantity ??
+                                        item?.quantity ??
                                         0
                                     ),
                                   0
@@ -5960,8 +6124,8 @@ const PharmacistDashboard = () => {
 
                               <td className="p-3 text-xs">
                                 {
-                                  bill?.customer?.name ||
                                   bill?.customerName ||
+                                  bill?.customer?.name ||
                                   'Walk-in Guest'
                                 }
                               </td>
@@ -5987,7 +6151,12 @@ const PharmacistDashboard = () => {
 
                               <td className="p-3 text-xs font-bold text-emerald-700">
                                 {getCurrency(
-                                  bill?.total
+                                  bill?.netTotal ??
+                                    Math.max(
+                                      0,
+                                      Number(bill?.total || 0) -
+                                        Number(bill?.totalRefunded || 0)
+                                    )
                                 )}
                               </td>
 
@@ -6134,8 +6303,8 @@ const PharmacistDashboard = () => {
 
                   <div className="text-xs font-bold mt-2">
                     {
-                      selectedBill.customer?.name ||
                       selectedBill.customerName ||
+                      selectedBill.customer?.name ||
                       'Walk-in Guest'
                     }
                   </div>
@@ -6226,7 +6395,7 @@ const PharmacistDashboard = () => {
                       .reduce((sum, r) => sum + (r.quantityReturned || 0), 0);
 
                     const netQty = (item.quantity || 0) - returnedQty;
-                    const unitPrice = item.salePrice || item.unitPrice || 0;
+                    const unitPrice = item.salePrice ?? item.unitPrice ?? 0;
                     const originalLineTotal = unitPrice * (item.quantity || 0);
                     const netLineTotal = unitPrice * Math.max(0, netQty);
                     const isFullyReturned = returnedQty >= (item.quantity || 0);
@@ -6370,7 +6539,17 @@ const PharmacistDashboard = () => {
       {confirmedBill && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
 
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
+          <div className="relative bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
+
+            <button
+              type="button"
+              onClick={() => setConfirmedBill(null)}
+              aria-label="Close completed bill"
+              title="Close; the saved bill remains in sales history"
+              className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
             <div className="text-center">
 
@@ -6389,6 +6568,20 @@ const PharmacistDashboard = () => {
                 created successfully.
               </p>
 
+            </div>
+
+            <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs">
+              <p className="font-bold">
+                {confirmedBill.customerName ||
+                  confirmedBill.customerId?.name ||
+                  'Walk-in Guest'}
+              </p>
+              <p className="mt-1 text-slate-500">
+                {confirmedBill.customerPhone ||
+                  confirmedBill.guestPhone ||
+                  confirmedBill.customerId?.phone ||
+                  'Phone not provided'}
+              </p>
             </div>
 
             <div className="border rounded-xl mt-5 overflow-hidden">
@@ -6439,6 +6632,13 @@ const PharmacistDashboard = () => {
                 )}
 
             </div>
+
+            {Number(confirmedBill.discount) > 0 && (
+              <div className="flex justify-between mt-3 text-xs text-emerald-700">
+                <span>Discount</span>
+                <span>- {getCurrency(confirmedBill.discount)}</span>
+              </div>
+            )}
 
             <div className="flex justify-between mt-4">
 
@@ -6498,6 +6698,7 @@ const PharmacistDashboard = () => {
       />
 
       <SalesReturnModal
+        key={returnModalBill?._id || 'no-return-bill'}
         isOpen={Boolean(returnModalBill)}
         onClose={() => setReturnModalBill(null)}
         bill={returnModalBill}

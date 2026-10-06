@@ -11,8 +11,12 @@ The application supports three roles, each with a tailored workspace and securit
 *   **Superadmin**: Controls user management, system diagnostics, overall dashboards, and has override permissions.
 *   **Pharmacist Portal**: A high-efficiency panel designed for pharmacy operators:
     *   **Dashboard**: Shows statistics like sales history (last 7 days chart), total stock count, expired batches, and expiring-soon lists.
-    *   **Catalog Database Manager**: Full CRUD operations on medicines, bulk JSON batch import, and an **OCR Smart Label Autocomplete** tool.
-    *   **Invoice Worksheet**: An integrated point-of-sale compiler directly in the dashboard that supports selecting registered customers as well as direct walk-in guest checkouts (using an optional guest phone number). On completion, it triggers an interactive success modal to print standard receipts or begin a new bill.
+    *   **Catalog Database Manager**: The add-medicine form is limited to medicine name, manufacturer, expiry date, purchase cost, sale cost, quantity, and rack. Stock labels are End Stock (0), Low Stock (1–4), Stock Available (5–20), and High Stock (over 20).
+    *   **Expiry Watch**: Every medicine expiring within 180 days appears in the expiry list; the scheduler creates an advance alert six months before expiry and follows up with shorter-window alerts.
+    *   **Invoice Worksheet**: An integrated point-of-sale compiler with per-unit purchase-cost snapshots, invoice-only sale-price overrides, editable quantities, discounts, and cash-only checkout. It records customer name and phone, supports registered customers and walk-in guests, and places the checkout action at the top of the sticky invoice panel.
+    *   **Stock & returns**: Audited stock adjustments and partial sale returns update inventory with transactional writes. Return refunds honor invoice discounts, and profit reports use recorded purchase costs and actual sale prices.
+    *   **Return history**: Fully returned invoices are omitted from regular customer and sales history. Their invoice and return audit records remain stored; staff can include them in the all-bills response with `GET /api/bills?includeReturned=true`. Partial returns show remaining quantities and net paid totals.
+    *   **Medicine export**: Use **Export Excel** on the Medicine Inventory page to download the complete current medicine list using the stable name, manufacturer, expiry, purchase cost, sale cost, quantity, and rack columns.
     *   **Alerts & Reminders page**: A simplified, friendly dashboard listing daily automated checks (expired medicine, low stock, patient reminders) with "Run now" capabilities.
 *   **Customer Portal**: A consumer-facing panel:
     *   **Medicine Shop**: A catalog to search, filter by category, and buy medicines.
@@ -21,7 +25,9 @@ The application supports three roles, each with a tailored workspace and securit
 
 ### 2. OCR Smart Label Scanning
 *   Utilizes **Tesseract.js** directly on the server to parse uploaded photos of medicine packages.
-*   Automatically extracts medicine name, generic formula name, manufacturer, batch number, and expiry date to pre-fill registration forms, saving time and reducing typing errors.
+* Only recognized medicine-name patterns are used to pre-fill a name; ambiguous text is not guessed. Explicitly labeled decimal prices may be shown as suggestions, but unlabeled values and digit-only OCR output are never silently converted into decimal prices. Verify OCR results before saving.
+*   The English OCR language model is installed with the server dependencies and loaded locally, so label recognition does not need to download its model when the pharmacy is offline.
+* Medicine entry and bill item lookup support the current device's live browser camera or an image chooser. A phone camera works by opening the application in a supported mobile browser; a laptop browser cannot remotely control a phone camera over USB or Bluetooth. Live camera access requires user permission and a secure browser context (localhost is supported; LAN/mobile access generally requires HTTPS).
 
 ### 3. Compliance & Expiry Protection
 *   The billing panel automatically detects if any medicine in the current invoice worksheet has expired.
@@ -49,7 +55,7 @@ The application supports three roles, each with a tailored workspace and securit
 
 ### Backend
 *   **Runtime**: Node.js & Express
-*   **Database**: MongoDB & Mongoose ORM
+*   **Database**: MongoDB replica set & Mongoose ORM (transactions keep sales, returns, stock, and audit logs in sync)
 *   **Authentication**: JSON Web Tokens (JWT) & Bcrypt.js (password hashing)
 *   **OCR Parsing**: Tesseract.js
 *   **Invoice Rendering**: PDFKit (dynamic PDF generation)
@@ -95,7 +101,7 @@ This section provides comprehensive instructions for deploying, installing, and 
 ### Step 1: Install Prerequisites
 Before running the application, make sure the target system has the following software installed:
 
-1. **Node.js (LTS Version - v18 or higher)**
+1. **Node.js (LTS Version - v20.19 or higher; Node.js 22 or 24 LTS recommended)**
    * Download and install from [Node.js Official Website](https://nodejs.org/).
    * Verify installation in terminal/command prompt:
      ```bash
@@ -121,7 +127,7 @@ Before running the application, make sure the target system has the following so
 ```env
 PORT=5000
 NODE_ENV=development
-MONGO_URI=mongodb://localhost:27017/Sardar Medical Store
+MONGO_URI=mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true
 JWT_ACCESS_SECRET=your_access_token_secret_here
 JWT_REFRESH_SECRET=your_refresh_token_secret_here
 CLIENT_URL=http://localhost:5173
@@ -135,7 +141,8 @@ SMTP_PASS=your-gmail-app-password
 
 #### 💡 Environment Config Notes for Different Systems:
 * **`MONGO_URI`**:
-  * If running **local MongoDB**, use `mongodb://localhost:27017/Sardar Medical Store`. (On some systems, if `localhost` fails to connect, try `mongodb://127.0.0.1:27017/Sardar Medical Store`).
+  * If running **local MongoDB**, configure `replication.replSetName: rs0` in `mongod.cfg`, restart MongoDB, and initiate the single-node replica set with `mongosh --eval "rs.initiate()"`. Then use `mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true` when running Node directly on Windows; direct connection avoids following the Docker-only replica-set hostname. Stock-changing sales and returns use MongoDB transactions and do not run against a standalone server.
+  * The included Docker Compose setup configures and initializes its MongoDB service as a single-node replica set automatically.
   * If running **MongoDB Atlas cloud**, replace it with your Atlas connection string (e.g., `mongodb+srv://username:password@cluster.xxxx.mongodb.net/Sardar Medical Store?retryWrites=true&w=majority`).
 * **`JWT Secrets`**:
   * You can generate high-entropy secure keys on any platform by executing this command in your terminal:
@@ -158,8 +165,8 @@ npm run install:all
 
 ---
 
-### Step 4: Seed Mock Data
-To populate the database with default test accounts (Superadmins, Pharmacists, Customers) and mock medicine listings, run:
+### Step 4: Seed Mock Data (Disposable Test Database Only)
+WARNING: `npm run seed` deletes existing users, medicines, bills, reminders, and notifications before inserting demo data. Never run it on real pharmacy data. On a new empty database, the app automatically creates login accounts; use the seed script only with a disposable test database.
 
 ```bash
 npm run seed
@@ -168,7 +175,7 @@ npm run seed
 ---
 
 ### Step 5: Run the Project
-Start both the Node.js API server and React/Vite development server concurrently with a single command from the project root:
+From the project root, run `npm run dev`. The predev check verifies the local MongoDB replica set is transaction-ready and starts the persistent Docker database only when needed. The launcher reuses healthy Pharma Desk services already running and starts only missing services; it does not kill processes using the required ports. Install dependencies once with `npm run install:all` first.
 
 ```bash
 npm run dev
@@ -176,6 +183,12 @@ npm run dev
 
 * **Frontend Client (React/Vite)**: Runs on **[http://localhost:5173](http://localhost:5173)**
 * **Backend Server (Express API)**: Runs on **[http://localhost:5000](http://localhost:5000)**
+
+Run `npm test` from the project root to execute the backend unit suite and the 5,000-record medicine-export test.
+
+### Backups and restores
+
+`npm run db:backup` creates timestamped and latest JSON snapshots of users, medicines, bills, reminders, notifications, stock adjustments, and Udhar records under `server/backups/`. Keep a copy on separate storage; a local backup is not protection against disk loss. Restore with `npm run db:restore -- <backup-file>`. Restore validates the archive checksum when present, creates a pre-restore backup, and replaces included collections inside a MongoDB transaction. Use a replica-set MongoDB deployment (the included Docker Compose setup provides one); never test restore against the live pharmacy database. Older backups that do not contain stock-adjustment or Udhar collections leave those collections untouched.
 
 ---
 
@@ -185,4 +198,3 @@ After running the seeder script (`npm run seed`), you can log in using the follo
 * **Superadmin**: `aheerdawood014@gmail.com` / `Dawood@@5786`
 * **Pharmacist**: `mlksardar6@gmail.com` / `Dawood@@5786`
 * **Customer**: `aheerraza0@gmail.com` / `Dawood@@5786`
-

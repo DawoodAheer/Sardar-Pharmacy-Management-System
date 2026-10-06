@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
-import { X, RotateCcw, AlertTriangle, CheckCircle, Package, Receipt, DollarSign } from 'lucide-react';
+import { X, RotateCcw, AlertTriangle, CheckCircle, Package } from 'lucide-react';
 
 const getCurrency = (value) => {
   return new Intl.NumberFormat('en-PK', {
@@ -11,29 +11,55 @@ const getCurrency = (value) => {
   }).format(value || 0);
 };
 
+const getRefundPreview = (bill, item, quantityToReturn) => {
+  if (!quantityToReturn) return 0;
+
+  const priorReturns = (bill.returns || []).filter(
+    (ret) => String(ret.medicineId) === String(item.medicineId)
+  );
+  const quantityAlreadyReturned = priorReturns.reduce(
+    (sum, ret) => sum + ret.quantityReturned,
+    0
+  );
+  const previousRefunds = priorReturns.reduce(
+    (sum, ret) => sum + ret.refundAmount,
+    0
+  );
+  const unitPrice = Number(item.salePrice ?? item.unitPrice ?? 0);
+  const itemGross = unitPrice * item.quantity;
+  const subtotal = Number(bill.subtotal) || 0;
+  const discount = Number(bill.discount) || 0;
+  const itemNet = subtotal > 0 ? itemGross * (1 - discount / subtotal) : 0;
+  const refundAfterReturn =
+    Math.round(
+      ((itemNet * (quantityAlreadyReturned + quantityToReturn)) /
+        item.quantity +
+        Number.EPSILON) *
+        100
+    ) / 100;
+
+  return Math.max(0, refundAfterReturn - previousRefunds);
+};
+
+const getInitialReturnItems = (bill) =>
+  Object.fromEntries((bill?.items || []).map((item) => [item.medicineId, 0]));
+
+const getInitialReasons = (bill) =>
+  Object.fromEntries(
+    (bill?.items || []).map((item) => [
+      item.medicineId,
+      'Customer Return / Change of Mind',
+    ])
+  );
+
 export default function SalesReturnModal({ isOpen, onClose, bill }) {
   const queryClient = useQueryClient();
-  const [returnItems, setReturnItems] = useState({});
-  const [reasons, setReasons] = useState({});
+  const [returnItems, setReturnItems] = useState(() =>
+    getInitialReturnItems(bill)
+  );
+  const [reasons, setReasons] = useState(() => getInitialReasons(bill));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  useEffect(() => {
-    if (bill && bill.items) {
-      const initialReturns = {};
-      const initialReasons = {};
-
-      bill.items.forEach((item) => {
-        initialReturns[item.medicineId] = 0;
-        initialReasons[item.medicineId] = 'Customer Return / Change of Mind';
-      });
-
-      setReturnItems(initialReturns);
-      setReasons(initialReasons);
-      setError('');
-      setSuccess('');
-    }
-  }, [bill, isOpen]);
 
   const returnMutation = useMutation({
     mutationFn: async (payload) => {
@@ -83,8 +109,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
   const totalRefundPreview = bill?.items
     ? bill.items.reduce((sum, item) => {
         const qty = returnItems[item.medicineId] || 0;
-        const price = item.salePrice || item.unitPrice || 0;
-        return sum + qty * price;
+        return sum + getRefundPreview(bill, item, qty);
       }, 0)
     : 0;
 
@@ -130,7 +155,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                 Process Sales Return & Refund
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Bill #{bill.billNumber} • Customer: {bill.customerId?.name || bill.customerPhone || 'Walk-in Customer'}
+                Bill #{bill.billNumber} • Customer: {bill.customerName || bill.customerId?.name || bill.customerPhone || 'Walk-in Customer'}
               </p>
             </div>
           </div>
@@ -190,7 +215,12 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                   {bill.items.map((item) => {
                     const maxAvail = getAvailableToReturn(item);
                     const qtyToReturn = returnItems[item.medicineId] || 0;
-                    const price = item.salePrice || item.unitPrice || 0;
+                    const price = item.salePrice ?? item.unitPrice ?? 0;
+                    const refundPreview = getRefundPreview(
+                      bill,
+                      item,
+                      qtyToReturn
+                    );
 
                     return (
                       <tr key={item._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
@@ -200,7 +230,14 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                             {item.name}
                           </div>
                         </td>
-                        <td className="px-3 py-3 font-mono">{getCurrency(price)}</td>
+                        <td className="px-3 py-3 font-mono">
+                          <div>{getCurrency(price)}</div>
+                          {Number(bill.discount) > 0 && (
+                            <div className="text-[10px] text-slate-400">
+                              Refund: {getCurrency(refundPreview)}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-3">
                           <span className="font-bold text-slate-900 dark:text-white">{item.quantity}</span>
                           {item.quantity - maxAvail > 0 && (
