@@ -84,34 +84,6 @@ const Login = () => {
       location.state?.message || ""
     );
 
-  /*
-  |--------------------------------------------------------------------------
-  | Load Sora Font
-  |--------------------------------------------------------------------------
-  */
-  useEffect(() => {
-    const existingLink =
-      document.querySelector(
-        'link[data-pharmadesk-sora="true"]'
-      );
-
-    if (existingLink) {
-      return;
-    }
-
-    const link =
-      document.createElement("link");
-
-    link.href =
-      "https://fonts.googleapis.com/css2?family=Sora:wght@600;700&display=swap";
-
-    link.rel = "stylesheet";
-
-    link.dataset.pharmadeskSora =
-      "true";
-
-    document.head.appendChild(link);
-  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -353,7 +325,7 @@ const Login = () => {
 
         <div className="my-auto py-12 relative z-10 max-w-xl">
 
-          <h1 className="font-['Sora'] font-extrabold text-4xl lg:text-5xl leading-tight text-white tracking-tight space-y-2">
+          <h1 className="font-sans font-extrabold text-4xl lg:text-5xl leading-tight text-white tracking-tight space-y-2">
 
             <span className="block">
               Smart pharmacy

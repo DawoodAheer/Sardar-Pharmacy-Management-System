@@ -38,19 +38,6 @@ const ResetPassword = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(3);
-
-  // Load Sora Font
-  useEffect(() => {
-    const existingLink = document.querySelector('link[data-pharmadesk-sora="true"]');
-    if (existingLink) return;
-
-    const link = document.createElement('link');
-    link.setAttribute('data-pharmadesk-sora', 'true');
-    link.href = 'https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&display=swap';
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-  }, []);
-
   // Password strength calculator
   const getStrength = (pass) => {
     if (!pass) return { score: 0, label: '', color: 'bg-slate-700' };
@@ -153,7 +140,7 @@ const ResetPassword = () => {
             <Activity className="h-7 w-7" />
           </div>
           <h1
-            style={{ fontFamily: "'Sora', sans-serif" }}
+
             className="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl"
           >
             Pharma Desk

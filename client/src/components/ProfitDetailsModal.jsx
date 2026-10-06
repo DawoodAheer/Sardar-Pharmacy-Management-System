@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import * as XLSX from 'xlsx';
 import api from '../utils/api';
 import { X, Download, Package } from 'lucide-react';
 
@@ -33,65 +34,70 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
       acc.quantitySold += item.quantitySold || 0;
       acc.remainingStock += item.remainingStock || 0;
       acc.totalCost += item.totalCost || 0;
+      acc.totalDiscount += item.totalDiscount || 0;
       acc.totalSales += item.totalSales || 0;
       acc.totalProfit += item.totalProfit || 0;
       return acc;
     },
-    { quantitySold: 0, remainingStock: 0, totalCost: 0, totalSales: 0, totalProfit: 0 }
+    { quantitySold: 0, remainingStock: 0, totalCost: 0, totalDiscount: 0, totalSales: 0, totalProfit: 0 }
   );
 
-  const handleDownloadCSV = () => {
+  const handleDownloadExcel = () => {
     if (!data || data.length === 0) return;
 
-    // Create CSV header
-    const headers = [
+    const rows = [
+      [
       'Medicine Name',
-      'Purchase Price',
-      'Sale Price',
+      'Avg Purchase Cost / Unit',
+      'Avg Sale Price / Unit',
       'Quantity Sold',
       'Remaining Stock',
       'Total Purchase Cost',
+      'Discount',
       'Total Sales',
       'Total Profit',
-    ];
-    const csvRows = [headers.join(',')];
-
-    // Add data rows
-    data.forEach((row) => {
-      const rowData = [
-        `"${row.name}"`,
-        row.purchasePrice || 0,
-        row.salePrice || 0,
-        row.quantitySold || 0,
-        row.remainingStock || 0,
-        row.totalCost || 0,
-        row.totalSales || 0,
-        row.totalProfit || 0,
-      ];
-      csvRows.push(rowData.join(','));
-    });
-
-    // Add Total Summary row at end of CSV
-    const summaryRow = [
-      '"TOTAL SUMMARY"',
-      '""',
-      '""',
+      ],
+      ...data.map((row) => [
+      row.name,
+      row.purchasePrice || 0,
+      row.salePrice || 0,
+      row.quantitySold || 0,
+      row.remainingStock || 0,
+      row.totalCost || 0,
+      row.totalDiscount || 0,
+      row.totalSales || 0,
+      row.totalProfit || 0,
+      ]),
+      [
+      'TOTAL SUMMARY',
+      '',
+      '',
       totals.quantitySold,
       totals.remainingStock,
       totals.totalCost,
+      totals.totalDiscount,
       totals.totalSales,
       totals.totalProfit,
+      ],
     ];
-    csvRows.push(summaryRow.join(','));
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `profit_report_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.aoa_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 28 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 18 },
+      { wch: 18 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Profit Details');
+    XLSX.writeFile(
+      workbook,
+      `profit_report_${new Date().toISOString().split('T')[0]}.xlsx`
+    );
   };
 
   if (!isOpen) return null;
@@ -130,12 +136,12 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
               />
             </div>
             <button
-              onClick={handleDownloadCSV}
+              onClick={handleDownloadExcel}
               disabled={isLoading || !data || data.length === 0}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               <Download size={16} />
-              Download Excel (CSV)
+              Download Excel (.xlsx)
             </button>
           </div>
 
@@ -144,11 +150,12 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
               <thead className="sticky top-0 bg-slate-100 uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300 z-10 shadow-sm">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Medicine</th>
-                  <th className="px-4 py-3 font-semibold">Purchase Price</th>
-                  <th className="px-4 py-3 font-semibold">Sale Price</th>
+                  <th className="px-4 py-3 font-semibold">Avg. Purchase Cost / Unit</th>
+                  <th className="px-4 py-3 font-semibold">Avg. Sale Price / Unit</th>
                   <th className="px-4 py-3 font-semibold text-center">Qty Sold</th>
                   <th className="px-4 py-3 font-semibold text-center">Remaining Stock</th>
                   <th className="px-4 py-3 font-semibold">Total Cost</th>
+                  <th className="px-4 py-3 font-semibold">Discount</th>
                   <th className="px-4 py-3 font-semibold">Total Sales</th>
                   <th className="px-4 py-3 font-semibold text-emerald-600 dark:text-emerald-400">Total Profit</th>
                 </tr>
@@ -156,13 +163,13 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
                 {isLoading ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan="9" className="px-6 py-12 text-center text-slate-500">
                       Loading profit data...
                     </td>
                   </tr>
                 ) : !data || data.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan="9" className="px-6 py-12 text-center text-slate-500">
                       No sales data found for this period.
                     </td>
                   </tr>
@@ -188,6 +195,7 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
                         </span>
                       </td>
                       <td className="px-4 py-3">{getCurrency(item.totalCost)}</td>
+                      <td className="px-4 py-3 text-emerald-700 dark:text-emerald-400">{getCurrency(item.totalDiscount)}</td>
                       <td className="px-4 py-3">{getCurrency(item.totalSales)}</td>
                       <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">
                         {getCurrency(item.totalProfit)}
@@ -210,6 +218,9 @@ export default function ProfitDetailsModal({ isOpen, onClose }) {
                     </td>
                     <td className="px-4 py-3">
                       {getCurrency(totals.totalCost)}
+                    </td>
+                    <td className="px-4 py-3 text-emerald-700 dark:text-emerald-400">
+                      {getCurrency(totals.totalDiscount)}
                     </td>
                     <td className="px-4 py-3">
                       {getCurrency(totals.totalSales)}

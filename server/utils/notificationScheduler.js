@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import { checkExpiryStatus } from './expiryCheck.js';
+import { getStockStatus } from './stockStatus.js';
 import { createBackup } from './backupManager.js';
 
 // Setup Nodemailer email transporter
@@ -62,9 +63,10 @@ const getStaffEmailRecipients = async () => {
 
 /**
  * Check medicines and dispatch targeted expiry alert emails:
- * 1) 1-Day Final Urgent Alert (diffDays <= 1 && diffDays >= 0)
- * 2) 10-Day Advance Warning (diffDays <= 10 && diffDays > 1)
- * 3) Expired Alert (diffDays < 0)
+ * 1) Six-month advance warning (diffDays <= 180 && diffDays > 10)
+ * 2) 10-Day advance warning (diffDays <= 10 && diffDays > 1)
+ * 3) 1-Day final urgent alert (diffDays <= 1 && diffDays >= 0)
+ * 4) Expired alert (diffDays < 0)
  *
  * @param {Object} options
  * @param {boolean} options.force - Force sending even if already flagged as sent
@@ -90,6 +92,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
     const oneDayUrgentList = [];
     const tenDaysWarningList = [];
+    const sixMonthsWarningList = [];
     const expiredList = [];
 
     medicines.forEach((med) => {
@@ -112,10 +115,15 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
         if (!med.expiryAlert10Sent || force) {
           tenDaysWarningList.push({ med, diffDays });
         }
+      } else if (diffDays <= 180 && diffDays > 10) {
+        // Six-month advance warning
+        if (!med.expiryAlert180Sent || force) {
+          sixMonthsWarningList.push({ med, diffDays });
+        }
       }
     });
 
-    const totalAlertsNeeded = oneDayUrgentList.length + tenDaysWarningList.length + expiredList.length;
+    const totalAlertsNeeded = oneDayUrgentList.length + tenDaysWarningList.length + sixMonthsWarningList.length + expiredList.length;
     if (totalAlertsNeeded === 0) {
       console.log('[Expiry Alert Engine] All medicines are healthy or already notified. No new alerts needed.');
       return { status: 'success', message: 'No pending expiry alerts' };
@@ -123,12 +131,11 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
     const { staffUsers, emailList } = await getStaffEmailRecipients();
     if (emailList.length === 0) {
-      console.log('[Expiry Alert Engine] No recipient email addresses configured.');
-      return { status: 'warning', message: 'No email recipients found' };
+      console.log('[Expiry Alert Engine] No email recipients configured; alerts will be saved in the in-app notification panel.');
     }
 
-    const transporter = getEmailTransporter();
-    const isEthereal = transporter.options && transporter.options.host === 'smtp.ethereal.email';
+    const transporter = emailList.length > 0 ? getEmailTransporter() : null;
+    const isEthereal = transporter?.options?.host === 'smtp.ethereal.email';
     const sender = `"Sardar Medical Store Alerts" <${process.env.SMTP_USER || 'no-reply@sardarpharmacy.com'}>`;
 
     // --- Helper to send formatted alert email to all staff ---
@@ -221,7 +228,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
         try {
           await Notification.create({
             recipientId: staff._id,
-            type: 'Email',
+            type: emailList.length > 0 ? 'Email' : 'Browser',
             message: `${subject}\n${items.map(i => `- ${i.med.name} (Qty: ${i.med.quantity})`).join('\n')}`,
             status: 'sent',
           });
@@ -231,7 +238,29 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
       }
     };
 
-    // 1. Send 1-Day Final Urgent Warning (Expires Tomorrow / Today)
+    // 1. Send six-month advance warning.
+    if (sixMonthsWarningList.length > 0) {
+      const subject = sixMonthsWarningList.length === 1
+        ? `⚠️ [6-Month Expiry Warning] ${sixMonthsWarningList[0].med.name}`
+        : `⚠️ [6-Month Expiry Warning] ${sixMonthsWarningList.length} Medicines`;
+
+      await sendBatchAlert({
+        subject,
+        headerBg: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+        badgeText: 'SIX-MONTH EXPIRY WARNING',
+        title: 'Medicines Expiring Within 6 Months',
+        description: 'The following medicines will expire within the next 180 days and are included in the inventory expiry list.',
+        actionNotice: 'Review stock and plan sales, supplier returns, or replenishment before these medicines expire.',
+        items: sixMonthsWarningList,
+        isCritical: false,
+      });
+
+      for (const { med } of sixMonthsWarningList) {
+        await Medicine.findByIdAndUpdate(med._id, { expiryAlert180Sent: true });
+      }
+    }
+
+    // 2. Send 1-Day Final Urgent Warning (Expires Tomorrow / Today)
     if (oneDayUrgentList.length > 0) {
       const subject = oneDayUrgentList.length === 1
         ? `🚨 [URGENT 1-DAY FINAL ALERT] ${oneDayUrgentList[0].med.name} Expires Tomorrow!`
@@ -254,7 +283,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
       }
     }
 
-    // 2. Send 10-Day Advance Warning
+    // 3. Send 10-Day Advance Warning
     if (tenDaysWarningList.length > 0) {
       const subject = tenDaysWarningList.length === 1
         ? `⚠️ [10-Day Warning] Medicine Expiring Soon: ${tenDaysWarningList[0].med.name}`
@@ -277,7 +306,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
       }
     }
 
-    // 3. Send Expired Alert
+    // 4. Send Expired Alert
     if (expiredList.length > 0) {
       const subject = expiredList.length === 1
         ? `⛔ [EXPIRED ALERT] ${expiredList[0].med.name} is Expired!`
@@ -301,6 +330,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
     return {
       status: 'success',
+      sent180DayAlerts: sixMonthsWarningList.length,
       sent1DayAlerts: oneDayUrgentList.length,
       sent10DayAlerts: tenDaysWarningList.length,
       sentExpiredAlerts: expiredList.length,
@@ -320,9 +350,9 @@ export const runExpiryReport = async () => {
 export const runLowStockReport = async () => {
   console.log('Running daily low stock check...');
   try {
-    // Find medicines where quantity is below or equal to reorderLevel
+    // Match the inventory's fixed stock labels: under five is low stock.
     const medicines = await Medicine.find({
-      $expr: { $lte: ['$quantity', '$reorderLevel'] },
+      quantity: { $lt: 5 },
     });
 
     if (medicines.length === 0) {
@@ -340,19 +370,19 @@ export const runLowStockReport = async () => {
     // Build low stock HTML report
     let htmlContent = `
       <h2 style="color: #0f172a; font-family: sans-serif;">Sardar Medical Store Low Stock Alert</h2>
-      <p style="color: #475569; font-family: sans-serif;">The following medicines have fallen below their configured reorder thresholds:</p>
+      <p style="color: #475569; font-family: sans-serif;">The following medicines have fewer than five units available:</p>
       <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; font-family: sans-serif; width: 100%; text-align: left; border-color: #cbd5e1;">
         <tr style="background-color: #f8fafc; color: #334155;">
           <th>Medicine Name</th>
-          <th>Batch Number</th>
+          <th>Rack</th>
           <th>Category</th>
           <th>Available Stock</th>
-          <th>Reorder Level</th>
           <th>Status</th>
         </tr>
     `;
 
     medicines.forEach((med) => {
+      const status = getStockStatus(med.quantity);
       const isDepleted = med.quantity === 0;
       htmlContent += `
         <tr>
@@ -360,9 +390,8 @@ export const runLowStockReport = async () => {
             <td><code>${med.rackLocation || 'Not assigned'}</code></td>
           <td>${med.category}</td>
           <td style="color: ${isDepleted ? '#ef4444' : '#f59e0b'}; font-weight: bold;">${med.quantity} units</td>
-          <td>${med.reorderLevel} units</td>
           <td style="color: ${isDepleted ? '#ef4444' : '#f59e0b'}; font-weight: bold;">
-            ${isDepleted ? 'DEPLETED' : 'LOW STOCK'}
+            ${status}
           </td>
         </tr>
       `;
@@ -377,8 +406,8 @@ export const runLowStockReport = async () => {
 
     const stockSummary = medicines.map((m) => {
       const isDepleted = m.quantity === 0;
-      const statusStr = isDepleted ? 'DEPLETED' : 'LOW STOCK';
-      return `- ${m.name} (Rack: ${m.rackLocation || 'Not assigned'}): ${m.quantity} units left (Reorder: ${m.reorderLevel}) [${statusStr}]`;
+      const statusStr = getStockStatus(m.quantity);
+      return `- ${m.name} (Rack: ${m.rackLocation || 'Not assigned'}): ${m.quantity} units left [${statusStr}]`;
     }).join('\n');
 
     const detailedMessage = `Low Stock Alert:\n${stockSummary}`;

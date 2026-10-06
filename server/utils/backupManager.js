@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
@@ -9,6 +10,8 @@ import Medicine from '../models/Medicine.js';
 import Bill from '../models/Bill.js';
 import Reminder from '../models/Reminder.js';
 import Notification from '../models/Notification.js';
+import StockAdjustment from '../models/StockAdjustment.js';
+import Udhar from '../models/Udhar.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,125 +20,156 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 dotenv.config();
 
 const BACKUP_DIR = path.join(__dirname, '../backups');
+const COLLECTION_MODELS = {
+  users: User,
+  medicines: Medicine,
+  bills: Bill,
+  reminders: Reminder,
+  notifications: Notification,
+  stockAdjustments: StockAdjustment,
+  udhar: Udhar,
+};
+const REQUIRED_COLLECTIONS = [
+  'users',
+  'medicines',
+  'bills',
+  'reminders',
+  'notifications',
+];
 
-if (!fs.existsSync(BACKUP_DIR)) {
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
-}
+const getMongoUri = () =>
+  process.env.MONGO_URI ||
+  'mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true';
 
-export async function createBackup() {
-  try {
-    const isConnected = mongoose.connection.readyState === 1;
-    if (!isConnected) {
-      const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pharmadesk';
-      await mongoose.connect(uri);
+const ensureConnected = async () => {
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(getMongoUri());
+  }
+};
+
+export const checksumFor = (data) =>
+  crypto
+    .createHash('sha256')
+    .update(JSON.stringify({
+      timestamp: data.timestamp,
+      version: data.version,
+      collections: data.collections,
+    }))
+    .digest('hex');
+
+export const validateBackup = (data) => {
+  if (!data || typeof data !== 'object' || !data.collections) {
+    throw new Error('Invalid backup file format');
+  }
+  for (const name of REQUIRED_COLLECTIONS) {
+    if (!Array.isArray(data.collections[name])) {
+      throw new Error(`Invalid backup: "${name}" must be an array`);
     }
+  }
+  for (const name of Object.keys(COLLECTION_MODELS)) {
+    if (
+      data.collections[name] !== undefined &&
+      !Array.isArray(data.collections[name])
+    ) {
+      throw new Error(`Invalid backup: "${name}" must be an array`);
+    }
+  }
+  if (data.checksum && data.checksum !== checksumFor(data)) {
+    throw new Error('Backup checksum validation failed; restore was not started');
+  }
+};
 
-    const backupData = {
-      timestamp: new Date().toISOString(),
-      version: '1.0.0',
-      collections: {
-        users: await User.find({}),
-        medicines: await Medicine.find({}),
-        bills: await Bill.find({}),
-        reminders: await Reminder.find({}),
-        notifications: await Notification.find({}),
-      },
-    };
-
-    const dateStr = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `pharmadesk_backup_${dateStr}.json`;
-    const filePath = path.join(BACKUP_DIR, filename);
-    const latestPath = path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json');
-
-    fs.writeFileSync(filePath, JSON.stringify(backupData, null, 2), 'utf-8');
-    fs.writeFileSync(latestPath, JSON.stringify(backupData, null, 2), 'utf-8');
-
-    console.log(`📦 Database Backup Successfully Created: ${filename}`);
-    console.log(`💾 Saved to: ${filePath}`);
-    return filePath;
+const writeAtomically = async (filePath, contents) => {
+  const tempPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    await fs.promises.writeFile(tempPath, contents, { encoding: 'utf-8', flag: 'wx' });
+    await fs.promises.rename(tempPath, filePath);
   } catch (error) {
-    console.error('❌ Backup Failed:', error.message);
+    await fs.promises.rm(tempPath, { force: true }).catch(() => {});
     throw error;
   }
+};
+
+export async function createBackup() {
+  await ensureConnected();
+  await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
+
+  const collections = {};
+  for (const [name, Model] of Object.entries(COLLECTION_MODELS)) {
+    collections[name] = await Model.find({}).lean();
+  }
+  const backupData = {
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    collections,
+  };
+  backupData.checksum = checksumFor(backupData);
+  const contents = `${JSON.stringify(backupData, null, 2)}\n`;
+  const dateStr = backupData.timestamp.replace(/[:.]/g, '-');
+  const filePath = path.join(BACKUP_DIR, `pharmadesk_backup_${dateStr}.json`);
+  const latestPath = path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json');
+
+  await writeAtomically(filePath, contents);
+  await writeAtomically(latestPath, contents);
+  console.log(`Database backup created: ${filePath}`);
+  return filePath;
 }
 
 export async function restoreBackup(specifiedFile = null) {
+  await ensureConnected();
+  const filePath = path.resolve(
+    specifiedFile || path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json')
+  );
+  const rawData = await fs.promises.readFile(filePath, 'utf-8');
+  let backupData;
   try {
-    const isConnected = mongoose.connection.readyState === 1;
-    if (!isConnected) {
-      const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pharmadesk';
-      await mongoose.connect(uri);
-    }
-
-    let filePath = specifiedFile;
-    if (!filePath) {
-      filePath = path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json');
-    }
-
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`Backup file not found at: ${filePath}`);
-    }
-
-    const rawData = fs.readFileSync(filePath, 'utf-8');
-    const backupData = JSON.parse(rawData);
-
-    if (!backupData.collections) {
-      throw new Error('Invalid backup file format');
-    }
-
-    console.log(`🔄 Restoring database from backup created at ${backupData.timestamp}...`);
-
-    if (backupData.collections.users?.length) {
-      await User.deleteMany({});
-      await User.insertMany(backupData.collections.users);
-      console.log(`✅ Restored ${backupData.collections.users.length} Users.`);
-    }
-
-    if (backupData.collections.medicines?.length) {
-      await Medicine.deleteMany({});
-      await Medicine.insertMany(backupData.collections.medicines);
-      console.log(`✅ Restored ${backupData.collections.medicines.length} Medicines.`);
-    }
-
-    if (backupData.collections.bills?.length) {
-      await Bill.deleteMany({});
-      await Bill.insertMany(backupData.collections.bills);
-      console.log(`✅ Restored ${backupData.collections.bills.length} Bills.`);
-    }
-
-    if (backupData.collections.reminders?.length) {
-      await Reminder.deleteMany({});
-      await Reminder.insertMany(backupData.collections.reminders);
-      console.log(`✅ Restored ${backupData.collections.reminders.length} Reminders.`);
-    }
-
-    if (backupData.collections.notifications?.length) {
-      await Notification.deleteMany({});
-      await Notification.insertMany(backupData.collections.notifications);
-      console.log(`✅ Restored ${backupData.collections.notifications.length} Notifications.`);
-    }
-
-    console.log('🎉 Database Restoration Completed Successfully!');
+    backupData = JSON.parse(rawData);
   } catch (error) {
-    console.error('❌ Restore Failed:', error.message);
-    throw error;
+    throw new Error(`Backup JSON is invalid: ${error.message}`);
   }
+  validateBackup(backupData);
+
+  const preRestoreFile = await createBackup();
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      for (const [name, Model] of Object.entries(COLLECTION_MODELS)) {
+        const documents = backupData.collections[name];
+        if (documents === undefined) continue;
+        await Model.deleteMany({}).session(session);
+        if (documents.length > 0) {
+          await Model.insertMany(documents, { session, ordered: true });
+        }
+      }
+    });
+  } catch (error) {
+    throw new Error(
+      `Restore failed; transaction was rolled back. A pre-restore backup is available at ${preRestoreFile}. ${error.message}`
+    );
+  } finally {
+    await session.endSession();
+  }
+  console.log(`Database restored from ${filePath}`);
+  return { restoredFrom: filePath, preRestoreBackup: preRestoreFile };
 }
 
-// Support CLI execution directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const action = process.argv[2] || 'backup';
   const fileArg = process.argv[3] || null;
-
   (async () => {
     try {
       if (action === 'restore') {
         await restoreBackup(fileArg);
-      } else {
+      } else if (action === 'backup') {
         await createBackup();
+      } else {
+        throw new Error(`Unsupported backup action: ${action}`);
       }
+      await mongoose.disconnect();
       process.exit(0);
-    } catch (err) {
+    } catch (error) {
+      console.error('Database operation failed:', error.message);
+      await mongoose.disconnect().catch(() => {});
       process.exit(1);
     }
   })();
