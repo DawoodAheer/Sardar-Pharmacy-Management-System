@@ -1,0 +1,115 @@
+name: sardar-pharmacy-management-system
+
+# ===================================================
+# Sardar Medical Store — Offline Docker Compose Configuration
+# Guaranteed Data Persistence via Local Volume & Host Mounts
+# ===================================================
+
+services:
+  # -------------------------------------------------
+  # 1. MongoDB Database Service (Runs 100% Offline)
+  # -------------------------------------------------
+  mongodb:
+    image: mongo:7.0
+    container_name: pharmadesk-mongodb
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      # DATA PERSISTENCE: Stored in named persistent Docker volume.
+      # Decoupled from container lifecycle. Stopping/rebuilding containers NEVER deletes data.
+      - pharmadesk_mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { if (rs.status().myState === 1) quit(0); quit(1); } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongodb:27017'}]}); quit(1); }\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - pharmadesk-network
+
+  # -------------------------------------------------
+  # 2. Node.js Express Backend API
+  # -------------------------------------------------
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pharmadesk-backend
+    restart: unless-stopped
+    ports:
+      - "5001:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      # Connects directly to internal offline MongoDB container
+      - MONGO_URI=mongodb://mongodb:27017/pharmadesk?replicaSet=rs0
+      # Preconfigured offline secrets
+      - JWT_ACCESS_SECRET=pharmadesk_super_secure_offline_jwt_access_secret_key_2026
+      - JWT_REFRESH_SECRET=pharmadesk_super_secure_offline_jwt_refresh_secret_key_2026
+      - CLIENT_URL=http://localhost:5173
+    volumes:
+      # UPLOADS PERSISTENCE: Host-mounted folder for medicine images & uploaded documents
+      - ./server/uploads:/app/uploads
+      # BACKUPS PERSISTENCE: Host-mounted folder for database dumps & archives
+      - ./backups:/app/backups
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5000/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - pharmadesk-network
+
+  # -------------------------------------------------
+  # 3. React Frontend with Production Nginx Server
+  # -------------------------------------------------
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        # Empty string lets client use relative /api reverse-proxy through Nginx
+        - VITE_API_URL=
+    container_name: pharmadesk-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+      - "3000:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - pharmadesk-network
+
+# ---------------------------------------------------
+# Persistent Storage Volumes
+# ---------------------------------------------------
+volumes:
+  # Managed named volume for MongoDB data files
+  pharmadesk_mongo_data:
+    name: pharmadesk_mongo_data
+    driver: local
+
+# ---------------------------------------------------
+# Internal Private Bridge Network
+# ---------------------------------------------------
+networks:
+  pharmadesk-network:
+    name: pharmadesk-network
+    driver: bridge
