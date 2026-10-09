@@ -302,6 +302,9 @@ const PharmacistDashboard = () => {
   const [salesDetailsType, setSalesDetailsType] =
     useState(null);
 
+  // Sales Ranking Modal
+  const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
+
   // ==========================================================================
   // MEDICINE MODAL
   // ==========================================================================
@@ -340,17 +343,15 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const [name, setName] = useState('');
-  const [genericName, setGenericName] =
+  const [ setGenericName] =
     useState('');
   const [manufacturer, setManufacturer] =
     useState('');
-  const [supplierName, setSupplierName] = useState('');
-  const [supplierPhone, setSupplierPhone] = useState('');
-  const [expiryDate, setExpiryDate] =
+      const [expiryDate, setExpiryDate] =
     useState('');
   const [quantity, setQuantity] =
     useState('');
-  const [reorderLevel, setReorderLevel] =
+  const [ setReorderLevel] =
     useState('10');
   const [price, setPrice] =
     useState('');
@@ -364,9 +365,9 @@ const PharmacistDashboard = () => {
     useState(null);
   const [returnModalBill, setReturnModalBill] =
     useState(null);
-  const [category, setCategory] =
+  const [ setCategory] =
     useState('Antibiotic');
-  const [barcode, setBarcode] =
+  const [ setBarcode] =
     useState('');
   const [rackLocation, setRackLocation] =
     useState('');
@@ -722,6 +723,22 @@ const PharmacistDashboard = () => {
   });
 
   // ==========================================================================
+  // MEDICINE SALES RANKING
+  // ==========================================================================
+
+  const {
+    data: medicineSalesRanking,
+    isLoading: isMedicineSalesLoading,
+  } = useQuery({
+    queryKey: ['medicineSalesRanking'],
+    queryFn: async () => {
+      const response = await api.get('/bills/medicine-sales-ranking');
+      return response.data || {};
+    },
+    staleTime: 60000,
+  });
+
+  // ==========================================================================
   // CUSTOMERS
   // ==========================================================================
 
@@ -968,19 +985,13 @@ const PharmacistDashboard = () => {
     setEditingMedicine(null);
 
     setName('');
-    setGenericName('');
-    setManufacturer('');
-    setSupplierName('');
-    setSupplierPhone('');
-    setExpiryDate('');
+        setManufacturer('');
+            setExpiryDate('');
     setQuantity('');
-    setReorderLevel('10');
-    setPrice('');
+        setPrice('');
     setPurchasePrice('');
     setUnitsPerPack('1');
-    setCategory('Antibiotic');
-    setBarcode('');
-    setRackLocation('');
+            setRackLocation('');
     setLabelImageUrl('');
     setOcrPreview(null);
     setError('');
@@ -993,16 +1004,12 @@ const PharmacistDashboard = () => {
 
     setName(medicine?.name || '');
 
-    setGenericName(
-      medicine?.genericName || ''
-    );
+    
 
     setManufacturer(
       medicine?.manufacturer || ''
     );
-    setSupplierName(medicine?.supplierName || '');
-    setSupplierPhone(medicine?.supplierPhone || '');
-
+        
 
     setExpiryDate(
       medicine?.expiryDate
@@ -1019,9 +1026,7 @@ const PharmacistDashboard = () => {
       medicine?.quantity ?? ''
     );
 
-    setReorderLevel(
-      medicine?.reorderLevel ?? 10
-    );
+    
 
     setPrice(
       medicine?.price ?? ''
@@ -1032,13 +1037,9 @@ const PharmacistDashboard = () => {
     );
     setUnitsPerPack(String(medicine?.unitsPerPack ?? 1));
 
-    setCategory(
-      medicine?.category || 'Other'
-    );
+    
 
-    setBarcode(
-      medicine?.barcode || ''
-    );
+    
 
     setRackLocation(
       medicine?.rackLocation || ''
@@ -1203,8 +1204,7 @@ const PharmacistDashboard = () => {
 
   const showAllMedicines = () => {
     setSearch('');
-    setCategoryFilter('');
-    setExpiryStatusFilter('');
+        setExpiryStatusFilter('');
     setReorderFilter(false);
     setMedicineViewFilter('ALL');
     setActiveTab('medicines');
@@ -1212,8 +1212,7 @@ const PharmacistDashboard = () => {
 
   const showExpiredMedicines = () => {
     setSearch('');
-    setCategoryFilter('');
-    setExpiryStatusFilter('EXPIRED');
+        setExpiryStatusFilter('EXPIRED');
     setReorderFilter(false);
     setMedicineViewFilter('ALL');
     setActiveTab('medicines');
@@ -1221,8 +1220,7 @@ const PharmacistDashboard = () => {
 
   const showExpiringSixMonths = () => {
     setSearch('');
-    setCategoryFilter('');
-    setExpiryStatusFilter('EXPIRING');
+        setExpiryStatusFilter('EXPIRING');
     setReorderFilter(false);
     setMedicineViewFilter('ALL');
     setActiveTab('medicines');
@@ -1230,8 +1228,7 @@ const PharmacistDashboard = () => {
 
   const showLowStockMedicines = () => {
     setSearch('');
-    setCategoryFilter('');
-    setExpiryStatusFilter('');
+        setExpiryStatusFilter('');
     setReorderFilter(false);
     setMedicineViewFilter(
       'LOW_STOCK'
@@ -1279,25 +1276,17 @@ const PharmacistDashboard = () => {
 
     const medicineData = {
       name: name.trim(),
-      genericName:
-        genericName.trim(),
-      manufacturer:
-        manufacturer.trim(),
-      supplierName: supplierName.trim(),
-      supplierPhone: supplierPhone.trim(),
+      
+      
       expiryDate,
       quantity:
         Number(quantity),
-      reorderLevel:
-        Number(
-          reorderLevel || 10
-        ),
+      
       price: Number(price),
       purchasePrice: Number(purchasePrice) || 0,
       unitsPerPack: packSize,
-      category,
-      barcode:
-        barcode.trim(),
+      
+      
       rackLocation:
         rackLocation.trim(),
       labelImageUrl:
@@ -1367,7 +1356,7 @@ const PharmacistDashboard = () => {
 
         setOcrPreview({
           medicineName: data.medicineName || '',
-          genericName: data.genericName || '',
+          
           expiryDate: data.expiryDate || '',
           scannedPrices: data.scannedPrices || {},
           confidence: data.confidence || 'low',
@@ -1380,9 +1369,7 @@ const PharmacistDashboard = () => {
         }
 
         if (data.genericName) {
-          setGenericName(
-            data.genericName
-          );
+          
         }
 
         if (data.manufacturer) {
@@ -1398,9 +1385,7 @@ const PharmacistDashboard = () => {
         }
 
         if (data.barcode) {
-          setBarcode(
-            data.barcode
-          );
+          
         }
 
         if (data.rackLocation) {
@@ -1429,8 +1414,7 @@ const PharmacistDashboard = () => {
             );
           });
           if (!match) {
-            setBillError(`Could not match "${data.medicineName || data.genericName || 'scanned medicine'}" to inventory. Search by name or barcode instead.`);
-          } else if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
+                      } else if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
             setBillError(`${match.name} is expired or out of stock and cannot be added to a bill.`);
           } else {
             setBillError('');
@@ -1538,25 +1522,20 @@ const PharmacistDashboard = () => {
           handleAddToBill(match);
         }
       } else {
-        setBillError('Scanned barcode not found in inventory: ' + text);
-      }
+              }
     } else {
       // Medicine form: barcode is safe to apply directly. If it belongs to an
       // existing inventory item, use that saved record to prefill the form.
-      setBarcode(text);
-      const match = medicines?.find(medicine => String(medicine.barcode || '').trim().toLowerCase() === scannedNorm);
+            const match = medicines?.find(medicine => String(medicine.barcode || '').trim().toLowerCase() === scannedNorm);
       if (match) {
         setName(match.name || '');
-        setGenericName(match.genericName || '');
-        setManufacturer(match.manufacturer || '');
+                setManufacturer(match.manufacturer || '');
         setExpiryDate(match.expiryDate ? new Date(match.expiryDate).toISOString().slice(0, 10) : '');
         setPurchasePrice(match.purchasePrice ?? '');
         setUnitsPerPack(String(match.unitsPerPack ?? 1));
         setPrice(match.price ?? '');
         setQuantity(match.quantity ?? '');
-        setCategory(match.category || 'Other');
-        setOcrPreview({ medicineName: match.name || '', genericName: match.genericName || '', expiryDate: '', scannedPrices: {}, confidence: 'matched to inventory' });
-      }
+                      }
     }
   };
 
@@ -1582,12 +1561,12 @@ const PharmacistDashboard = () => {
           setMobileConnected(false);
         }
         if (msg.type === 'scan_result') {
-          processScanResult(msg.data?.barcode, target);
+          processScanResult(msg.data?. target);
         }
         if (msg.type === 'ocr_result' && target === 'medicine') {
           setOcrPreview({
             medicineName: '',
-            genericName: '',
+            
             expiryDate: '',
             scannedPrices: {},
             confidence: Number(msg.data?.confidence || 0) >= 55 ? 'review text' : 'low',
@@ -1632,10 +1611,10 @@ const PharmacistDashboard = () => {
           setMobileConnected(Boolean(status.data.mobileConnected));
           const pending = await api.get(`/mobile-scanner/results/${sessionId}`);
           if (pending.data.result?.type === 'scan_result') {
-            processScanResult(pending.data.result.data?.barcode, target);
+            processScanResult(pending.data.result.data?. target);
           } else if (pending.data.result?.type === 'ocr_result' && target === 'medicine') {
             setOcrPreview({
-              medicineName: '', genericName: '', expiryDate: '', scannedPrices: {},
+              medicineName: '',  expiryDate: '', scannedPrices: {},
               confidence: Number(pending.data.result.data?.confidence || 0) >= 55 ? 'review text' : 'low',
               rawText: pending.data.result.data?.rawText || '',
             });
@@ -2984,6 +2963,61 @@ const PharmacistDashboard = () => {
 
               </div>
 
+              {/* MEDICINE SALES RANKING CARDS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+
+                {/* MOST SOLD */}
+                <button
+                  type="button"
+                  onClick={() => setSalesRankingModal('top')}
+                  className="text-left bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-sm hover:shadow-md hover:border-emerald-400 transition group"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">🏆 Most Sold Medicines</div>
+                      <div className="mt-2 text-sm font-bold text-emerald-800 dark:text-emerald-300">
+                        {isMedicineSalesLoading ? '...' : medicineSalesRanking?.topSelling?.[0]?.name || 'No data yet'}
+                      </div>
+                      {medicineSalesRanking?.topSelling?.[0] && (
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {medicineSalesRanking.topSelling[0].totalUnits} units sold · Top {medicineSalesRanking.topSelling.length} shown
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                      📈
+                    </div>
+                  </div>
+                  <div className="text-[9px] text-emerald-600 mt-3 font-bold">Click to view full ranking →</div>
+                </button>
+
+                {/* LEAST SOLD */}
+                <button
+                  type="button"
+                  onClick={() => setSalesRankingModal('least')}
+                  className="text-left bg-gradient-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-rose-200 dark:border-rose-800 shadow-sm hover:shadow-md hover:border-rose-400 transition group"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-[10px] uppercase font-bold text-rose-500 dark:text-rose-400 tracking-wider">⚠️ Least Sold Medicines</div>
+                      <div className="mt-2 text-sm font-bold text-rose-700 dark:text-rose-300">
+                        {isMedicineSalesLoading ? '...' : medicineSalesRanking?.leastSelling?.[0]?.name || 'No data yet'}
+                      </div>
+                      {medicineSalesRanking?.leastSelling?.[0] && (
+                        <div className="text-[10px] text-slate-500 mt-0.5">
+                          {medicineSalesRanking.leastSelling[0].totalUnits} units sold · Bottom {medicineSalesRanking.leastSelling.length} shown
+                        </div>
+                      )}
+                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                      📉
+                    </div>
+                  </div>
+                  <div className="text-[9px] text-rose-500 mt-3 font-bold">Click to view full ranking →</div>
+                </button>
+
+              </div>
+
               {/* PROFIT ANALYTICS SUMMARY CARD */}
               <div className="mt-4 p-5 bg-gradient-to-r from-emerald-900 to-teal-900 rounded-2xl text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
@@ -3774,8 +3808,7 @@ const PharmacistDashboard = () => {
                       );
 
                       setSearch('');
-                      setCategoryFilter('');
-                      setExpiryStatusFilter(
+                                            setExpiryStatusFilter(
                         ''
                       );
                       setReorderFilter(
@@ -5688,56 +5721,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    Additional medicine details (optional)
-                  </p>
-                  <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                    Generic name
-                    <input
-                      value={genericName}
-                      onChange={(event) => setGenericName(event.target.value)}
-                      placeholder="Active ingredient"
-                      className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
-                    />
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Reorder level (units)
-                      <input
-                        type="number"
-                        min="0"
-                        value={reorderLevel}
-                        onChange={(event) => setReorderLevel(event.target.value)}
-                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
-                      />
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Category
-                      <select
-                        value={category}
-                        onChange={(event) => setCategory(event.target.value)}
-                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
-                      >
-                        {standardCategories.map((item) => (
-                          <option key={item} value={item}>{item}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Barcode
-                      <input
-                        value={barcode}
-                        onChange={(event) => setBarcode(event.target.value)}
-                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
-                      />
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">Supplier name<input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="Supplier / wholesaler" className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal" /></label>
-                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">Supplier phone<input value={supplierPhone} onChange={(event) => setSupplierPhone(event.target.value)} placeholder="Contact number" className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal" /></label>
-                  </div>
-              </div>
+
 
               <div className="flex justify-end gap-2 pt-3 border-t">
 
@@ -5870,7 +5854,7 @@ const PharmacistDashboard = () => {
                   rows={10}
                   value={bulkJson}
                   onChange={(event) => { setBulkJson(event.target.value); setBulkPreviewResult(null); }}
-                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "genericName": "Paracetamol",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "purchasePrice": 400,\n    "unitsPerPack": 20,\n    "price": 25,\n    "quantity": 500,\n    "reorderLevel": 50,\n    "category": "Analgesic",\n    "barcode": "",\n    "rackLocation": "R-02-B"\n  }\n]`}
+                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "purchasePrice": 400,\n    "unitsPerPack": 20,\n    "price": 25,\n    "quantity": 500,\n    "rackLocation": "R-02-B"\n  }\n]`}
                   className="w-full border rounded-lg p-3 font-mono text-xs"
                 />
               )}
@@ -7105,6 +7089,99 @@ const PharmacistDashboard = () => {
         onClose={() => setReturnModalBill(null)}
         bill={returnModalBill}
       />
+
+      {/* ================================================================= */}
+      {/* MEDICINE SALES RANKING MODAL */}
+      {/* ================================================================= */}
+      {salesRankingModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+            {/* Header */}
+            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-rose-600 to-orange-600'}`}>
+              <div>
+                <div className="text-[10px] uppercase font-bold text-white/70 tracking-widest">Medicine Performance</div>
+                <h3 className="text-base font-extrabold text-white mt-0.5">
+                  {salesRankingModal === 'top' ? '🏆 Most Sold Medicines' : '📉 Least Sold Medicines'}
+                </h3>
+                <div className="text-[10px] text-white/60 mt-0.5">
+                  Based on all-time accepted bills · Top {salesRankingModal === 'top' ? medicineSalesRanking?.topSelling?.length : medicineSalesRanking?.leastSelling?.length} medicines
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSalesRankingModal(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-lg font-bold transition"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2">
+              {isMedicineSalesLoading ? (
+                <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+              ) : (() => {
+                const list = salesRankingModal === 'top'
+                  ? (medicineSalesRanking?.topSelling || [])
+                  : (medicineSalesRanking?.leastSelling || []);
+                if (!list.length) {
+                  return <div className="text-center py-8 text-slate-400 text-sm">No sales data available yet.</div>;
+                }
+                return list.map((med, index) => (
+                  <div
+                    key={med.medicineId}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+                      salesRankingModal === 'top'
+                        ? 'border-emerald-100 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                        : 'border-rose-100 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
+                    }`}
+                  >
+                    {/* Rank badge */}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                      salesRankingModal === 'top'
+                        ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-300 text-slate-800' : index === 2 ? 'bg-amber-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      {salesRankingModal === 'top' && index === 0 ? '🥇' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{med.name || 'Unknown Medicine'}</div>
+                      {med.manufacturer && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{med.manufacturer}</div>
+                      )}
+                    </div>
+
+                    {/* Stats */}
+                    <div className="text-right shrink-0">
+                      <div className={`text-sm font-extrabold ${salesRankingModal === 'top' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {med.totalUnits} units
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                        {getCurrency(med.totalRevenue)} rev
+                      </div>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSalesRankingModal(null)}
+                className="px-5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 transition"
+              >
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };

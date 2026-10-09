@@ -17,6 +17,7 @@ import {
   rejectOnlineOrder,
   getReturnActivity,
   getDailyClosingReport,
+  getMedicineSalesRanking,
 } from '../controllers/billController.js';
 import { createDeletionRequest } from '../controllers/deletionRequestController.js';
 
@@ -37,6 +38,13 @@ router.get(
   '/sales-summary',
   authorize('superadmin', 'pharmacist'),
   getSalesSummary
+);
+
+// Medicine sales ranking (most-sold / least-sold)
+router.get(
+  '/medicine-sales-ranking',
+  authorize('superadmin', 'pharmacist'),
+  getMedicineSalesRanking
 );
 
 router.get('/daily-closing', authorize('superadmin', 'pharmacist'), getDailyClosingReport);

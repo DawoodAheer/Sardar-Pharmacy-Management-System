@@ -446,6 +446,8 @@ export default function SuperadminDashboard() {
   const [selectedView, setSelectedView] =
     useState(null);
 
+  const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
+
   const [searchTerm, setSearchTerm] =
     useState('');
 
@@ -616,6 +618,18 @@ export default function SuperadminDashboard() {
       const response = await api.get('/bills/profit-summary');
       return response.data;
     },
+  });
+
+  const {
+    data: medicineSalesRanking,
+    isLoading: isMedicineSalesLoading,
+  } = useQuery({
+    queryKey: ['medicineSalesRankingAdmin'],
+    queryFn: async () => {
+      const response = await api.get('/bills/medicine-sales-ranking');
+      return response.data || {};
+    },
+    staleTime: 60000,
   });
 
   /* =======================================================
@@ -1591,6 +1605,63 @@ export default function SuperadminDashboard() {
               <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
                 <span className="text-xs font-semibold text-slate-500 group-hover:text-violet-600">Open this year’s sales</span>
                 <ChevronRight size={16} className="text-slate-400" />
+              </div>
+            </button>
+
+          </div>
+
+          {/* MEDICINE SALES RANKING CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+
+            {/* MOST SOLD */}
+            <button
+              type="button"
+              onClick={() => setSalesRankingModal('top')}
+              className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 dark:border-emerald-800 p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-emerald-400 hover:shadow-lg"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">🏆 Most Sold Medicines</p>
+                  <p className="mt-2 text-xl font-bold text-emerald-800 dark:text-emerald-300">
+                    {isMedicineSalesLoading ? '...' : medicineSalesRanking?.topSelling?.[0]?.name || 'No data yet'}
+                  </p>
+                  {medicineSalesRanking?.topSelling?.[0] && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {medicineSalesRanking.topSelling[0].totalUnits} units sold all-time
+                    </p>
+                  )}
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-100 text-2xl group-hover:scale-110 transition-transform">📈</div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-emerald-100 dark:border-emerald-900/40 pt-3">
+                <span className="text-xs font-semibold text-emerald-600 group-hover:text-emerald-700">View full ranking</span>
+                <ChevronRight size={16} className="text-emerald-400" />
+              </div>
+            </button>
+
+            {/* LEAST SOLD */}
+            <button
+              type="button"
+              onClick={() => setSalesRankingModal('least')}
+              className="group rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 dark:border-rose-800 p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-rose-400 hover:shadow-lg"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-rose-500 dark:text-rose-400">⚠️ Least Sold Medicines</p>
+                  <p className="mt-2 text-xl font-bold text-rose-700 dark:text-rose-300">
+                    {isMedicineSalesLoading ? '...' : medicineSalesRanking?.leastSelling?.[0]?.name || 'No data yet'}
+                  </p>
+                  {medicineSalesRanking?.leastSelling?.[0] && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {medicineSalesRanking.leastSelling[0].totalUnits} units sold all-time
+                    </p>
+                  )}
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-100 text-2xl group-hover:scale-110 transition-transform">📉</div>
+              </div>
+              <div className="mt-4 flex items-center justify-between border-t border-rose-100 dark:border-rose-900/40 pt-3">
+                <span className="text-xs font-semibold text-rose-500 group-hover:text-rose-600">View full ranking</span>
+                <ChevronRight size={16} className="text-rose-400" />
               </div>
             </button>
 
@@ -3713,6 +3784,74 @@ export default function SuperadminDashboard() {
         onClose={() => setReturnModalBill(null)}
         bill={returnModalBill}
       />
+
+      {/* MEDICINE SALES RANKING MODAL */}
+      {salesRankingModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+
+            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-rose-600 to-orange-600'}`}>
+              <div>
+                <div className="text-[10px] uppercase font-bold text-white/70 tracking-widest">Medicine Performance</div>
+                <h3 className="text-base font-extrabold text-white mt-0.5">
+                  {salesRankingModal === 'top' ? '🏆 Most Sold Medicines' : '📉 Least Sold Medicines'}
+                </h3>
+                <div className="text-[10px] text-white/60 mt-0.5">
+                  Based on all-time accepted bills · {salesRankingModal === 'top' ? medicineSalesRanking?.topSelling?.length : medicineSalesRanking?.leastSelling?.length} medicines listed
+                </div>
+              </div>
+              <button type="button" onClick={() => setSalesRankingModal(null)}
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-lg font-bold transition">×</button>
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2">
+              {isMedicineSalesLoading ? (
+                <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+              ) : (() => {
+                const list = salesRankingModal === 'top'
+                  ? (medicineSalesRanking?.topSelling || [])
+                  : (medicineSalesRanking?.leastSelling || []);
+                if (!list.length) return <div className="text-center py-8 text-slate-400 text-sm">No sales data available yet.</div>;
+                return list.map((med, index) => (
+                  <div key={med.medicineId}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
+                      salesRankingModal === 'top'
+                        ? 'border-emerald-100 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                        : 'border-rose-100 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
+                      salesRankingModal === 'top'
+                        ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-300 text-slate-800' : index === 2 ? 'bg-amber-600 text-white' : 'bg-emerald-100 text-emerald-700'
+                        : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      {salesRankingModal === 'top' && index === 0 ? '🥇' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{med.name || 'Unknown'}</div>
+                      {med.manufacturer && <div className="text-[10px] text-slate-500 truncate">{med.manufacturer}</div>}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className={`text-sm font-extrabold ${salesRankingModal === 'top' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        {med.totalUnits} units
+                      </div>
+                      <div className="text-[10px] text-slate-500">{getCurrency(med.totalRevenue)} rev</div>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+              <button type="button" onClick={() => setSalesRankingModal(null)}
+                className="px-5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 transition">
+                Close
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

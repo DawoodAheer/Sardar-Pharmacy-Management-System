@@ -6,7 +6,7 @@ import { recordMedicineAudit, snapshotMedicine } from '../utils/medicineAudit.js
 
 export const getLowStockMedicines = async (_req, res, next) => {
   try {
-    const medicines = await Medicine.find({ isDeleted: { $ne: true }, $expr: { $lte: ['$quantity', '$reorderLevel'] } })
+    const medicines = await Medicine.find({ isDeleted: { $ne: true }, quantity: { $lte: 10 } })
       .sort({ quantity: 1, name: 1 }).limit(500).lean();
     res.json({ medicines });
   } catch (error) { next(error); }
@@ -31,7 +31,7 @@ export const createPurchaseOrder = async (req, res, next) => {
     for (const item of items) {
       const qty = Number(item.quantityOrdered);
       if (!mongoose.isValidObjectId(item.medicineId) || !Number.isInteger(qty) || qty < 1) return res.status(400).json({ message: 'Every purchase line needs a valid medicine and whole order quantity.' });
-      const medicine = await Medicine.findOne({ _id: item.medicineId, isDeleted: { $ne: true } }).select('name quantity reorderLevel supplierName');
+      const medicine = await Medicine.findOne({ _id: item.medicineId, isDeleted: { $ne: true } }).select('name quantity');
       if (!medicine) return res.status(404).json({ message: 'A selected medicine is no longer active in inventory.' });
       normalized.push({ medicineId: medicine._id, medicineName: medicine.name, quantityOrdered: qty });
     }

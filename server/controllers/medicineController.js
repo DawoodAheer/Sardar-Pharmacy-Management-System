@@ -35,26 +35,24 @@ cloudinary.config({
 // @route   GET /api/medicines
 // @access  Private
 export const getAllMedicines = async (req, res, next) => {
-  const { search, category, status, reorder } = req.query;
+  const { search, status } = req.query;
 
   try {
     const query = { isDeleted: { $ne: true } };
 
-    // 1. Search filter (name, genericName, manufacturer, batch and rack)
+    // 1. Search filter (name, manufacturer, batch and rack)
     if (search) {
       const escapedSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       query.$or = [
         { name: { $regex: escapedSearch, $options: 'i' } },
-        { genericName: { $regex: escapedSearch, $options: 'i' } },
+        
         { manufacturer: { $regex: escapedSearch, $options: 'i' } },
         { rackLocation: { $regex: escapedSearch, $options: 'i' } },
       ];
     }
 
     // 2. Category filter
-    if (category) {
-      query.category = category;
-    }
+    
 
     // 3. Expiry status filter
     if (status) {
@@ -110,18 +108,12 @@ export const getAllMedicines = async (req, res, next) => {
 export const createMedicine = async (req, res, next) => {
   const {
     name,
-    genericName,
     manufacturer,
-    supplierName,
-    supplierPhone,
     expiryDate,
     quantity,
-    reorderLevel,
     price,
     purchasePrice,
     unitsPerPack,
-    category,
-    barcode,
     rackLocation,
     labelImageUrl,
   } = req.body;
@@ -147,19 +139,16 @@ export const createMedicine = async (req, res, next) => {
       res.status(400);
       return next(new Error('Stock quantity is required and must be a non-negative whole number of tablets or units'));
     }
-    if (reorderLevel !== undefined && (!Number.isInteger(Number(reorderLevel)) || Number(reorderLevel) < 0)) {
-      res.status(400);
-      return next(new Error('Reorder level must be a non-negative whole number'));
-    }
+    
 
     const session = await mongoose.startSession();
     let medicine;
     try {
       await session.withTransaction(async () => {
         [medicine] = await Medicine.create([{
-          name, genericName, manufacturer, supplierName, supplierPhone, expiryDate,
-          quantity, reorderLevel, price, purchasePrice: numericPurchasePrice,
-          unitsPerPack: numericUnitsPerPack, category, barcode, rackLocation,
+          name, manufacturer, expiryDate,
+          quantity, price, purchasePrice: numericPurchasePrice,
+          unitsPerPack: numericUnitsPerPack, rackLocation,
           labelImageUrl, createdBy: req.user._id,
         }], { session });
         await recordMedicineAudit({ medicine, action: 'created', newValues: snapshotMedicine(medicine), performedBy: req.user._id, session });
@@ -188,18 +177,12 @@ export const updateMedicine = async (req, res, next) => {
   const { id } = req.params;
   const {
     name,
-    genericName,
     manufacturer,
-    supplierName,
-    supplierPhone,
     expiryDate,
     quantity,
-    reorderLevel,
     price,
     purchasePrice,
     unitsPerPack,
-    category,
-    barcode,
     rackLocation,
     labelImageUrl,
   } = req.body;
@@ -222,26 +205,26 @@ export const updateMedicine = async (req, res, next) => {
         if (!isValidUnitsPerPack(nextUnitsPerPack)) { const error = new Error('Units per pack must be a positive whole number'); error.statusCode = 400; throw error; }
         if (!Number.isFinite(nextPurchasePrice) || nextPurchasePrice <= 0 || !Number.isFinite(nextSalePrice) || nextSalePrice <= 0) { const error = new Error('Pack purchase price and unit sale price must both be greater than zero'); error.statusCode = 400; throw error; }
         if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }
-        if (reorderLevel !== undefined && (!Number.isInteger(Number(reorderLevel)) || Number(reorderLevel) < 0)) { const error = new Error('Reorder level must be a non-negative whole number'); error.statusCode = 400; throw error; }
+        
 
         const previousValues = snapshotMedicine(medicine);
         medicine.name = nextName;
-        medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
+        
         medicine.manufacturer = nextManufacturer;
-        medicine.supplierName = supplierName !== undefined ? supplierName : medicine.supplierName;
-        medicine.supplierPhone = supplierPhone !== undefined ? supplierPhone : medicine.supplierPhone;
+        
+        
         if (expiryDate !== undefined && String(expiryDate) !== String(medicine.expiryDate)) {
           medicine.expiryDate = expiryDate;
           medicine.expiryAlert10Sent = false; medicine.expiryAlert1Sent = false;
           medicine.expiryAlert180Sent = false; medicine.expiryAlertExpiredSent = false;
         }
         medicine.quantity = quantity !== undefined ? Number(quantity) : medicine.quantity;
-        medicine.reorderLevel = reorderLevel !== undefined ? Number(reorderLevel) : medicine.reorderLevel;
+        
         medicine.price = price !== undefined ? nextSalePrice : medicine.price;
         medicine.purchasePrice = nextPurchasePrice;
         medicine.unitsPerPack = nextUnitsPerPack;
-        medicine.category = category !== undefined ? category : medicine.category;
-        medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
+        
+        
         medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
         medicine.labelImageUrl = labelImageUrl !== undefined ? labelImageUrl : medicine.labelImageUrl;
         updatedMedicine = await medicine.save({ session });
@@ -335,22 +318,22 @@ export const bulkImportMedicines = async (req, res, next) => {
 
   try {
     const existingMedicines = await Medicine.find({ isDeleted: { $ne: true } })
-      .select('name manufacturer barcode').lean();
-    const existingBarcodes = new Set(existingMedicines.map((item) => String(item.barcode || '').trim().toLowerCase()).filter(Boolean));
+      .select('name manufacturer').lean();
+    
     const existingNames = new Set(existingMedicines.map((item) => `${String(item.name).trim().toLowerCase()}|${String(item.manufacturer || '').trim().toLowerCase()}`));
-    const seenBarcodes = new Set();
+    
     const seenNames = new Set();
     const validRows = [];
     const invalidRows = [];
 
     medicineArray.forEach((row, index) => {
       const { medicine, errors } = normalizeMedicineImportRow(row);
-      const barcode = medicine.barcode.toLowerCase();
+      
       const nameKey = `${medicine.name.toLowerCase()}|${medicine.manufacturer.toLowerCase()}`;
       if (medicine.name && existingNames.has(nameKey)) errors.push('This medicine and manufacturer already exist in active inventory.');
-      if (barcode && (existingBarcodes.has(barcode) || seenBarcodes.has(barcode))) errors.push('This barcode is already used by another medicine.');
+      
       if (medicine.name && seenNames.has(nameKey)) errors.push('This medicine is duplicated in the uploaded file.');
-      if (barcode) seenBarcodes.add(barcode);
+      
       if (medicine.name) seenNames.add(nameKey);
       const rowNumber = index + (req.body?.sourceFile || req.headers['x-import-filename'] ? 2 : 1);
       const originalRow = row && typeof row === 'object' ? row : { rawValue: row ?? null };
@@ -436,11 +419,11 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
           throw error;
         }
         const existing = await Medicine.find({ isDeleted: { $ne: true } })
-          .select('name manufacturer barcode').session(session).lean();
+          .select('name manufacturer').session(session).lean();
         const duplicate = existing.some((item) =>
           (String(item.name).trim().toLowerCase() === medicine.name.toLowerCase() &&
             String(item.manufacturer || '').trim().toLowerCase() === medicine.manufacturer.toLowerCase()) ||
-          (medicine.barcode && String(item.barcode || '').trim().toLowerCase() === medicine.barcode.toLowerCase())
+          false
         );
         if (duplicate) {
           const error = new Error('A medicine with this name/manufacturer or barcode already exists.');
@@ -735,7 +718,6 @@ export const scanLabel = async (req, res, next) => {
 
     res.json({
       medicineName,
-      genericName,
       manufacturer,
       expiryDate,
       scannedPrices,

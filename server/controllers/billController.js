@@ -1996,3 +1996,48 @@ export const getReturnActivity = async (req, res, next) => {
     res.json({ success: true, returns });
   } catch (error) { next(error); }
 };
+
+// @desc    Get most-sold and least-sold medicines ranking
+// @route   GET /api/bills/medicine-sales-ranking
+// @access  Private/Pharmacist/Superadmin
+export const getMedicineSalesRanking = async (req, res, next) => {
+  try {
+    const acceptedBills = await Bill.find({
+      orderStatus: { $nin: ['PENDING', 'REJECTED'] },
+    }).select('items').lean();
+
+    // Aggregate units sold per medicine across all accepted bills
+    const salesMap = new Map();
+    for (const bill of acceptedBills) {
+      if (!Array.isArray(bill.items)) continue;
+      for (const item of bill.items) {
+        const id = String(item.medicine || item.medicineId || '');
+        if (!id) continue;
+        const qty = Number(item.quantity) || 0;
+        const revenue = Number(item.price || 0) * qty;
+        if (salesMap.has(id)) {
+          const entry = salesMap.get(id);
+          entry.totalUnits += qty;
+          entry.totalRevenue += revenue;
+        } else {
+          salesMap.set(id, {
+            medicineId: id,
+            name: String(item.name || item.medicineName || ''),
+            manufacturer: String(item.manufacturer || ''),
+            totalUnits: qty,
+            totalRevenue: revenue,
+          });
+        }
+      }
+    }
+
+    const allMedicines = Array.from(salesMap.values()).filter((m) => m.totalUnits > 0);
+    const topSelling = [...allMedicines].sort((a, b) => b.totalUnits - a.totalUnits).slice(0, 20);
+    const leastSelling = [...allMedicines].sort((a, b) => a.totalUnits - b.totalUnits).slice(0, 20);
+
+    res.json({ success: true, topSelling, leastSelling, totalMedicinesWithSales: allMedicines.length });
+  } catch (error) {
+    next(error);
+  }
+};
+

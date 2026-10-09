@@ -1,9 +1,9 @@
 import MedicineAudit from '../models/MedicineAudit.js';
 
 export const AUDITED_MEDICINE_FIELDS = [
-  'name', 'genericName', 'manufacturer', 'supplierName', 'supplierPhone', 'expiryDate',
-  'quantity', 'reorderLevel', 'price', 'purchasePrice', 'unitsPerPack', 'category',
-  'barcode', 'rackLocation',
+  'name', 'manufacturer', 'expiryDate',
+  'quantity', 'price', 'purchasePrice', 'unitsPerPack',
+  'rackLocation',
   'isDeleted', 'deletedAt',
 ];
 

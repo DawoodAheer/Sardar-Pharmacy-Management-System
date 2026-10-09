@@ -1,21 +1,14 @@
 import { isValidUnitsPerPack } from './medicinePricing.js';
 
 const aliases = {
-  name: ['name', 'Name', 'Medicine Name'],
-  genericName: ['genericName', 'Generic Name'],
+  name: ['name', 'Name', 'Medicine Name', 'Medicine name'],
   manufacturer: ['manufacturer', 'Manufacturer', 'Manufacture Company'],
-  supplierName: ['supplierName', 'Supplier Name', 'Supplier'],
-  supplierPhone: ['supplierPhone', 'Supplier Phone', 'Supplier Contact'],
-  expiryDate: ['expiryDate', 'Expiry Date'],
+  expiryDate: ['expiryDate', 'Expiry Date', 'Expiry date'],
   purchasePrice: ['purchasePrice', 'Purchase Price', 'Purchase Pack Cost', 'Purchase cost per pack (PKR)'],
   unitsPerPack: ['unitsPerPack', 'Units Per Pack', 'Units per pack'],
   price: ['price', 'Sale Price', 'Sale Price / Unit', 'Sale price per unit (PKR)'],
   quantity: ['quantity', 'Quantity', 'Quantity (Units)', 'Stock Quantity (Units)', 'Stock quantity (units)'],
-  reorderLevel: ['reorderLevel', 'Reorder Level', 'Reorder Level (Units)'],
-  category: ['category', 'Category'],
-  barcode: ['barcode', 'Barcode'],
-  rackLocation: ['rackLocation', 'Rack', 'Rack Location', 'Rack / Shelf'],
-  labelImageUrl: ['labelImageUrl', 'Label Image URL'],
+  rackLocation: ['rackLocation', 'Rack', 'Rack Location', 'Rack / Shelf', 'Rack / shelf location'],
 };
 
 const readAlias = (row, keys) => {
@@ -58,23 +51,15 @@ export const normalizeMedicineImportRow = (row = {}) => {
   const unitsRaw = readAlias(row, aliases.unitsPerPack);
   const priceRaw = readAlias(row, aliases.price);
   const quantityRaw = readAlias(row, aliases.quantity);
-  const reorderRaw = readAlias(row, aliases.reorderLevel);
   const medicine = {
     name: String(name ?? '').trim(),
-    genericName: String(readAlias(row, aliases.genericName) ?? '').trim(),
     manufacturer: String(manufacturer ?? '').trim(),
-    supplierName: String(readAlias(row, aliases.supplierName) ?? '').trim(),
-    supplierPhone: String(readAlias(row, aliases.supplierPhone) ?? '').trim(),
     expiryDate: parseMedicineExpiryDate(expiryRaw),
     purchasePrice: purchaseRaw === undefined ? NaN : Number(purchaseRaw),
     unitsPerPack: unitsRaw === undefined ? 1 : Number(unitsRaw),
     price: priceRaw === undefined ? NaN : Number(priceRaw),
     quantity: quantityRaw === undefined ? NaN : Number(quantityRaw),
-    reorderLevel: reorderRaw === undefined ? 10 : Number(reorderRaw),
-    category: String(readAlias(row, aliases.category) ?? 'Antibiotic').trim(),
-    barcode: String(readAlias(row, aliases.barcode) ?? '').trim(),
     rackLocation: String(readAlias(row, aliases.rackLocation) ?? '').trim(),
-    labelImageUrl: String(readAlias(row, aliases.labelImageUrl) ?? '').trim(),
   };
   const errors = [];
   if (!medicine.name) errors.push('Medicine name is required.');
@@ -84,6 +69,5 @@ export const normalizeMedicineImportRow = (row = {}) => {
   if (!isValidUnitsPerPack(medicine.unitsPerPack)) errors.push('Units per pack must be a positive whole number.');
   if (!Number.isFinite(medicine.price) || medicine.price <= 0) errors.push('Sale price per unit must be greater than zero.');
   if (!Number.isInteger(medicine.quantity) || medicine.quantity < 0) errors.push('Stock quantity must be a non-negative whole number of units.');
-  if (!Number.isInteger(medicine.reorderLevel) || medicine.reorderLevel < 0) errors.push('Reorder level must be a non-negative whole number.');
   return { medicine, errors };
 };

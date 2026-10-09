@@ -10,12 +10,7 @@ const medicineSchema = new mongoose.Schema(
     },
 
     // Active ingredient / generic medicine name
-    genericName: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-
+    
     // Manufacturer / company
     manufacturer: {
       type: String,
@@ -23,9 +18,7 @@ const medicineSchema = new mongoose.Schema(
       default: '',
     },
 
-    supplierName: { type: String, trim: true, default: '' },
-    supplierPhone: { type: String, trim: true, default: '' },
-
+        
 
     // Expiry date
     expiryDate: {
@@ -42,12 +35,7 @@ const medicineSchema = new mongoose.Schema(
     },
 
     // Minimum stock level
-    reorderLevel: {
-      type: Number,
-      min: [0, 'Reorder level cannot be negative'],
-      default: 10,
-    },
-
+    
     // Selling price (default sale rate)
     price: {
       type: Number,
@@ -70,19 +58,9 @@ const medicineSchema = new mongoose.Schema(
     },
 
     // Medicine category
-    category: {
-      type: String,
-      trim: true,
-      default: '',
-    },
-
+    
     // Barcode / GTIN
-    barcode: {
-      type: String,
-      trim: true,
-      index: true,
-    },
-
+    
     // Physical shelf/rack location inside the pharmacy
     rackLocation: {
       type: String,
