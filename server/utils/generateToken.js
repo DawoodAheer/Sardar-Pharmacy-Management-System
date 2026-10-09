@@ -9,12 +9,14 @@ import jwt from "jsonwebtoken";
 */
 export const generateAccessToken = (
   userId,
-  role
+  role,
+  tokenVersion = 0
 ) => {
   return jwt.sign(
     {
       id: userId.toString(),
       role,
+      tokenVersion,
     },
     process.env.JWT_ACCESS_SECRET,
     {
@@ -31,11 +33,13 @@ export const generateAccessToken = (
 |--------------------------------------------------------------------------
 */
 export const generateRefreshToken = (
-  userId
+  userId,
+  tokenVersion = 0
 ) => {
   return jwt.sign(
     {
       id: userId.toString(),
+      tokenVersion,
     },
     process.env.JWT_REFRESH_SECRET,
     {

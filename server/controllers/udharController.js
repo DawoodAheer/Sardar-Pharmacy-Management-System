@@ -199,9 +199,15 @@ export const recordPayment = async (req, res, next) => {
     }
 
     const amount = Number(req.body.amount);
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       res.status(400);
       return next(new Error('Payment amount must be a positive number'));
+    }
+
+    const paidAt = req.body.paidAt ? new Date(req.body.paidAt) : new Date();
+    if (Number.isNaN(paidAt.getTime())) {
+      res.status(400);
+      return next(new Error('Payment date is invalid'));
     }
 
     if (amount > udhar.remainingAmount) {
@@ -213,8 +219,9 @@ export const recordPayment = async (req, res, next) => {
 
     udhar.payments.push({
       amount,
-      paidAt: req.body.paidAt ? new Date(req.body.paidAt) : new Date(),
+      paidAt,
       note: req.body.note || '',
+      paidBy: req.user._id,
     });
 
     await udhar.save();
@@ -222,6 +229,40 @@ export const recordPayment = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// @desc    Admin audit feed for each recorded Udhar payment
+// @route   GET /api/udhar/payment-activity
+export const getUdharPaymentActivity = async (_req, res, next) => {
+  try {
+    const activity = await Udhar.aggregate([
+      { $unwind: '$payments' },
+      { $sort: { 'payments.paidAt': -1 } },
+      { $limit: 200 },
+      { $project: {
+        _id: '$payments._id',
+        customerName: 1,
+        customerPhone: 1,
+        amount: '$payments.amount',
+        paidAt: '$payments.paidAt',
+        note: '$payments.note',
+        paidBy: '$payments.paidBy',
+        recordedBy: 1,
+      } },
+      { $lookup: { from: 'users', localField: 'paidBy', foreignField: '_id', as: 'payer' } },
+      { $lookup: { from: 'users', localField: 'recordedBy', foreignField: '_id', as: 'recorder' } },
+      { $project: {
+        customerName: 1,
+        customerPhone: 1,
+        amount: 1,
+        paidAt: 1,
+        note: 1,
+        paidBy: { $let: { vars: { user: { $arrayElemAt: ['$payer', 0] } }, in: { _id: '$$user._id', name: '$$user.name', email: '$$user.email' } } },
+        recordedBy: { $let: { vars: { user: { $arrayElemAt: ['$recorder', 0] } }, in: { _id: '$$user._id', name: '$$user.name', email: '$$user.email' } } },
+      } },
+    ]);
+    res.json({ success: true, payments: activity });
+  } catch (error) { next(error); }
 };
 
 // @desc    Update Udhar customer info / notes

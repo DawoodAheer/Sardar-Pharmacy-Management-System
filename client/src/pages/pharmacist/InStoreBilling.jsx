@@ -30,6 +30,8 @@ const PAYMENT_METHODS = [
     label: 'Cash',
     icon: Banknote,
   },
+  { value: 'Card', label: 'Card', icon: CreditCard },
+  { value: 'UPI', label: 'Online / UPI', icon: Wallet },
 ];
 
 const formatPKR = (amount) =>
@@ -197,6 +199,64 @@ const InStoreBilling = () => {
     setCartNotice('');
     setCustomerName('');
     setCustomerPhone('');
+    setDiscount('');
+    setPaymentMethod('Cash');
+  };
+
+  const subtotal = cartItems.reduce((sum, item) => sum + toNumber(item.unitPrice) * toNumber(item.quantity), 0);
+  const safeDiscount = Math.min(Math.max(0, toNumber(discount)), subtotal);
+  const total = Math.max(0, subtotal - safeDiscount);
+  const totalItems = cartItems.reduce((sum, item) => sum + toNumber(item.quantity), 0);
+  const hasExpiredItems = cartItems.some((item) => item.expiryStatus === 'EXPIRED');
+
+  const handleAddToCart = (medicine) => {
+    if (medicine.expiryStatus === 'EXPIRED' || Number(medicine.quantity) <= 0) return;
+    setCartItems((current) => {
+      const existing = current.find((item) => item.medicineId === medicine._id);
+      if (existing) return current.map((item) => item.medicineId === medicine._id ? { ...item, quantity: Math.min(item.stock, item.quantity + 1) } : item);
+      return [...current, {
+        medicineId: medicine._id, name: medicine.name, quantity: 1,
+        unitPrice: toNumber(medicine.price), purchasePrice: toNumber(medicine.purchasePrice),
+        stock: toNumber(medicine.quantity), expiryStatus: medicine.expiryStatus,
+        expiryDate: medicine.expiryDate, rackLocation: medicine.rackLocation || '',
+      }];
+    });
+    setCartNotice(`${medicine.name} added to this bill.`);
+    setSearchQuery('');
+  };
+
+  const updateQuantity = (medicineId, quantity) => setCartItems((current) => current
+    .map((item) => item.medicineId === medicineId ? { ...item, quantity: Math.min(item.stock, Math.max(0, Math.floor(quantity))) } : item)
+    .filter((item) => item.quantity > 0));
+  const updatePrice = (medicineId, unitPrice) => setCartItems((current) => current.map((item) => item.medicineId === medicineId ? { ...item, unitPrice: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : item.unitPrice } : item));
+  const handleRemoveFromCart = (medicineId) => setCartItems((current) => current.filter((item) => item.medicineId !== medicineId));
+  const handleDiscountChange = (event) => {
+    const value = event.target.value;
+    if (value === '') return setDiscount('');
+    const amount = Number(value);
+    setDiscount(Number.isFinite(amount) ? String(Math.min(Math.max(0, amount), subtotal)) : '');
+  };
+
+  const handleConfirmBill = async () => {
+    if (!cartItems.length || hasExpiredItems || billLoading) return;
+    setBillLoading(true);
+    setBillError('');
+    try {
+      const { data } = await api.post('/bills/instore', {
+        customerName, customerPhone, discount: safeDiscount, paymentMethod,
+        items: cartItems.map(({ medicineId, quantity, unitPrice }) => ({ medicineId, quantity, salePrice: unitPrice })),
+      });
+      const createdBill = data?.bill || data;
+      setConfirmedBill(createdBill);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['medicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['bills'] }),
+        queryClient.invalidateQueries({ queryKey: ['salesSummary'] }),
+        queryClient.invalidateQueries({ queryKey: ['profitSummary'] }),
+      ]);
+    } catch (error) {
+      setBillError(error?.response?.data?.message || 'Could not complete the bill. Refresh stock and try again.');
+    } finally { setBillLoading(false); }
   };
 
     return (
@@ -628,11 +688,11 @@ const InStoreBilling = () => {
                   </div>
                 </div>
 
-                {/* Payment - Cash Only */}
-                <div className="flex items-center justify-center gap-2 rounded-xl border border-blue-500 bg-blue-50 px-2 py-2.5 text-sm font-bold text-blue-700 dark:border-blue-400 dark:bg-blue-950/40 dark:text-blue-300">
-                  <Banknote className="h-4 w-4" />
-                  Cash Payment
-                </div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300">Payment method
+                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-900">
+                    {PAYMENT_METHODS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
 
                 {/* Confirm & Print Bill - AT THE TOP */}
                 <button

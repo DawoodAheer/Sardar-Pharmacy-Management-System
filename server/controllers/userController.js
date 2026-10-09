@@ -1,5 +1,84 @@
 import User from '../models/User.js';
 
+export const createStaffUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body;
+    if (!name?.trim() || !email?.trim() || !password || password.length < 6) {
+      return res.status(400).json({ message: 'Name, valid email, and a password of at least 6 characters are required' });
+    }
+    if (!/^\S+@\S+\.\S+$/.test(String(email).trim())) {
+      return res.status(400).json({ message: 'Enter a valid email address' });
+    }
+    if (!['superadmin', 'pharmacist'].includes(role)) {
+      return res.status(400).json({ message: 'Staff role must be Admin or Pharmacist' });
+    }
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (await User.exists({ email: normalizedEmail })) {
+      return res.status(409).json({ message: 'An account with this email already exists' });
+    }
+    const user = await User.create({ name: name.trim(), email: normalizedEmail, password, role, accountStatus: 'approved' });
+    return res.status(201).json({ _id: user._id, name: user.name, email: user.email, role: user.role, accountStatus: user.accountStatus, isActive: user.isActive });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const setUserActiveStatus = async (req, res, next) => {
+  try {
+    const { isActive } = req.body;
+    if (typeof isActive !== 'boolean') return res.status(400).json({ message: 'isActive must be true or false' });
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    if (!isActive && String(target._id) === String(req.user._id)) return res.status(400).json({ message: 'You cannot deactivate your own account' });
+    if (!isActive && target.isActive !== false && target.role === 'superadmin') {
+      const activeAdmins = await User.countDocuments({ role: 'superadmin', isActive: { $ne: false } });
+      if (activeAdmins <= 1) return res.status(400).json({ message: 'Cannot deactivate the last active Admin' });
+    }
+    target.isActive = isActive;
+    target.tokenVersion = (target.tokenVersion || 0) + 1;
+    await target.save();
+    return res.json({ _id: target._id, name: target.name, email: target.email, role: target.role, isActive: target.isActive });
+  } catch (error) { next(error); }
+};
+
+export const resetManagedUserPassword = async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    const target = await User.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    target.password = password;
+    target.tokenVersion = (target.tokenVersion || 0) + 1;
+    target.resetPasswordToken = undefined;
+    target.resetPasswordExpire = undefined;
+    target.resetPasswordOtp = undefined;
+    await target.save();
+    return res.json({ message: 'Password reset successfully' });
+  } catch (error) { next(error); }
+};
+
+export const editManagedUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const { name, email, phone } = req.body;
+    if (name !== undefined) {
+      if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ message: 'Name cannot be empty' });
+      user.name = name.trim();
+    }
+    if (email !== undefined) {
+      const normalized = String(email).trim().toLowerCase();
+      if (!/^\S+@\S+\.\S+$/.test(normalized)) return res.status(400).json({ message: 'Enter a valid email address' });
+      const duplicate = await User.exists({ email: normalized, _id: { $ne: user._id } });
+      if (duplicate) return res.status(409).json({ message: 'An account with this email already exists' });
+      user.email = normalized;
+    }
+    if (phone !== undefined) user.phone = String(phone).trim();
+    await user.save();
+    return res.json({ _id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, isActive: user.isActive, accountStatus: user.accountStatus });
+  } catch (error) { next(error); }
+};
+
 // @desc    Get all users
 // @route   GET /api/users
 // @access  Private/Superadmin
@@ -29,6 +108,11 @@ export const updateUserRole = async (req, res, next) => {
       throw new Error('Invalid role specified');
     }
 
+    if (String(id) === String(req.user._id) && role !== 'superadmin') {
+      res.status(400);
+      throw new Error('You cannot remove your own Admin role');
+    }
+
     const userToChange = await User.findById(id);
 
     if (!userToChange) {
@@ -38,11 +122,12 @@ export const updateUserRole = async (req, res, next) => {
 
     // Protect last superadmin from role change
     if (
-      userToChange.role === 'superadmin' &&
+      userToChange.role === 'superadmin' && userToChange.isActive !== false &&
       role !== 'superadmin'
     ) {
       const superadminCount = await User.countDocuments({
         role: 'superadmin',
+        isActive: { $ne: false },
       });
 
       if (superadminCount <= 1) {
@@ -55,6 +140,7 @@ export const updateUserRole = async (req, res, next) => {
 
     const previousRole = userToChange.role;
     userToChange.role = role;
+    if (previousRole !== role) userToChange.tokenVersion = (userToChange.tokenVersion || 0) + 1;
 
     if (role === 'customer' && previousRole !== 'customer') {
       userToChange.accountStatus = 'pending';
@@ -97,9 +183,10 @@ export const deleteUser = async (req, res, next) => {
     }
 
     // Prevent deleting the last superadmin
-    if (user.role === 'superadmin') {
+    if (user.role === 'superadmin' && user.isActive !== false) {
       const superadminCount = await User.countDocuments({
         role: 'superadmin',
+        isActive: { $ne: false },
       });
 
       if (superadminCount <= 1) {

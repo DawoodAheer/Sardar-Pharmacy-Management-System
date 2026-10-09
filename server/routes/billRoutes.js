@@ -15,7 +15,10 @@ import {
   getOnlineOrders,
   acceptOnlineOrder,
   rejectOnlineOrder,
+  getReturnActivity,
+  getDailyClosingReport,
 } from '../controllers/billController.js';
+import { createDeletionRequest } from '../controllers/deletionRequestController.js';
 
 import {
   protect,
@@ -35,6 +38,8 @@ router.get(
   authorize('superadmin', 'pharmacist'),
   getSalesSummary
 );
+
+router.get('/daily-closing', authorize('superadmin', 'pharmacist'), getDailyClosingReport);
 
 // Profit summary  ← must be BEFORE /:id
 router.get(
@@ -56,6 +61,8 @@ router.get(
   authorize('superadmin', 'pharmacist'),
   getOnlineOrders
 );
+
+router.get('/return-activity', authorize('superadmin'), getReturnActivity);
 
 // Get customer's billing history
 router.get('/customer/:customerId', getCustomerBills);
@@ -83,6 +90,12 @@ router.post(
   authorize('superadmin', 'pharmacist'),
   processSalesReturn
 );
+
+// Deleting a bill is always routed through the Admin approval workflow.
+router.delete('/:id', authorize('pharmacist'), (req, res, next) => {
+  req.deletionTargetType = 'bill';
+  return createDeletionRequest(req, res, next);
+});
 
 // Accept online customer order
 router.put(

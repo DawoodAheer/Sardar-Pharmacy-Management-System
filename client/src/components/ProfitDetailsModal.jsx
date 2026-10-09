@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import api from '../utils/api';
@@ -12,9 +12,16 @@ const getCurrency = (value) => {
   }).format(value || 0);
 };
 
-export default function ProfitDetailsModal({ isOpen, onClose }) {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate = '', initialEndDate = '' }) {
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+
+  useEffect(() => {
+    if (isOpen) {
+      setStartDate(initialStartDate);
+      setEndDate(initialEndDate);
+    }
+  }, [isOpen, initialStartDate, initialEndDate]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['profitDetails', startDate, endDate],

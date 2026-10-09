@@ -90,3 +90,6 @@ export const getBillReturnSummary = (bill) => {
 
 export const isBillFullyReturned = (bill) =>
   getBillReturnSummary(bill).isFullyReturned;
+
+export const getAvailableReturnQuantity = (soldQuantity, returnedQuantity) =>
+  Math.max(0, (Number(soldQuantity) || 0) - (Number(returnedQuantity) || 0));

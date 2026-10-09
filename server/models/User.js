@@ -41,6 +41,14 @@ const userSchema = new mongoose.Schema(
       default: "customer",
     },
 
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    tokenVersion: { type: Number, default: 0, min: 0 },
+
     // Pharmacist approval status
     accountStatus: {
       type: String,

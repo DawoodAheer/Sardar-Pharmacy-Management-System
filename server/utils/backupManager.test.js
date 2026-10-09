@@ -9,10 +9,12 @@ const makeBackup = () => ({
     users: [],
     medicines: [],
     bills: [],
+    returns: [],
     reminders: [],
     notifications: [],
     stockAdjustments: [],
     udhar: [],
+    deletionRequests: [],
   },
 });
 
@@ -33,6 +35,8 @@ test('accepts legacy backups without newer optional collections', () => {
   const backup = makeBackup();
   delete backup.collections.stockAdjustments;
   delete backup.collections.udhar;
+  delete backup.collections.returns;
+  delete backup.collections.deletionRequests;
   assert.doesNotThrow(() => validateBackup(backup));
 });
 

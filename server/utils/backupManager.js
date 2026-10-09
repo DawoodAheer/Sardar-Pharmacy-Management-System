@@ -8,10 +8,15 @@ import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Medicine from '../models/Medicine.js';
 import Bill from '../models/Bill.js';
+import SaleReturn from '../models/SaleReturn.js';
 import Reminder from '../models/Reminder.js';
 import Notification from '../models/Notification.js';
 import StockAdjustment from '../models/StockAdjustment.js';
 import Udhar from '../models/Udhar.js';
+import DeletionRequest from '../models/DeletionRequest.js';
+import MedicineAudit from '../models/MedicineAudit.js';
+import PurchaseOrder from '../models/PurchaseOrder.js';
+import MedicineImportIssue from '../models/MedicineImportIssue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,14 +25,20 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 dotenv.config();
 
 const BACKUP_DIR = path.join(__dirname, '../backups');
+const STATUS_PATH = path.join(BACKUP_DIR, 'backup_status.json');
 const COLLECTION_MODELS = {
   users: User,
   medicines: Medicine,
   bills: Bill,
+  returns: SaleReturn,
   reminders: Reminder,
   notifications: Notification,
   stockAdjustments: StockAdjustment,
   udhar: Udhar,
+  deletionRequests: DeletionRequest,
+  medicineAudits: MedicineAudit,
+  purchaseOrders: PurchaseOrder,
+  medicineImportIssues: MedicineImportIssue,
 };
 const REQUIRED_COLLECTIONS = [
   'users',
@@ -90,9 +101,66 @@ const writeAtomically = async (filePath, contents) => {
   }
 };
 
-export async function createBackup() {
-  await ensureConnected();
+const writeBackupStatus = async (status) => {
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
+  const persisted = Object.fromEntries(['lastAttemptAt', 'lastSuccessAt', 'lastBackupName', 'lastError', 'lastRestoreAt'].map((key) => [key, status[key] ?? null]));
+  await writeAtomically(STATUS_PATH, `${JSON.stringify(persisted, null, 2)}\n`);
+};
+
+export const markBackupFailure = async (error) => {
+  try {
+    const current = await getBackupStatus();
+    await writeBackupStatus({
+      ...current,
+      lastAttemptAt: new Date().toISOString(),
+      lastError: String(error?.message || error || 'Unknown backup error').slice(0, 1000),
+    });
+  } catch (statusError) {
+    console.error('Could not save backup failure status:', statusError.message);
+  }
+};
+
+export const listBackups = async () => {
+  await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
+  const entries = await fs.promises.readdir(BACKUP_DIR, { withFileTypes: true });
+  const files = await Promise.all(entries
+    .filter((entry) => entry.isFile() && /^pharmadesk_backup_.*\.json$/.test(entry.name))
+    .map(async (entry) => {
+      const filePath = path.join(BACKUP_DIR, entry.name);
+      const stat = await fs.promises.stat(filePath);
+      return { name: entry.name, size: stat.size, createdAt: stat.mtime.toISOString() };
+    }));
+  return files.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+};
+
+export const getBackupStatus = async () => {
+  let status = {};
+  try { status = JSON.parse(await fs.promises.readFile(STATUS_PATH, 'utf-8')); } catch {}
+  const backups = await listBackups();
+  const latest = backups[0] || null;
+  return {
+    lastAttemptAt: status.lastAttemptAt || null,
+    lastSuccessAt: status.lastSuccessAt || latest?.createdAt || null,
+    lastBackupName: status.lastBackupName || latest?.name || null,
+    lastError: status.lastError || null,
+    lastRestoreAt: status.lastRestoreAt || null,
+    backups,
+  };
+};
+
+export const getLatestBackupPath = async () => {
+  const status = await getBackupStatus();
+  if (!status.lastBackupName) return null;
+  return path.join(BACKUP_DIR, path.basename(status.lastBackupName));
+};
+
+export async function createBackup() {
+  const attemptAt = new Date().toISOString();
+  const previousStatus = await getBackupStatus();
+  await writeBackupStatus({ ...previousStatus, lastAttemptAt: attemptAt, lastError: null });
+  try {
+    await ensureConnected();
+    await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
 
   const collections = {};
   for (const [name, Model] of Object.entries(COLLECTION_MODELS)) {
@@ -109,24 +177,19 @@ export async function createBackup() {
   const filePath = path.join(BACKUP_DIR, `pharmadesk_backup_${dateStr}.json`);
   const latestPath = path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json');
 
-  await writeAtomically(filePath, contents);
-  await writeAtomically(latestPath, contents);
-  console.log(`Database backup created: ${filePath}`);
-  return filePath;
+    await writeAtomically(filePath, contents);
+    await writeAtomically(latestPath, contents);
+    await writeBackupStatus({ ...previousStatus, lastAttemptAt: attemptAt, lastSuccessAt: backupData.timestamp, lastBackupName: path.basename(filePath), lastError: null });
+    console.log(`Database backup created: ${filePath}`);
+    return filePath;
+  } catch (error) {
+    await writeBackupStatus({ ...previousStatus, lastAttemptAt: attemptAt, lastError: String(error.message || error).slice(0, 1000) }).catch(() => {});
+    throw error;
+  }
 }
 
-export async function restoreBackup(specifiedFile = null) {
+export async function restoreBackupData(backupData, sourceLabel = 'uploaded backup') {
   await ensureConnected();
-  const filePath = path.resolve(
-    specifiedFile || path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json')
-  );
-  const rawData = await fs.promises.readFile(filePath, 'utf-8');
-  let backupData;
-  try {
-    backupData = JSON.parse(rawData);
-  } catch (error) {
-    throw new Error(`Backup JSON is invalid: ${error.message}`);
-  }
   validateBackup(backupData);
 
   const preRestoreFile = await createBackup();
@@ -149,8 +212,21 @@ export async function restoreBackup(specifiedFile = null) {
   } finally {
     await session.endSession();
   }
-  console.log(`Database restored from ${filePath}`);
-  return { restoredFrom: filePath, preRestoreBackup: preRestoreFile };
+  const restoredAt = new Date().toISOString();
+  const status = await getBackupStatus();
+  await writeBackupStatus({ ...status, lastRestoreAt: restoredAt, lastError: null });
+  console.log(`Database restored from ${sourceLabel}`);
+  return { restoredFrom: sourceLabel, restoredAt, preRestoreBackup: preRestoreFile };
+}
+
+export async function restoreBackup(specifiedFile = null) {
+  await ensureConnected();
+  const filePath = path.resolve(specifiedFile || path.join(BACKUP_DIR, 'pharmadesk_latest_backup.json'));
+  const rawData = await fs.promises.readFile(filePath, 'utf-8');
+  let backupData;
+  try { backupData = JSON.parse(rawData); }
+  catch (error) { throw new Error(`Backup JSON is invalid: ${error.message}`); }
+  return restoreBackupData(backupData, path.basename(filePath));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

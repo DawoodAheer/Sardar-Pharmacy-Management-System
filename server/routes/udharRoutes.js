@@ -9,6 +9,7 @@ import {
   updateUdhar,
   deleteUdhar,
   getUdharSummary,
+  getUdharPaymentActivity,
 } from '../controllers/udharController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -20,6 +21,7 @@ router.use(authorize('pharmacist', 'superadmin'));
 
 // Summary stats
 router.get('/summary', getUdharSummary);
+router.get('/payment-activity', authorize('superadmin'), getUdharPaymentActivity);
 
 // Main CRUD
 router.route('/')
@@ -28,12 +30,12 @@ router.route('/')
 
 router.route('/:id')
   .get(getUdharById)
-  .put(updateUdhar)
-  .delete(deleteUdhar);
+  .put(updateUdhar);
+router.delete('/:id', authorize('superadmin'), deleteUdhar);
 
 // Item management
 router.post('/:id/add-item', addItemToUdhar);
-router.delete('/:id/item/:itemId', removeItemFromUdhar);
+router.delete('/:id/item/:itemId', authorize('superadmin'), removeItemFromUdhar);
 
 // Payment recording
 router.post('/:id/pay', recordPayment);

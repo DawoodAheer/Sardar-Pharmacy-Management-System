@@ -1,4 +1,6 @@
 
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { LogOut, Moon, Sun, Stethoscope, RefreshCw } from 'lucide-react';
@@ -6,9 +8,20 @@ import { LogOut, Moon, Sun, Stethoscope, RefreshCw } from 'lucide-react';
 const Navbar = () => {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const queryClient = useQueryClient();
+  const [refreshState, setRefreshState] = useState('idle');
 
-  const handleRefresh = () => {
-    window.location.reload();
+  const handleRefresh = async () => {
+    if (refreshState === 'loading') return;
+    setRefreshState('loading');
+    try {
+      await queryClient.refetchQueries({ type: 'active' }, { throwOnError: true });
+      setRefreshState('done');
+      window.setTimeout(() => setRefreshState('idle'), 1400);
+    } catch {
+      setRefreshState('error');
+      window.setTimeout(() => setRefreshState('idle'), 2400);
+    }
   };
 
   const getRoleBadgeStyle = (role) => {
@@ -52,12 +65,13 @@ const Navbar = () => {
           <button
             type="button"
             onClick={handleRefresh}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-500 dark:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-            title="Refresh the current page"
-            aria-label="Refresh page"
+            disabled={refreshState === 'loading'}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            title="Refresh data on the current page"
+            aria-label="Refresh current page data"
           >
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className={`h-4 w-4 ${refreshState === 'loading' ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{refreshState === 'loading' ? 'Refreshing…' : refreshState === 'done' ? 'Updated' : refreshState === 'error' ? 'Retry' : 'Refresh'}</span>
           </button>
 
           <div className="hidden items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800 sm:flex">

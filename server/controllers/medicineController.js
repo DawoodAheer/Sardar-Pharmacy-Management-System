@@ -1,8 +1,13 @@
 import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
+import MedicineImportIssue from '../models/MedicineImportIssue.js';
 import StockAdjustment from '../models/StockAdjustment.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
 import { parseExplicitDecimalPrice } from '../utils/ocrParsing.js';
+import { isValidUnitsPerPack } from '../utils/medicinePricing.js';
+import { normalizeMedicineImportRow, parseMedicineExpiryDate } from '../utils/medicineImport.js';
+import { AUDITED_MEDICINE_FIELDS, recordMedicineAudit, snapshotMedicine } from '../utils/medicineAudit.js';
+import MedicineAudit from '../models/MedicineAudit.js';
 import { getStockStatus } from '../utils/stockStatus.js';
 import { checkAndSendExpiryAlerts } from '../utils/notificationScheduler.js';
 import Tesseract from 'tesseract.js';
@@ -16,6 +21,8 @@ const englishOcrDataPath = path.resolve(
   controllerDirectory,
   '../node_modules/@tesseract.js-data/eng/4.0.0_best_int'
 );
+
+const isValidDate = (value) => Boolean(parseMedicineExpiryDate(value));
 
 // Configure Cloudinary
 cloudinary.config({
@@ -31,7 +38,7 @@ export const getAllMedicines = async (req, res, next) => {
   const { search, category, status, reorder } = req.query;
 
   try {
-    const query = {};
+    const query = { isDeleted: { $ne: true } };
 
     // 1. Search filter (name, genericName, manufacturer, batch and rack)
     if (search) {
@@ -105,11 +112,14 @@ export const createMedicine = async (req, res, next) => {
     name,
     genericName,
     manufacturer,
+    supplierName,
+    supplierPhone,
     expiryDate,
     quantity,
     reorderLevel,
     price,
     purchasePrice,
+    unitsPerPack,
     category,
     barcode,
     rackLocation,
@@ -117,29 +127,44 @@ export const createMedicine = async (req, res, next) => {
   } = req.body;
 
   try {
-    const numericPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : 0;
-    const numericPrice = price !== undefined ? Number(price) : 0;
-
-    if (Number.isFinite(numericPrice) && Number.isFinite(numericPurchasePrice) && numericPrice < numericPurchasePrice) {
+    if (!String(name || '').trim() || !String(manufacturer || '').trim() || !isValidDate(expiryDate)) {
       res.status(400);
-      return next(new Error('Sale price cannot be lower than the purchase price'));
+      return next(new Error('Medicine name, manufacturer, and a valid expiry date are required'));
+    }
+    const numericPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : NaN;
+    const numericPrice = price !== undefined ? Number(price) : NaN;
+    const numericUnitsPerPack = unitsPerPack !== undefined ? Number(unitsPerPack) : 1;
+
+    if (!isValidUnitsPerPack(numericUnitsPerPack)) {
+      res.status(400);
+      return next(new Error('Units per pack must be a positive whole number'));
+    }
+    if (!Number.isFinite(numericPurchasePrice) || numericPurchasePrice <= 0 || !Number.isFinite(numericPrice) || numericPrice <= 0) {
+      res.status(400);
+      return next(new Error('Pack purchase price and unit sale price must both be greater than zero'));
+    }
+    if (quantity === undefined || !Number.isInteger(Number(quantity)) || Number(quantity) < 0) {
+      res.status(400);
+      return next(new Error('Stock quantity is required and must be a non-negative whole number of tablets or units'));
+    }
+    if (reorderLevel !== undefined && (!Number.isInteger(Number(reorderLevel)) || Number(reorderLevel) < 0)) {
+      res.status(400);
+      return next(new Error('Reorder level must be a non-negative whole number'));
     }
 
-    const medicine = await Medicine.create({
-      name,
-      genericName,
-      manufacturer,
-      expiryDate,
-      quantity,
-      reorderLevel,
-      price,
-      purchasePrice: numericPurchasePrice,
-      category,
-      barcode,
-      rackLocation,
-      labelImageUrl,
-      createdBy: req.user._id,
-    });
+    const session = await mongoose.startSession();
+    let medicine;
+    try {
+      await session.withTransaction(async () => {
+        [medicine] = await Medicine.create([{
+          name, genericName, manufacturer, supplierName, supplierPhone, expiryDate,
+          quantity, reorderLevel, price, purchasePrice: numericPurchasePrice,
+          unitsPerPack: numericUnitsPerPack, category, barcode, rackLocation,
+          labelImageUrl, createdBy: req.user._id,
+        }], { session });
+        await recordMedicineAudit({ medicine, action: 'created', newValues: snapshotMedicine(medicine), performedBy: req.user._id, session });
+      });
+    } finally { await session.endSession(); }
 
     const populatedMed = await Medicine.findById(medicine._id).populate('createdBy', 'name email');
     const medObj = populatedMed.toObject();
@@ -165,11 +190,14 @@ export const updateMedicine = async (req, res, next) => {
     name,
     genericName,
     manufacturer,
+    supplierName,
+    supplierPhone,
     expiryDate,
     quantity,
     reorderLevel,
     price,
     purchasePrice,
+    unitsPerPack,
     category,
     barcode,
     rackLocation,
@@ -177,43 +205,51 @@ export const updateMedicine = async (req, res, next) => {
   } = req.body;
 
   try {
-    const medicine = await Medicine.findById(id);
+    const session = await mongoose.startSession();
+    let updatedMedicine;
+    try {
+      await session.withTransaction(async () => {
+        const medicine = await Medicine.findById(id).session(session);
+        if (!medicine) { const error = new Error('Medicine not found'); error.statusCode = 404; throw error; }
+        if (medicine.isDeleted && req.user.role !== 'superadmin') { const error = new Error('Medicine is archived and unavailable for editing'); error.statusCode = 404; throw error; }
+        const nextPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : Number(medicine.purchasePrice);
+        const nextSalePrice = price !== undefined ? Number(price) : Number(medicine.price);
+        const nextUnitsPerPack = unitsPerPack !== undefined ? Number(unitsPerPack) : Number(medicine.unitsPerPack) || 1;
+        const nextName = name !== undefined ? String(name).trim() : medicine.name;
+        const nextManufacturer = manufacturer !== undefined ? String(manufacturer).trim() : medicine.manufacturer;
+        const nextExpiryDate = expiryDate !== undefined ? expiryDate : medicine.expiryDate;
+        if (!nextName || !nextManufacturer || !isValidDate(nextExpiryDate)) { const error = new Error('Medicine name, manufacturer, and a valid expiry date are required'); error.statusCode = 400; throw error; }
+        if (!isValidUnitsPerPack(nextUnitsPerPack)) { const error = new Error('Units per pack must be a positive whole number'); error.statusCode = 400; throw error; }
+        if (!Number.isFinite(nextPurchasePrice) || nextPurchasePrice <= 0 || !Number.isFinite(nextSalePrice) || nextSalePrice <= 0) { const error = new Error('Pack purchase price and unit sale price must both be greater than zero'); error.statusCode = 400; throw error; }
+        if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }
+        if (reorderLevel !== undefined && (!Number.isInteger(Number(reorderLevel)) || Number(reorderLevel) < 0)) { const error = new Error('Reorder level must be a non-negative whole number'); error.statusCode = 400; throw error; }
 
-    if (!medicine) {
-      res.status(404);
-      throw new Error('Medicine not found');
-    }
-
-    const nextPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : medicine.purchasePrice;
-    const nextSalePrice = price !== undefined ? Number(price) : Number(medicine.price);
-
-    if (Number.isFinite(nextSalePrice) && Number.isFinite(nextPurchasePrice) && nextSalePrice < nextPurchasePrice) {
-      res.status(400);
-      throw new Error('Sale price cannot be lower than the purchase price');
-    }
-
-    medicine.name = name !== undefined ? name : medicine.name;
-    medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
-    medicine.manufacturer = manufacturer !== undefined ? manufacturer : medicine.manufacturer;
-    if (expiryDate !== undefined && String(expiryDate) !== String(medicine.expiryDate)) {
-      medicine.expiryDate = expiryDate;
-      // Reset alert flags so that alerts fire appropriately for the new date
-      medicine.expiryAlert10Sent = false;
-      medicine.expiryAlert1Sent = false;
-      medicine.expiryAlert180Sent = false;
-      medicine.expiryAlertExpiredSent = false;
-    }
-
-    medicine.quantity = quantity !== undefined ? quantity : medicine.quantity;
-    medicine.reorderLevel = reorderLevel !== undefined ? reorderLevel : medicine.reorderLevel;
-    medicine.price = price !== undefined ? price : medicine.price;
-    medicine.purchasePrice = nextPurchasePrice;
-    medicine.category = category !== undefined ? category : medicine.category;
-    medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
-    medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
-    medicine.labelImageUrl = labelImageUrl !== undefined ? labelImageUrl : medicine.labelImageUrl;
-
-    const updatedMedicine = await medicine.save();
+        const previousValues = snapshotMedicine(medicine);
+        medicine.name = nextName;
+        medicine.genericName = genericName !== undefined ? genericName : medicine.genericName;
+        medicine.manufacturer = nextManufacturer;
+        medicine.supplierName = supplierName !== undefined ? supplierName : medicine.supplierName;
+        medicine.supplierPhone = supplierPhone !== undefined ? supplierPhone : medicine.supplierPhone;
+        if (expiryDate !== undefined && String(expiryDate) !== String(medicine.expiryDate)) {
+          medicine.expiryDate = expiryDate;
+          medicine.expiryAlert10Sent = false; medicine.expiryAlert1Sent = false;
+          medicine.expiryAlert180Sent = false; medicine.expiryAlertExpiredSent = false;
+        }
+        medicine.quantity = quantity !== undefined ? Number(quantity) : medicine.quantity;
+        medicine.reorderLevel = reorderLevel !== undefined ? Number(reorderLevel) : medicine.reorderLevel;
+        medicine.price = price !== undefined ? nextSalePrice : medicine.price;
+        medicine.purchasePrice = nextPurchasePrice;
+        medicine.unitsPerPack = nextUnitsPerPack;
+        medicine.category = category !== undefined ? category : medicine.category;
+        medicine.barcode = barcode !== undefined ? barcode : medicine.barcode;
+        medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
+        medicine.labelImageUrl = labelImageUrl !== undefined ? labelImageUrl : medicine.labelImageUrl;
+        updatedMedicine = await medicine.save({ session });
+        const newValues = snapshotMedicine(updatedMedicine);
+        const changedFields = AUDITED_MEDICINE_FIELDS.filter((field) => String(previousValues[field] ?? '') !== String(newValues[field] ?? ''));
+        if (changedFields.length) await recordMedicineAudit({ medicine: updatedMedicine, action: 'updated', previousValues, newValues, changedFields, performedBy: req.user._id, session });
+      });
+    } finally { await session.endSession(); }
     const populatedMed = await Medicine.findById(updatedMedicine._id).populate('createdBy', 'name email');
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
@@ -242,77 +278,122 @@ export const deleteMedicine = async (req, res, next) => {
       res.status(404);
       throw new Error('Medicine not found');
     }
+    if (medicine.isDeleted) {
+      return res.json({ message: 'Medicine is already archived from active inventory.' });
+    }
 
-    await Medicine.findByIdAndDelete(id);
-    res.json({ message: 'Medicine deleted successfully' });
+    const previousValues = snapshotMedicine(medicine);
+    medicine.isDeleted = true;
+    medicine.deletedAt = medicine.deletedAt || new Date();
+    medicine.deletedBy = req.user._id;
+    await medicine.save();
+    await recordMedicineAudit({ medicine, action: 'archived', previousValues, newValues: snapshotMedicine(medicine), changedFields: ['isDeleted', 'deletedAt'], performedBy: req.user._id });
+    res.json({ message: 'Medicine deleted from active inventory. Historical bills and returns remain preserved.' });
   } catch (error) {
     next(error);
   }
+};
+
+export const getDeletedMedicines = async (_req, res, next) => {
+  try {
+    const medicines = await Medicine.find({ isDeleted: true })
+      .populate('createdBy', 'name email')
+      .populate('deletedBy', 'name email')
+      .sort({ deletedAt: -1 });
+    res.json(medicines);
+  } catch (error) { next(error); }
+};
+
+export const restoreMedicine = async (req, res, next) => {
+  try {
+    const medicine = await Medicine.findById(req.params.id);
+    if (!medicine) return res.status(404).json({ message: 'Medicine not found.' });
+    const previousValues = snapshotMedicine(medicine);
+    medicine.isDeleted = false;
+    medicine.deletedAt = null;
+    medicine.deletedBy = null;
+    await medicine.save();
+    await recordMedicineAudit({ medicine, action: 'restored', previousValues, newValues: snapshotMedicine(medicine), changedFields: ['isDeleted', 'deletedAt'], performedBy: req.user._id });
+    res.json({ message: 'Medicine restored to active inventory.', medicine });
+  } catch (error) { next(error); }
 };
 
 // @desc    Bulk import medicines
 // @route   POST /api/medicines/bulk
 // @access  Private/Pharmacist,Superadmin
 export const bulkImportMedicines = async (req, res, next) => {
-  const medicineArray = req.body;
+  const medicineArray = Array.isArray(req.body) ? req.body : req.body?.medicines;
 
   if (!Array.isArray(medicineArray)) {
     res.status(400);
     return next(new Error('Payload must be a JSON array of medicines'));
   }
+  if (!medicineArray.length) {
+    res.status(400);
+    return next(new Error('At least one medicine row is required'));
+  }
 
   try {
-    let insertedCount = 0;
-    let skippedCount = 0;
-    const skippedBatches = [];
+    const existingMedicines = await Medicine.find({ isDeleted: { $ne: true } })
+      .select('name manufacturer barcode').lean();
+    const existingBarcodes = new Set(existingMedicines.map((item) => String(item.barcode || '').trim().toLowerCase()).filter(Boolean));
+    const existingNames = new Set(existingMedicines.map((item) => `${String(item.name).trim().toLowerCase()}|${String(item.manufacturer || '').trim().toLowerCase()}`));
+    const seenBarcodes = new Set();
+    const seenNames = new Set();
+    const validRows = [];
+    const invalidRows = [];
 
-    for (const med of medicineArray) {
-      const {
-        name,
-        genericName,
-        manufacturer,
-        expiryDate,
-        quantity,
-        reorderLevel,
-        price,
-        purchasePrice,
-        category,
-        barcode,
-        rackLocation,
-        labelImageUrl,
-      } = med;
+    medicineArray.forEach((row, index) => {
+      const { medicine, errors } = normalizeMedicineImportRow(row);
+      const barcode = medicine.barcode.toLowerCase();
+      const nameKey = `${medicine.name.toLowerCase()}|${medicine.manufacturer.toLowerCase()}`;
+      if (medicine.name && existingNames.has(nameKey)) errors.push('This medicine and manufacturer already exist in active inventory.');
+      if (barcode && (existingBarcodes.has(barcode) || seenBarcodes.has(barcode))) errors.push('This barcode is already used by another medicine.');
+      if (medicine.name && seenNames.has(nameKey)) errors.push('This medicine is duplicated in the uploaded file.');
+      if (barcode) seenBarcodes.add(barcode);
+      if (medicine.name) seenNames.add(nameKey);
+      const rowNumber = index + (req.body?.sourceFile || req.headers['x-import-filename'] ? 2 : 1);
+      const originalRow = row && typeof row === 'object' ? row : { rawValue: row ?? null };
+      if (errors.length) invalidRows.push({ rowNumber, originalRow, medicine, errors });
+      else validRows.push({ rowNumber, medicine });
+    });
 
-      // Only name and price are truly required; everything else is optional
-      if (!name) {
-        skippedCount++;
-        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing medicine name' });
-        continue;
-      }
-
-      if (price === undefined || price === null || price === '') {
-        skippedCount++;
-        skippedBatches.push({ name: name || 'UNKNOWN', reason: 'Missing price' });
-        continue;
-      }
-
-      await Medicine.create({
-        name: String(name).trim(),
-        genericName: genericName ? String(genericName).trim() : '',
-        manufacturer: manufacturer ? String(manufacturer).trim() : '',
-        expiryDate: expiryDate || null,
-        quantity: quantity !== undefined ? Number(quantity) : 0,
-        reorderLevel: reorderLevel !== undefined ? Number(reorderLevel) : 10,
-        price: Number(price),
-        purchasePrice: purchasePrice !== undefined ? Number(purchasePrice) : 0,
-        category: category ? String(category).trim() : '',
-        barcode: barcode ? String(barcode).trim() : '',
-        rackLocation: rackLocation ? String(rackLocation).trim() : '',
-        labelImageUrl: labelImageUrl ? String(labelImageUrl).trim() : '',
-        createdBy: req.user._id,
-      });
-
-      insertedCount++;
+    const sourceFile = String(req.body?.sourceFile || req.headers['x-import-filename'] || '').slice(0, 180);
+    if (req.body?.dryRun === true) {
+      const previewRows = [
+        ...validRows.map((row) => ({ ...row, errors: [] })),
+        ...invalidRows.map((row) => ({ rowNumber: row.rowNumber, medicine: row.medicine, errors: row.errors })),
+      ].sort((a, b) => a.rowNumber - b.rowNumber);
+      return res.json({ preview: true, sourceFile, totalRows: previewRows.length, validCount: validRows.length, invalidCount: invalidRows.length, rows: previewRows });
     }
+
+    const imported = [];
+    for (const { rowNumber, medicine } of validRows) {
+      const session = await mongoose.startSession();
+      try {
+        let created;
+        await session.withTransaction(async () => {
+          [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
+          await recordMedicineAudit({ medicine: created, action: 'bulk_imported', newValues: snapshotMedicine(created), performedBy: req.user._id, session });
+        });
+        imported.push(created);
+      } catch (error) {
+        invalidRows.push({ rowNumber, originalRow: medicine, medicine, errors: [error.message || 'Medicine could not be saved.'] });
+      } finally {
+        await session.endSession();
+      }
+    }
+
+    const issues = invalidRows.length
+      ? await MedicineImportIssue.insertMany(invalidRows.map((issue) => ({
+        sourceFile,
+        rowNumber: issue.rowNumber,
+        originalRow: issue.originalRow,
+        normalizedRow: issue.medicine,
+        validationErrors: issue.errors,
+        createdBy: req.user._id,
+      })))
+      : [];
 
     // Evaluate newly bulk imported medicines
     checkAndSendExpiryAlerts().catch((err) => {
@@ -321,13 +402,63 @@ export const bulkImportMedicines = async (req, res, next) => {
 
     res.status(201).json({
       message: 'Bulk import complete',
-      insertedCount,
-      skippedCount,
-      skippedDetails: skippedBatches,
+      insertedCount: imported.length,
+      skippedCount: invalidRows.length,
+      skippedDetails: invalidRows.map(({ rowNumber, medicine, errors }) => ({ rowNumber, name: medicine.name || 'Unknown medicine', reason: errors.join(' '), issueId: issues.find((item) => item.rowNumber === rowNumber)?._id })),
+      invalidRows: issues,
     });
   } catch (error) {
     next(error);
   }
+};
+
+export const getMedicineImportIssues = async (_req, res, next) => {
+  try {
+    const issues = await MedicineImportIssue.find({ status: 'pending' })
+      .populate('createdBy', 'name email role')
+      .sort({ createdAt: -1 }).lean();
+    res.json({ issues });
+  } catch (error) { next(error); }
+};
+
+export const resolveMedicineImportIssue = async (req, res, next) => {
+  try {
+    const { medicine, errors } = normalizeMedicineImportRow(req.body || {});
+    if (errors.length) return res.status(400).json({ message: errors.join(' '), errors });
+    const session = await mongoose.startSession();
+    let created;
+    try {
+      await session.withTransaction(async () => {
+        const issue = await MedicineImportIssue.findOne({ _id: req.params.id, status: 'pending' }).session(session);
+        if (!issue) {
+          const error = new Error('This import issue is no longer pending.');
+          error.statusCode = 404;
+          throw error;
+        }
+        const existing = await Medicine.find({ isDeleted: { $ne: true } })
+          .select('name manufacturer barcode').session(session).lean();
+        const duplicate = existing.some((item) =>
+          (String(item.name).trim().toLowerCase() === medicine.name.toLowerCase() &&
+            String(item.manufacturer || '').trim().toLowerCase() === medicine.manufacturer.toLowerCase()) ||
+          (medicine.barcode && String(item.barcode || '').trim().toLowerCase() === medicine.barcode.toLowerCase())
+        );
+        if (duplicate) {
+          const error = new Error('A medicine with this name/manufacturer or barcode already exists.');
+          error.statusCode = 409;
+          throw error;
+        }
+        [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
+        issue.status = 'resolved';
+        issue.resolvedMedicine = created._id;
+        issue.resolvedBy = req.user._id;
+        issue.resolvedAt = new Date();
+        await issue.save({ session });
+      });
+    } finally {
+      await session.endSession();
+    }
+    res.status(201).json({ message: `${created.name} was corrected and added to inventory.`, medicine: created });
+  } catch (error) { next(error); }
 };
 
 // @desc    Process a bill checkout and validate medicine statuses
@@ -635,6 +766,10 @@ export const adjustStock = async (req, res, next) => {
       res.status(404);
       return next(new Error('Medicine not found'));
     }
+    if (medicine.isDeleted) {
+      res.status(404);
+      return next(new Error('Medicine is archived and unavailable for stock adjustments'));
+    }
 
     if (!reason || !reason.trim()) {
       res.status(400);
@@ -677,6 +812,7 @@ export const adjustStock = async (req, res, next) => {
     let adjustmentLog;
     try {
       await session.withTransaction(async () => {
+        const previousValues = snapshotMedicine(medicine);
         const updatedMedicine = await Medicine.findOneAndUpdate(
           { _id: medicine._id, quantity: previousQuantity },
           { $set: { quantity: newQuantity } },
@@ -701,6 +837,7 @@ export const adjustStock = async (req, res, next) => {
           }],
           { session }
         );
+        await recordMedicineAudit({ medicine: updatedMedicine, action: 'stock_adjusted', previousValues, newValues: snapshotMedicine(updatedMedicine), changedFields: ['quantity'], reason: reason.trim(), performedBy: req.user._id, session });
       });
     } finally {
       await session.endSession();
@@ -734,4 +871,15 @@ export const getStockAdjustments = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+export const getMedicineAuditHistory = async (req, res, next) => {
+  try {
+    const query = {};
+    if (req.query.medicineId && mongoose.isValidObjectId(req.query.medicineId)) query.medicineId = req.query.medicineId;
+    const records = await MedicineAudit.find(query)
+      .populate('performedBy', 'name email role')
+      .sort({ createdAt: -1 }).limit(300).lean();
+    res.json({ records });
+  } catch (error) { next(error); }
 };

@@ -1,15 +1,21 @@
 import { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
 import api from '../utils/api';
-import { downloadMedicineInventory } from '../utils/medicineExport';
+import { createMedicineInventoryWorkbook, downloadMedicineInventory } from '../utils/medicineExport';
+import { getPurchaseCostPerUnit } from '../utils/medicinePricing';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import ProfitDetailsModal from '../components/ProfitDetailsModal';
+import MedicineImportIssues from '../components/MedicineImportIssues';
+import MedicineExpiryAlerts from '../components/MedicineExpiryAlerts';
+import MedicineAuditHistory from '../components/MedicineAuditHistory';
+import PurchaseOrdersPanel from '../components/PurchaseOrdersPanel';
+import DailyClosingReport from '../components/DailyClosingReport';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 import SalesReturnModal from '../components/SalesReturnModal';
 import UdharManagement from './UdharManagement';
@@ -254,6 +260,7 @@ const PharmacistDashboard = () => {
 
   const queryClient = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const fileInputRef = useRef(null);
   const billScanInputRef = useRef(null);
@@ -322,6 +329,8 @@ const PharmacistDashboard = () => {
   const [mobileConnected, setMobileConnected] = useState(false);
   const mobilePollIntervalRef = useRef(null); // kept for cleanup
   const mobileScannerWsRef = useRef(null);
+  const mobileScannerReconnectRef = useRef(null);
+  const mobileScannerActiveRef = useRef(false);
 
   const [error, setError] =
     useState('');
@@ -335,6 +344,8 @@ const PharmacistDashboard = () => {
     useState('');
   const [manufacturer, setManufacturer] =
     useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierPhone, setSupplierPhone] = useState('');
   const [expiryDate, setExpiryDate] =
     useState('');
   const [quantity, setQuantity] =
@@ -345,8 +356,10 @@ const PharmacistDashboard = () => {
     useState('');
   const [purchasePrice, setPurchasePrice] =
     useState('');
+  const [unitsPerPack, setUnitsPerPack] = useState('1');
   const [isProfitModalOpen, setIsProfitModalOpen] =
     useState(false);
+  const [profitDateRange, setProfitDateRange] = useState({ startDate: '', endDate: '' });
   const [stockAdjMedicine, setStockAdjMedicine] =
     useState(null);
   const [returnModalBill, setReturnModalBill] =
@@ -447,6 +460,7 @@ const PharmacistDashboard = () => {
   const [importMode, setImportMode] = useState('excel'); // 'excel' or 'json'
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkData, setBulkData] = useState([]);
+  const [bulkPreviewResult, setBulkPreviewResult] = useState(null);
   const [bulkJson, setBulkJson] = useState('');
 
   const [bulkError, setBulkError] =
@@ -456,6 +470,9 @@ const PharmacistDashboard = () => {
     useState('');
   const [isExportingMedicines, setIsExportingMedicines] =
     useState(false);
+  const [isDashboardRefreshing, setIsDashboardRefreshing] =
+    useState(false);
+  const [dashboardRefreshMessage, setDashboardRefreshMessage] = useState('');
 
   // ==========================================================================
   // BILLING
@@ -551,6 +568,7 @@ const PharmacistDashboard = () => {
   const {
     data: medicines = [],
     isLoading: isMedsLoading,
+    isFetching: isMedsFetching,
     refetch: refetchMeds,
   } = useQuery({
     queryKey: [
@@ -600,6 +618,7 @@ const PharmacistDashboard = () => {
   const {
     data: bills = [],
     isLoading: isBillsLoading,
+    isFetching: isBillsFetching,
     refetch: refetchBills,
   } = useQuery({
     queryKey: ['bills'],
@@ -621,6 +640,7 @@ const PharmacistDashboard = () => {
   const {
     data: onlineOrders = [],
     isLoading: isOrdersLoading,
+    isFetching: isOrdersFetching,
     refetch: refetchOnlineOrders,
   } = useQuery({
     queryKey: ['onlineOrders'],
@@ -663,6 +683,28 @@ const PharmacistDashboard = () => {
     },
   });
 
+  const refreshDashboardData = async () => {
+    if (isDashboardRefreshing) return;
+    setIsDashboardRefreshing(true);
+    setDashboardRefreshMessage('');
+    try {
+      const results = await Promise.allSettled([
+        refetchMeds({ throwOnError: true }),
+        refetchBills({ throwOnError: true }),
+        refetchSalesSummary({ throwOnError: true }),
+        refetchOnlineOrders({ throwOnError: true }),
+        refetchProfitSummary({ throwOnError: true }),
+      ]);
+      if (results.some((result) => result.status === 'rejected')) {
+        setDashboardRefreshMessage('Some dashboard data could not be refreshed. Check the connection and retry.');
+      } else setDashboardRefreshMessage('Dashboard data updated.');
+    } catch {
+      setDashboardRefreshMessage('Dashboard refresh failed. Check the connection and retry.');
+    } finally {
+      setIsDashboardRefreshing(false);
+    }
+  };
+
   // ==========================================================================
   // PROFIT SUMMARY
   // ==========================================================================
@@ -670,6 +712,7 @@ const PharmacistDashboard = () => {
   const {
     data: profitSummary,
     isLoading: isProfitLoading,
+    refetch: refetchProfitSummary,
   } = useQuery({
     queryKey: ['profitSummary'],
     queryFn: async () => {
@@ -705,6 +748,7 @@ const PharmacistDashboard = () => {
     isLoading: isPendingCustomersLoading,
   } = useQuery({
     queryKey: ['pendingCustomers'],
+    enabled: currentUser?.role === 'superadmin',
     queryFn: async () => {
       const response = await api.get(
         '/users/pending-customers'
@@ -751,6 +795,9 @@ const PharmacistDashboard = () => {
   const todayBills = Number(
     salesSummary?.today?.totalBills || 0
   );
+
+  const yearlySales = Number(salesSummary?.year?.totalSales || 0);
+  const yearlyBills = Number(salesSummary?.year?.totalBills || 0);
 
   const monthlySales = Number(
     salesSummary?.month?.totalSales || 0
@@ -835,33 +882,34 @@ const PharmacistDashboard = () => {
     useMutation({
       mutationFn: async (id) => {
         const response =
-          await api.delete(
-            `/medicines/${id}`
+          await api.post(
+            `/deletion-requests/medicine/${id}`
           );
 
         return response.data;
       },
 
-      onSuccess: (_, deletedId) => {
+      onSuccess: () => {
+        alert('Deletion request sent to Admin. The medicine will remain until approval.');
         queryClient.invalidateQueries({
           queryKey: ['medicines'],
         });
 
-        if (
-          selectedMedicine?._id ===
-          deletedId
-        ) {
-          setSelectedMedicine(null);
-        }
       },
 
       onError: (err) => {
         alert(
           err.response?.data?.message ||
-            'Failed to delete medicine'
+            'Failed to request medicine deletion'
         );
       },
     });
+
+  const requestBillDeletionMutation = useMutation({
+    mutationFn: async (billId) => (await api.delete(`/bills/${billId}`)).data,
+    onSuccess: () => alert('Deletion request sent to Admin. The bill remains active until approval.'),
+    onError: (err) => alert(err.response?.data?.message || 'Failed to request bill deletion.'),
+  });
 
   // ==========================================================================
   // BULK IMPORT
@@ -869,32 +917,39 @@ const PharmacistDashboard = () => {
 
   const bulkImportMutation =
     useMutation({
-      mutationFn: async (data) => {
+      mutationFn: async ({ data, dryRun }) => {
         const response =
           await api.post(
             '/medicines/bulk',
-            data
+            { medicines: data, sourceFile: bulkFile?.name || 'JSON bulk import', dryRun }
           );
 
         return response.data;
       },
 
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
+        if (variables.dryRun) {
+          setBulkPreviewResult(data);
+          setBulkError('');
+          return;
+        }
         queryClient.invalidateQueries({
           queryKey: ['medicines'],
         });
+        queryClient.invalidateQueries({ queryKey: ['medicineImportIssues'] });
 
         setBulkSuccess(
           `Imported ${
             data?.insertedCount || 0
           } medicines. Skipped ${
             data?.skippedCount || 0
-          }.`
+        }. Invalid rows are saved for Admin and Pharmacist review.`
         );
 
         setBulkFile(null);
         setBulkData([]);
         setBulkJson('');
+        setBulkPreviewResult(null);
       },
 
       onError: (err) => {
@@ -915,11 +970,14 @@ const PharmacistDashboard = () => {
     setName('');
     setGenericName('');
     setManufacturer('');
+    setSupplierName('');
+    setSupplierPhone('');
     setExpiryDate('');
     setQuantity('');
     setReorderLevel('10');
     setPrice('');
     setPurchasePrice('');
+    setUnitsPerPack('1');
     setCategory('Antibiotic');
     setBarcode('');
     setRackLocation('');
@@ -942,6 +1000,8 @@ const PharmacistDashboard = () => {
     setManufacturer(
       medicine?.manufacturer || ''
     );
+    setSupplierName(medicine?.supplierName || '');
+    setSupplierPhone(medicine?.supplierPhone || '');
 
 
     setExpiryDate(
@@ -970,6 +1030,7 @@ const PharmacistDashboard = () => {
     setPurchasePrice(
       medicine?.purchasePrice ?? ''
     );
+    setUnitsPerPack(String(medicine?.unitsPerPack ?? 1));
 
     setCategory(
       medicine?.category || 'Other'
@@ -1021,6 +1082,21 @@ const PharmacistDashboard = () => {
     setSalesDetailsType(type);
   };
 
+  const openProfitDetails = (period) => {
+    const now = new Date();
+    const start = period === 'daily'
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      : period === 'monthly'
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getFullYear(), 0, 1);
+    const end = period === 'daily'
+      ? start
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const asInputDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    setProfitDateRange({ startDate: asInputDate(start), endDate: asInputDate(end) });
+    setIsProfitModalOpen(true);
+  };
+
   const closeSalesDetails = () => {
     setSalesDetailsType(null);
   };
@@ -1056,6 +1132,13 @@ const PharmacistDashboard = () => {
         }
 
         if (
+          type === 'yearly' &&
+          Number(bill.netTotal ?? Math.max(0, Number(bill.total || 0) - Number(bill.totalRefunded || 0))) <= 0
+        ) {
+          return false;
+        }
+
+        if (
           type === 'daily'
         ) {
           return (
@@ -1073,6 +1156,10 @@ const PharmacistDashboard = () => {
             billDate.getFullYear() ===
               currentDate.getFullYear()
           );
+        }
+
+        if (type === 'yearly') {
+          return billDate.getFullYear() === currentDate.getFullYear();
         }
 
         return false;
@@ -1178,6 +1265,17 @@ const PharmacistDashboard = () => {
 
     const purchaseValue = Number(purchasePrice) || 0;
     const saleValue = Number(price);
+    const packSize = Number(unitsPerPack);
+
+    if (!Number.isInteger(packSize) || packSize < 1) {
+      setError('Units per pack must be a positive whole number.');
+      return;
+    }
+
+    if (!Number.isFinite(purchaseValue) || purchaseValue <= 0 || !Number.isFinite(saleValue) || saleValue <= 0) {
+      setError('Pack purchase price and unit sale price must both be greater than zero.');
+      return;
+    }
 
     const medicineData = {
       name: name.trim(),
@@ -1185,15 +1283,18 @@ const PharmacistDashboard = () => {
         genericName.trim(),
       manufacturer:
         manufacturer.trim(),
+      supplierName: supplierName.trim(),
+      supplierPhone: supplierPhone.trim(),
       expiryDate,
       quantity:
         Number(quantity),
       reorderLevel:
         Number(
-          reorderLevel || 0
+          reorderLevel || 10
         ),
       price: Number(price),
       purchasePrice: Number(purchasePrice) || 0,
+      unitsPerPack: packSize,
       category,
       barcode:
         barcode.trim(),
@@ -1440,8 +1541,22 @@ const PharmacistDashboard = () => {
         setBillError('Scanned barcode not found in inventory: ' + text);
       }
     } else {
-      // Medicine add form: populate barcode field
+      // Medicine form: barcode is safe to apply directly. If it belongs to an
+      // existing inventory item, use that saved record to prefill the form.
       setBarcode(text);
+      const match = medicines?.find(medicine => String(medicine.barcode || '').trim().toLowerCase() === scannedNorm);
+      if (match) {
+        setName(match.name || '');
+        setGenericName(match.genericName || '');
+        setManufacturer(match.manufacturer || '');
+        setExpiryDate(match.expiryDate ? new Date(match.expiryDate).toISOString().slice(0, 10) : '');
+        setPurchasePrice(match.purchasePrice ?? '');
+        setUnitsPerPack(String(match.unitsPerPack ?? 1));
+        setPrice(match.price ?? '');
+        setQuantity(match.quantity ?? '');
+        setCategory(match.category || 'Other');
+        setOcrPreview({ medicineName: match.name || '', genericName: match.genericName || '', expiryDate: '', scannedPrices: {}, confidence: 'matched to inventory' });
+      }
     }
   };
 
@@ -1449,7 +1564,8 @@ const PharmacistDashboard = () => {
     const wsHost = window.location.hostname;
     const wsPort = window.location.port || '5173';
     // On the laptop browser window.location.hostname is localhost, but the WS proxy handles it
-    const wsUrl = `ws://${wsHost}:${wsPort}/ws/scanner?sessionId=${sessionId}&role=laptop`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/ws/scanner?sessionId=${encodeURIComponent(sessionId)}&role=laptop`;
     const ws = new WebSocket(wsUrl);
     mobileScannerWsRef.current = ws;
 
@@ -1468,23 +1584,66 @@ const PharmacistDashboard = () => {
         if (msg.type === 'scan_result') {
           processScanResult(msg.data?.barcode, target);
         }
+        if (msg.type === 'ocr_result' && target === 'medicine') {
+          setOcrPreview({
+            medicineName: '',
+            genericName: '',
+            expiryDate: '',
+            scannedPrices: {},
+            confidence: Number(msg.data?.confidence || 0) >= 55 ? 'review text' : 'low',
+            rawText: msg.data?.rawText || '',
+          });
+        }
       } catch {}
     };
     ws.onclose = () => {
       setMobileConnected(false);
+      if (mobileScannerActiveRef.current) {
+        clearTimeout(mobileScannerReconnectRef.current);
+        mobileScannerReconnectRef.current = setTimeout(() => {
+          if (mobileScannerActiveRef.current) connectMobileScannerWs(sessionId, target);
+        }, 2500);
+      }
     };
   };
 
   const startMobileScanner = async (target) => {
     try {
-      const response = await api.get('/mobile-scanner/url');
+      mobileScannerActiveRef.current = false;
+      if (mobileScannerReconnectRef.current) clearTimeout(mobileScannerReconnectRef.current);
+      if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
+      mobileScannerWsRef.current?.close();
+      const response = await api.get('/mobile-scanner/url', {
+        params: { frontendPort: window.location.port || '5174' },
+      });
       const { scannerUrl, sessionId } = response.data;
+      mobileScannerActiveRef.current = true;
       setMobileScannerUrl(scannerUrl);
       setMobileScannerSession(sessionId);
       setMobileScannerActive(true);
       setMobileConnected(false);
       cameraTargetRef.current = target;
       connectMobileScannerWs(sessionId, target);
+      if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
+      mobilePollIntervalRef.current = setInterval(async () => {
+        try {
+          const status = await api.get(`/mobile-scanner/status/${sessionId}`);
+          if (status.data.scannerUrl) setMobileScannerUrl(status.data.scannerUrl);
+          setMobileConnected(Boolean(status.data.mobileConnected));
+          const pending = await api.get(`/mobile-scanner/results/${sessionId}`);
+          if (pending.data.result?.type === 'scan_result') {
+            processScanResult(pending.data.result.data?.barcode, target);
+          } else if (pending.data.result?.type === 'ocr_result' && target === 'medicine') {
+            setOcrPreview({
+              medicineName: '', genericName: '', expiryDate: '', scannedPrices: {},
+              confidence: Number(pending.data.result.data?.confidence || 0) >= 55 ? 'review text' : 'low',
+              rawText: pending.data.result.data?.rawText || '',
+            });
+          }
+        } catch {
+          // A brief LAN interruption is reflected by the WebSocket status and retried next poll.
+        }
+      }, 5000);
       if (target === 'bill') setBillError('');
       else setError('');
     } catch (err) {
@@ -1495,10 +1654,12 @@ const PharmacistDashboard = () => {
   };
 
   const stopMobileScanner = () => {
+    mobileScannerActiveRef.current = false;
     setMobileScannerActive(false);
     setMobileScannerSession(null);
     setMobileConnected(false);
     if (mobileScannerWsRef.current) {
+      if (mobileScannerReconnectRef.current) clearTimeout(mobileScannerReconnectRef.current);
       mobileScannerWsRef.current.close();
       mobileScannerWsRef.current = null;
     }
@@ -1507,7 +1668,9 @@ const PharmacistDashboard = () => {
 
   useEffect(() => {
     return () => {
+      mobileScannerActiveRef.current = false;
       if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
+      if (mobileScannerReconnectRef.current) clearTimeout(mobileScannerReconnectRef.current);
       if (mobileScannerWsRef.current) mobileScannerWsRef.current.close();
     };
   }, []);
@@ -1517,21 +1680,7 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const downloadExcelTemplate = () => {
-    const templateData = [
-      {
-        name: 'Panadol',
-        manufacturer: 'GSK',
-        purchasePrice: 400,
-        price: 450,
-        quantity: 500,
-        expiryDate: '15/08/25',
-        rackLocation: 'R-02-B',
-      },
-    ];
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Medicines');
-    XLSX.writeFile(wb, 'Medicine_Bulk_Import_Template.xlsx');
+    XLSX.writeFile(createMedicineInventoryWorkbook([]), 'Medicine_Bulk_Import_Template.xlsx');
   };
 
   const exportAllMedicines = async () => {
@@ -1556,6 +1705,7 @@ const PharmacistDashboard = () => {
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    setBulkPreviewResult(null);
     setBulkFile(file);
 
     const reader = new FileReader();
@@ -1566,32 +1716,7 @@ const PharmacistDashboard = () => {
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'dd/mm/yy' });
-        
-        const parsedData = data.map((row) => {
-          let parsedExpiry = null;
-          if (row.expiryDate) {
-             const parts = row.expiryDate.split('/');
-             if(parts.length === 3) {
-               let year = parseInt(parts[2], 10);
-               if(year < 100) year += 2000;
-               parsedExpiry = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).toISOString();
-             } else {
-               parsedExpiry = new Date(row.expiryDate).toISOString();
-             }
-          }
-
-          return {
-            name: row.name || row.Name || row['Medicine Name'],
-            manufacturer: row.manufacturer || row.Manufacturer || row['Manufacture Company'],
-            purchasePrice: Number(row.purchasePrice || row['Purchase Price'] || 0),
-            price: Number(row.price || row['Sale Price'] || 0),
-            quantity: Number(row.quantity || row.Quantity || 0),
-            expiryDate: parsedExpiry,
-            rackLocation: row.rackLocation || row.Rack || row['Rack Location'] || '',
-          };
-        });
-
-        setBulkData(parsedData);
+        setBulkData(data);
         setBulkError('');
       } catch {
         setBulkError('Error parsing Excel file. Ensure it matches the template.');
@@ -1615,7 +1740,7 @@ const PharmacistDashboard = () => {
         );
         return;
       }
-      bulkImportMutation.mutate(bulkData);
+      bulkImportMutation.mutate({ data: bulkData, dryRun: !bulkPreviewResult });
     } else {
       if (!bulkJson.trim()) {
         setBulkError('Please enter JSON data');
@@ -1627,7 +1752,7 @@ const PharmacistDashboard = () => {
           setBulkError('Please provide a JSON array');
           return;
         }
-        bulkImportMutation.mutate(parsed);
+        bulkImportMutation.mutate({ data: parsed, dryRun: !bulkPreviewResult });
       } catch {
         setBulkError('Invalid JSON format');
       }
@@ -1641,7 +1766,7 @@ const PharmacistDashboard = () => {
   const handleDelete = (id) => {
     const confirmed =
       window.confirm(
-        'Delete this medicine?'
+        'Send this medicine deletion request to Admin for approval? The medicine will stay until Admin approves.'
       );
 
     if (confirmed) {
@@ -1841,16 +1966,6 @@ const PharmacistDashboard = () => {
 
       if ((Number(discount) || 0) > subtotal) {
         setBillError('Discount cannot exceed the invoice subtotal');
-        return;
-      }
-
-      const itemBelowCost = billItems.find(
-        (item) => Number(item.salePrice ?? item.price ?? 0) < Number(item.purchasePrice ?? 0)
-      );
-      if (itemBelowCost) {
-        setBillError(
-          `Sale price for ${itemBelowCost.name} cannot be lower than its purchase cost.`
-        );
         return;
       }
 
@@ -2584,9 +2699,9 @@ const PharmacistDashboard = () => {
                   <p className="text-xs sm:text-sm text-emerald-100/90 font-medium mt-0.5">Real-time inventory metrics, billing terminal, customer orders, and automated compliance alerts.</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => { refetchMeds(); refetchBills(); refetchSalesSummary(); refetchOnlineOrders(); }} className="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2.5 rounded-xl border border-emerald-400/30 flex items-center gap-2 text-xs transition-all cursor-pointer">
-                    <RefreshCw className="w-4 h-4 text-emerald-200" />
-                    Refresh
+                  <button type="button" onClick={refreshDashboardData} disabled={isDashboardRefreshing} aria-label="Refresh dashboard data" className="bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2.5 rounded-xl border border-emerald-400/30 flex items-center gap-2 text-xs transition-all cursor-pointer disabled:cursor-wait disabled:opacity-60">
+                    <RefreshCw className={`w-4 h-4 text-emerald-200 ${isDashboardRefreshing ? 'animate-spin' : ''}`} />
+                    {isDashboardRefreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
                   <button onClick={() => setActiveTab('new-bill')} className="bg-white text-emerald-950 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl shadow-sm border border-emerald-100 flex items-center gap-2 text-xs transition-all cursor-pointer">
                     <Receipt className="w-4 h-4 text-emerald-700" />
@@ -2598,6 +2713,18 @@ const PharmacistDashboard = () => {
                   </button>
                 </div>
               </div>
+
+              {dashboardRefreshMessage && (
+                <p role="status" className={`-mt-2 text-xs font-semibold ${dashboardRefreshMessage.includes('failed') || dashboardRefreshMessage.includes('Some') ? 'text-rose-600' : 'text-emerald-700'}`}>
+                  {dashboardRefreshMessage}
+                </p>
+              )}
+
+              <MedicineImportIssues compact />
+              <DailyClosingReport compact />
+              <MedicineExpiryAlerts compact />
+              <PurchaseOrdersPanel compact />
+              <MedicineAuditHistory compact />
 
               {/* STAT CARDS */}
 
@@ -2843,6 +2970,18 @@ const PharmacistDashboard = () => {
 
                 </button>
 
+                <button type="button" onClick={() => openSalesDetails('yearly')} className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-violet-300 transition">
+                  <div className="text-[10px] uppercase font-bold text-violet-600">Yearly Sales · {new Date().getFullYear()}</div>
+                  <div className="flex justify-between items-end mt-2">
+                    <div>
+                      <div className="text-lg font-bold text-violet-700">{isSalesSummaryLoading ? '...' : getCurrency(yearlySales)}</div>
+                      <div className="text-[9px] text-slate-600 dark:text-slate-400 mt-1">{yearlyBills} bill(s) this year</div>
+                    </div>
+                    <Calendar className="w-5 h-5" />
+                  </div>
+                  <div className="text-[9px] text-violet-600 mt-2 font-bold">Click to view this year’s sales</div>
+                </button>
+
               </div>
 
               {/* PROFIT ANALYTICS SUMMARY CARD */}
@@ -2852,14 +2991,14 @@ const PharmacistDashboard = () => {
                     <TrendingUp className="w-5 h-5 text-emerald-400" />
                     Profit & Analytics Summary
                   </h3>
-                  <p className="text-xs text-emerald-100 mt-1">
-                    Today's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.dailyProfit || 0)}</span> | 
-                    This Month's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.monthlyProfit || 0)}</span> | 
-                    This Year's Profit: <span className="font-bold text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.yearlyProfit || 0)}</span>
-                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <button type="button" onClick={() => openProfitDetails('daily')} className="rounded-lg bg-white/10 px-3 py-2 text-left text-xs hover:bg-white/20">Today's profit · <strong className="text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.dailyProfit || 0)}</strong><span className="block text-[10px] text-emerald-200">View details</span></button>
+                    <button type="button" onClick={() => openProfitDetails('monthly')} className="rounded-lg bg-white/10 px-3 py-2 text-left text-xs hover:bg-white/20">This month's profit · <strong className="text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.monthlyProfit || 0)}</strong><span className="block text-[10px] text-emerald-200">View details</span></button>
+                    <button type="button" onClick={() => openProfitDetails('yearly')} className="rounded-lg bg-white/10 px-3 py-2 text-left text-xs hover:bg-white/20">This year's profit · <strong className="text-emerald-300">{isProfitLoading ? '...' : getCurrency(profitSummary?.yearlyProfit || 0)}</strong><span className="block text-[10px] text-emerald-200">View details</span></button>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setIsProfitModalOpen(true)}
+                  onClick={() => { setProfitDateRange({ startDate: '', endDate: '' }); setIsProfitModalOpen(true); }}
                   className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow"
                 >
                   <BarChart className="w-4 h-4" />
@@ -3380,6 +3519,17 @@ const PharmacistDashboard = () => {
                                   View Details
                                 </button>
 
+                                {currentUser?.role === 'pharmacist' && (
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Send bill ${bill.billNumber || ''} to Admin for deletion approval? It will remain until approval.`)) requestBillDeletionMutation.mutate(bill._id);
+                                    }}
+                                    className="ml-2 px-3 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-bold"
+                                  >
+                                    Request Deletion
+                                  </button>
+                                )}
+
                               </td>
 
                             </tr>
@@ -3421,10 +3571,11 @@ const PharmacistDashboard = () => {
                   <button
                     type="button"
                     onClick={() => refetchOnlineOrders()}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    disabled={isOrdersFetching}
+                    className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
-                    <RefreshCw className="inline w-3.5 h-3.5 mr-1" />
-                    Refresh Orders
+                    <RefreshCw className={`inline w-3.5 h-3.5 mr-1 ${isOrdersFetching ? 'animate-spin' : ''}`} />
+                    {isOrdersFetching ? 'Refreshing…' : 'Refresh Orders'}
                   </button>
                 </div>
               </div>
@@ -3572,6 +3723,8 @@ const PharmacistDashboard = () => {
             'medicines' && (
             <div className="space-y-4">
 
+              <MedicineImportIssues />
+
               <div className="section-banner p-4 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
 
                 <div>
@@ -3607,10 +3760,11 @@ const PharmacistDashboard = () => {
                       refetchMeds();
                     }}
                     className="flex items-center justify-center rounded-lg !bg-white px-3 py-2 !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
+                    disabled={isMedsFetching}
                     title="Refresh"
                     aria-label="Refresh medicine inventory"
                   >
-                    <RefreshCw className="h-4 w-4 !text-emerald-700" />
+                    <RefreshCw className={`h-4 w-4 !text-emerald-700 ${isMedsFetching ? 'animate-spin' : ''}`} />
                   </button>
 
                   <button
@@ -4006,7 +4160,7 @@ const PharmacistDashboard = () => {
                                   Sale: {getCurrency(medicine.price)}
                                 </div>
                                 <div className="mt-1 text-[10px] font-medium text-slate-500">
-                                  Cost/unit: {getCurrency(medicine.purchasePrice)}
+                                  Cost/tablet: {getCurrency(getPurchaseCostPerUnit(medicine))}
                                 </div>
                               </td>
 
@@ -4084,17 +4238,15 @@ const PharmacistDashboard = () => {
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
 
-                                  <button
-                                    onClick={() =>
-                                      handleDelete(
-                                        medicine._id
-                                      )
-                                    }
-                                    className="p-2 rounded-lg hover:bg-red-50 text-red-600"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {currentUser?.role === 'pharmacist' && (
+                                    <button
+                                      onClick={() => handleDelete(medicine._id)}
+                                      className="p-2 rounded-lg hover:bg-red-50 text-red-600"
+                                      title="Request deletion from Admin"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
 
                                 </div>
 
@@ -4135,9 +4287,9 @@ const PharmacistDashboard = () => {
                       {ocrLoading ? 'Scanning image...' : 'Search by name, rack, or barcode; scan a label to add it to this bill.'}
                     </p>
                   </div>
-                  <button onClick={() => { refetchMeds(); }} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 ml-auto">
-                    <RefreshCw className="inline w-3.5 h-3.5 mr-1" />
-                    Refresh
+                  <button type="button" onClick={() => { refetchMeds(); refetchBills(); }} disabled={isMedsFetching || isBillsFetching} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800 ml-auto">
+                    <RefreshCw className={`inline w-3.5 h-3.5 mr-1 ${isMedsFetching || isBillsFetching ? 'animate-spin' : ''}`} />
+                    {isMedsFetching || isBillsFetching ? 'Refreshing…' : 'Refresh'}
                   </button>
                   <div className="flex flex-wrap gap-2">
                     <input
@@ -4278,7 +4430,7 @@ const PharmacistDashboard = () => {
                                 Sale: {getCurrency(medicine.price)}
                               </span>
                               <span className="mt-1 block text-slate-500">
-                                Cost: {getCurrency(medicine.purchasePrice)}
+                              Cost/tablet: {getCurrency(getPurchaseCostPerUnit(medicine))}
                               </span>
                             </span>
 
@@ -4590,7 +4742,7 @@ const PharmacistDashboard = () => {
             'customers' && (
             <div className="space-y-4">
 
-              {pendingCustomers.length > 0 && (
+              {currentUser?.role === 'superadmin' && pendingCustomers.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
@@ -4651,7 +4803,7 @@ const PharmacistDashboard = () => {
               <div className="p-5 border-b">
 
                 <h3 className="font-bold text-sm">
-                  User Control Panel
+                  Customer Accounts
                 </h3>
 
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
@@ -4894,6 +5046,12 @@ const PharmacistDashboard = () => {
           {activeTab ===
             'settings' && (
             <div className="max-w-xl mx-auto space-y-4">
+
+              {currentUser?.role === 'superadmin' && (
+                <button type="button" onClick={() => navigate('/superadmin')} className="w-full rounded-xl bg-teal-700 px-4 py-3 text-left text-sm font-bold text-white shadow-sm hover:bg-teal-800">
+                  Admin Settings · Open User Control Panel
+                </button>
+              )}
 
               <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
 
@@ -5142,7 +5300,7 @@ const PharmacistDashboard = () => {
             <Smartphone className="w-12 h-12 text-teal-500 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">Mobile Scanner</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
-              Make sure phone and laptop are on the <strong>same Wi-Fi</strong>. Scan QR with phone camera.
+              Connect both devices to the same Wi-Fi or laptop hotspot. The mobile page has access only to this temporary scanner session.
             </p>
 
             {mobileScannerUrl ? (
@@ -5156,7 +5314,14 @@ const PharmacistDashboard = () => {
             )}
 
             {mobileScannerUrl && (
-              <p className="text-[10px] text-slate-400 mb-4 font-mono break-all">{mobileScannerUrl}</p>
+              <>
+                <p className="text-[10px] text-slate-400 mb-2 font-mono break-all">{mobileScannerUrl}</p>
+                <p className="text-[10px] text-amber-700 dark:text-amber-300 mb-4">
+                  Android Chrome requires a secure page for camera access. Plain HTTP over Wi-Fi may block the camera. For USB, run <code>{`adb reverse tcp:${window.location.port || '5173'} tcp:${window.location.port || '5173'}`}</code> and open the localhost version of this link on the phone.
+                </p>
+                <a href={mobileScannerUrl.replace(/:\/\/[^/:]+/, '://localhost')} target="_blank" rel="noreferrer" className="inline-block text-[10px] font-semibold text-teal-700 underline dark:text-teal-300">USB pairing link (requires ADB reverse)</a>
+                <p className="mt-1 mb-4 break-all font-mono text-[9px] text-slate-500">{mobileScannerUrl.replace(/:\/\/[^/:]+/, '://localhost')}</p>
+              </>
             )}
 
             {/* Live connection status */}
@@ -5274,6 +5439,7 @@ const PharmacistDashboard = () => {
                     Connect Mobile Scanner
                   </button>
                 </div>
+                <p className="mb-3 text-[10px] text-amber-700 dark:text-amber-300">Android Chrome blocks live camera access on plain HTTP Wi-Fi links. Use the USB localhost link from the pairing dialog, or a trusted HTTPS address.</p>
 
                 {ocrLoading && (
                   <div className="mb-3 flex items-center gap-2 text-[10px] font-bold text-blue-700">
@@ -5309,7 +5475,7 @@ const PharmacistDashboard = () => {
                     Open Camera
                   </button>
                   <span className="self-center text-[10px] text-slate-500">
-                    On a phone, open this app in the mobile browser to use its camera. Remote USB/Bluetooth phone-camera control is not available in standard browsers.
+                    Android camera access needs HTTPS or localhost. USB can provide a localhost connection with ADB; the phone browser still controls its own camera.
                   </span>
                 </div>
 
@@ -5349,6 +5515,13 @@ const PharmacistDashboard = () => {
                     </div>
                   )}
                 </div>
+                {ocrPreview.rawText && (
+                  <div className="mt-3 text-left">
+                    <label htmlFor="mobile-ocr-review" className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">Text read from the package — review and edit; no medicine name was guessed</label>
+                    <textarea id="mobile-ocr-review" rows={3} value={ocrPreview.rawText} onChange={event => setOcrPreview(current => ({ ...current, rawText: event.target.value }))} className="mt-1 w-full rounded-lg border border-emerald-200 bg-white p-2 text-xs text-slate-800 dark:border-emerald-900 dark:bg-slate-900 dark:text-slate-100" />
+                    <button type="button" onClick={() => setName(ocrPreview.rawText.trim())} className="mt-2 rounded-lg bg-emerald-700 px-3 py-1.5 text-[10px] font-bold text-white">Use reviewed text as medicine name</button>
+                  </div>
+                )}
                 <p className="mt-2 text-[10px] text-emerald-800 dark:text-emerald-300">
                   OCR results are suggestions. Verify every value before saving; names are filled only when a known medicine term is recognized.
                 </p>
@@ -5362,8 +5535,9 @@ const PharmacistDashboard = () => {
               className="space-y-3"
             >
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
+              <div className="grid grid-cols-1 gap-3">
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Medicine name
                 <input
                   required
                   value={name}
@@ -5372,14 +5546,16 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Medicine Name"
-                  className="border rounded-lg px-3 py-2 text-xs"
+                  placeholder="e.g. ALII"
+                  className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                 />
+                </label>
 
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
+              <div className="grid grid-cols-1 gap-3">
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Manufacturer
                 <input
                   required
                   value={
@@ -5391,13 +5567,15 @@ const PharmacistDashboard = () => {
                     )
                   }
                   placeholder="Manufacturer"
-                  className="border rounded-lg px-3 py-2 text-xs"
+                  className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                 />
+                </label>
 
               </div>
 
               <div className="grid grid-cols-1 gap-3">
-
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Expiry date
                 <input
                   required
                   type="date"
@@ -5409,66 +5587,91 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  className="border rounded-lg px-3 py-2 text-xs"
+                  className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                 />
+                </label>
 
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Purchase cost per pack (PKR)
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={purchasePrice}
+                    onChange={(event) => setPurchasePrice(event.target.value)}
+                    placeholder="Full pack price"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                  />
+                </label>
 
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={
-                    purchasePrice
-                  }
-                  onChange={(event) =>
-                    setPurchasePrice(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Purchase cost per tablet / unit (PKR)"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Units per pack
+                  <input
+                    required
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={unitsPerPack}
+                    onChange={(event) => setUnitsPerPack(event.target.value)}
+                    placeholder="e.g. 20 tablets"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                  />
+                </label>
 
-                <input
-                  required
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={
-                    price
-                  }
-                  onChange={(event) =>
-                    setPrice(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Default sale price per tablet / unit (PKR)"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Sale price per unit (PKR)
+                  <input
+                    required
+                    type="number"
+                    step="0.01"
+                    value={price}
+                    onChange={(event) => setPrice(event.target.value)}
+                    placeholder="One tablet price"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                  />
+                </label>
 
-                <input
-                  required
-                  type="number"
-                  min="0"
-                  value={
-                    quantity
-                  }
-                  onChange={(event) =>
-                    setQuantity(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Quantity"
-                  className="border rounded-lg px-3 py-2 text-xs"
-                />
-
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Stock quantity (units)
+                  <input
+                    required
+                    type="number"
+                    min="0"
+                    value={quantity}
+                    onChange={(event) => setQuantity(event.target.value)}
+                    placeholder="Tablets in stock"
+                    className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                  />
+                </label>
               </div>
+              <p className="-mt-2 text-[10px] text-slate-500">
+                Sale and stock are per tablet/unit. Unit purchase cost is pack cost divided by units per pack; e.g. PKR 100 divided by 10 tablets = PKR 10 per tablet.
+              </p>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/60">
+                  <span className="text-slate-500">Cost per tablet/unit</span>
+                  <strong className="ml-2 text-slate-800 dark:text-slate-100">{getCurrency(getPurchaseCostPerUnit(purchasePrice, unitsPerPack))}</strong>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/60">
+                  <span className="text-slate-500">Profit per tablet/unit</span>
+                  <strong className={`ml-2 ${Number(price) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack) < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {getCurrency((Number(price) || 0) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack))}
+                  </strong>
+                </div>
+              </div>
+              {Number(purchasePrice) > 0 && Number(unitsPerPack) > 0 && Number(price) > 0 && Number(price) < getPurchaseCostPerUnit(purchasePrice, unitsPerPack) && (
+                <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Warning: this tablet/unit will be sold below its purchase cost.
+                </p>
+              )}
 
               <div className="grid grid-cols-1 gap-3">
+                <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Rack / shelf location
                 <input
                   value={
                     rackLocation
@@ -5478,50 +5681,63 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Rack / Shelf (e.g. R-02-B)"
-                  className="border rounded-lg px-3 py-2 text-xs"
+                  placeholder="e.g. R-02-B"
+                  className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                 />
+                </label>
 
               </div>
 
-              {editingMedicine && (
-                <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <div className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                    Optional existing medicine details
+                    Additional medicine details (optional)
                   </p>
-                  <input
-                    value={genericName}
-                    onChange={(event) => setGenericName(event.target.value)}
-                    placeholder="Generic Name"
-                    className="border rounded-lg px-3 py-2 text-xs"
-                  />
+                  <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                    Generic name
+                    <input
+                      value={genericName}
+                      onChange={(event) => setGenericName(event.target.value)}
+                      placeholder="Active ingredient"
+                      className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                    />
+                  </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <input
-                      type="number"
-                      min="0"
-                      value={reorderLevel}
-                      onChange={(event) => setReorderLevel(event.target.value)}
-                      placeholder="Reorder Level"
-                      className="border rounded-lg px-3 py-2 text-xs"
-                    />
-                    <select
-                      value={category}
-                      onChange={(event) => setCategory(event.target.value)}
-                      className="border rounded-lg px-3 py-2 text-xs"
-                    >
-                      {standardCategories.map((item) => (
-                        <option key={item} value={item}>{item}</option>
-                      ))}
-                    </select>
-                    <input
-                      value={barcode}
-                      onChange={(event) => setBarcode(event.target.value)}
-                      placeholder="Barcode"
-                      className="border rounded-lg px-3 py-2 text-xs"
-                    />
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Reorder level (units)
+                      <input
+                        type="number"
+                        min="0"
+                        value={reorderLevel}
+                        onChange={(event) => setReorderLevel(event.target.value)}
+                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                      />
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Category
+                      <select
+                        value={category}
+                        onChange={(event) => setCategory(event.target.value)}
+                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                      >
+                        {standardCategories.map((item) => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Barcode
+                      <input
+                        value={barcode}
+                        onChange={(event) => setBarcode(event.target.value)}
+                        className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
+                      />
+                    </label>
                   </div>
-                </div>
-              )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">Supplier name<input value={supplierName} onChange={(event) => setSupplierName(event.target.value)} placeholder="Supplier / wholesaler" className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal" /></label>
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">Supplier phone<input value={supplierPhone} onChange={(event) => setSupplierPhone(event.target.value)} placeholder="Contact number" className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal" /></label>
+                  </div>
+              </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t">
 
@@ -5601,6 +5817,8 @@ const PharmacistDashboard = () => {
               </div>
             )}
 
+            <MedicineImportIssues compact />
+
             <form
               onSubmit={
                 handleBulkSubmit
@@ -5610,14 +5828,14 @@ const PharmacistDashboard = () => {
               <div className="flex bg-slate-100 p-1 rounded-lg mb-4">
                 <button
                   type="button"
-                  onClick={() => setImportMode('excel')}
+                  onClick={() => { setImportMode('excel'); setBulkPreviewResult(null); }}
                   className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'excel' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Excel File Upload
                 </button>
                 <button
                   type="button"
-                  onClick={() => setImportMode('json')}
+                  onClick={() => { setImportMode('json'); setBulkPreviewResult(null); }}
                   className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'json' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   JSON Upload
@@ -5651,23 +5869,34 @@ const PharmacistDashboard = () => {
                 <textarea
                   rows={10}
                   value={bulkJson}
-                  onChange={(event) => setBulkJson(event.target.value)}
-                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "genericName": "Paracetamol",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "price": 450,\n    "quantity": 500,\n    "reorderLevel": 50,\n    "category": "Analgesic",\n    "rackLocation": "R-02-B"\n  }\n]`}
+                  onChange={(event) => { setBulkJson(event.target.value); setBulkPreviewResult(null); }}
+                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "genericName": "Paracetamol",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "purchasePrice": 400,\n    "unitsPerPack": 20,\n    "price": 25,\n    "quantity": 500,\n    "reorderLevel": 50,\n    "category": "Analgesic",\n    "barcode": "",\n    "rackLocation": "R-02-B"\n  }\n]`}
                   className="w-full border rounded-lg p-3 font-mono text-xs"
                 />
+              )}
+
+              {bulkPreviewResult && (
+                <div className="max-h-72 overflow-auto rounded-xl border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-xs font-bold text-blue-900">Preview: {bulkPreviewResult.validCount} valid · {bulkPreviewResult.invalidCount} need correction · {bulkPreviewResult.totalRows} total</p>
+                  <p className="mt-1 text-[10px] text-blue-800">Valid rows will be imported after confirmation. Invalid rows are saved for Admin and Pharmacist review.</p>
+                  <div className="mt-2 space-y-1">
+                    {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
+                    {bulkPreviewResult.rows.length > 80 && <p className="text-[10px] text-slate-600">Showing first 80 rows. {bulkPreviewResult.rows.length - 80} more rows are included in the preview validation.</p>}
+                  </div>
+                </div>
               )}
 
               <button
                 type="submit"
                 disabled={
-                  bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
+                    bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
                 }
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold shadow hover:brightness-110 disabled:opacity-50 transition"
               >
                 {
                   bulkImportMutation.isPending
                     ? 'Processing...'
-                    : 'Run Import'
+                    : bulkPreviewResult ? `Confirm & Import ${bulkPreviewResult.validCount} valid rows` : 'Validate & Preview'
                 }
               </button>
 
@@ -6016,18 +6245,15 @@ const PharmacistDashboard = () => {
                   Edit
                 </button>
 
-                <button
-                  onClick={() => {
-                    handleDelete(
-                      selectedMedicine._id
-                    );
-                    closeMedicineDetails();
-                  }}
-                  className="px-4 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-bold flex items-center gap-2"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Delete
-                </button>
+                  {currentUser?.role === 'pharmacist' && (
+                  <button
+                    onClick={() => { handleDelete(selectedMedicine._id); closeMedicineDetails(); }}
+                    className="px-4 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-bold flex items-center gap-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Request Admin Deletion
+                  </button>
+                )}
 
                 <button
                   onClick={
@@ -6071,10 +6297,11 @@ const PharmacistDashboard = () => {
 
                   <h3 className="font-bold text-base">
 
-                    {salesDetailsType ===
-                    'daily'
+                    {salesDetailsType === 'daily'
                       ? "Today's Sales Details"
-                      : 'Monthly Sales Details'}
+                      : salesDetailsType === 'yearly'
+                        ? `${new Date().getFullYear()} Yearly Sales Details`
+                        : 'Monthly Sales Details'}
 
                   </h3>
 
@@ -6082,10 +6309,11 @@ const PharmacistDashboard = () => {
 
                 <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
 
-                  {salesDetailsType ===
-                  'daily'
+                  {salesDetailsType === 'daily'
                     ? "Complete sales information for today's transactions."
-                    : 'Complete sales information for the current month.'}
+                    : salesDetailsType === 'yearly'
+                      ? `Complete net sales information for ${new Date().getFullYear()}.`
+                      : 'Complete sales information for the current month.'}
 
                 </p>
 
@@ -6173,10 +6401,11 @@ const PharmacistDashboard = () => {
 
                 <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400 font-bold">
 
-                  {salesDetailsType ===
-                  'daily'
+                  {salesDetailsType === 'daily'
                     ? 'TODAY'
-                    : 'THIS MONTH'}
+                    : salesDetailsType === 'yearly'
+                      ? String(new Date().getFullYear())
+                      : 'THIS MONTH'}
 
                 </span>
 
@@ -6857,8 +7086,11 @@ const PharmacistDashboard = () => {
       )}
 
       <ProfitDetailsModal
+        key={`${profitDateRange.startDate}-${profitDateRange.endDate}`}
         isOpen={isProfitModalOpen}
         onClose={() => setIsProfitModalOpen(false)}
+        initialStartDate={profitDateRange.startDate}
+        initialEndDate={profitDateRange.endDate}
       />
 
       <StockAdjustmentModal

@@ -19,6 +19,9 @@ import customerRoutes from "./routes/customerRoutes.js";
 import pharmacistRoutes from "./routes/pharmacistRoutes.js";
 import udharRoutes from "./routes/udharRoutes.js";
 import mobileScannerRoutes from "./routes/mobileScannerRoutes.js";
+import deletionRequestRoutes from "./routes/deletionRequestRoutes.js";
+import backupRoutes from "./routes/backupRoutes.js";
+import purchaseOrderRoutes from "./routes/purchaseOrderRoutes.js";
 import { initMobileScannerWebSocket } from "./controllers/mobileScannerController.js";
 
 import {
@@ -112,6 +115,11 @@ app.get("/", (req, res) => {
   res.send("Sardar Medical Store API is running...");
 });
 
+// Used by npm run dev to distinguish this workspace API from another local API.
+app.get("/api/dev-identity", (_req, res) => {
+  res.type("text/plain").send("sardar-pharmacy-dev-api-v2");
+});
+
 // Register API Routes
 app.use("/api/auth", authRoutes);
 
@@ -138,6 +146,9 @@ app.use(
 app.use("/api/udhar", udharRoutes);
 
 app.use("/api/mobile-scanner", mobileScannerRoutes);
+app.use("/api/deletion-requests", deletionRequestRoutes);
+app.use("/api/backups", backupRoutes);
+app.use("/api/purchase-orders", purchaseOrderRoutes);
 
 // Error Middleware
 app.use(notFound);

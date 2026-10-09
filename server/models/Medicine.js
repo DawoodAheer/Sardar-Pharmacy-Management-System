@@ -23,6 +23,9 @@ const medicineSchema = new mongoose.Schema(
       default: '',
     },
 
+    supplierName: { type: String, trim: true, default: '' },
+    supplierPhone: { type: String, trim: true, default: '' },
+
 
     // Expiry date
     expiryDate: {
@@ -34,6 +37,7 @@ const medicineSchema = new mongoose.Schema(
     quantity: {
       type: Number,
       min: [0, 'Quantity cannot be negative'],
+      validate: { validator: Number.isInteger, message: 'Stock quantity must be a whole number of tablets or units' },
       default: 0,
     },
 
@@ -51,11 +55,18 @@ const medicineSchema = new mongoose.Schema(
       min: [0, 'Price cannot be negative'],
     },
 
-    // Purchase / cost price (what you paid — fixed, for profit calculation)
+    // Total purchase cost for one package. Existing records default to one unit/package.
     purchasePrice: {
       type: Number,
       min: [0, 'Purchase price cannot be negative'],
       default: 0,
+    },
+
+    // Tablets or other individually sellable units inside one purchase package.
+    unitsPerPack: {
+      type: Number,
+      min: [1, 'Units per pack must be at least 1'],
+      default: 1,
     },
 
     // Medicine category
@@ -85,6 +96,11 @@ const medicineSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+
+    // Soft delete keeps historical bill/return references intact.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 
     // User who added the medicine
     createdBy: {

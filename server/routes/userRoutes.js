@@ -11,6 +11,10 @@ import {
   rejectPharmacist,
   approveCustomer,
   rejectCustomer,
+  createStaffUser,
+  setUserActiveStatus,
+  resetManagedUserPassword,
+  editManagedUser,
 } from '../controllers/userController.js';
 
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -27,32 +31,23 @@ router.get(
   getCustomers
 );
 
-router.get(
-  '/pending-customers',
-  authorize('superadmin', 'pharmacist'),
-  getPendingCustomers
-);
-
 // Any logged-in user can update their name/phone
 router.patch(
   '/profile',
   updateProfileNameOrPhone
 );
 
-router.put(
-  '/:id/approve-customer',
-  authorize('superadmin', 'pharmacist'),
-  approveCustomer
-);
-
-router.put(
-  '/:id/reject-customer',
-  authorize('superadmin', 'pharmacist'),
-  rejectCustomer
-);
-
 // All routes below this point are Superadmin only
 router.use(authorize('superadmin'));
+
+router.get('/pending-customers', getPendingCustomers);
+router.put('/:id/approve-customer', approveCustomer);
+router.put('/:id/reject-customer', rejectCustomer);
+
+router.post('/staff', createStaffUser);
+router.patch('/:id/active', setUserActiveStatus);
+router.patch('/:id', editManagedUser);
+router.put('/:id/password', resetManagedUserPassword);
 
 // Get all users
 router.get(

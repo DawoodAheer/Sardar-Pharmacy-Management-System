@@ -187,26 +187,31 @@ const PrintReceipt = () => {
     );
   }
 
-  const items = Array.isArray(bill.items) ? bill.items : [];
-
-  const subtotal =
-    bill.subtotal !== undefined
-      ? toNumber(bill.subtotal)
-      : items.reduce(
-          (sum, item) =>
-            sum +
-            toNumber(item.unitPrice) * toNumber(item.quantity),
-          0
-        );
-
-  const discount = toNumber(bill.discount);
+  const billedItems = Array.isArray(bill.items) ? bill.items : [];
+  const items = billedItems.map((item) => {
+    const returnedQuantity = (bill.returns || [])
+      .filter((returnItem) => String(returnItem.medicineId) === String(item.medicineId))
+      .reduce((sum, returnItem) => sum + toNumber(returnItem.quantityReturned), 0);
+    return { ...item, remainingQuantity: Math.max(0, toNumber(item.quantity) - returnedQuantity) };
+  }).filter((item) => item.remainingQuantity > 0);
+  const originalSubtotal = billedItems.reduce(
+    (sum, item) => sum + toNumber(item.salePrice ?? item.unitPrice) * toNumber(item.quantity), 0
+  );
+  const subtotal = items.reduce(
+    (sum, item) => sum + toNumber(item.salePrice ?? item.unitPrice) * item.remainingQuantity, 0
+  );
+  const discount = originalSubtotal > 0
+    ? Math.min(subtotal, toNumber(bill.discount) * subtotal / originalSubtotal)
+    : 0;
 
   const total =
     bill.total !== undefined
       ? toNumber(bill.total)
       : Math.max(0, subtotal - discount);
   const totalRefunded = toNumber(bill.totalRefunded);
-  const netTotal = Math.max(0, total - totalRefunded);
+  const netTotal = Math.max(0, bill.netTotal !== undefined
+    ? toNumber(bill.netTotal)
+    : total - totalRefunded);
 
   const customerName = getCustomerName(bill);
   const customerPhone = getCustomerPhone(bill);
@@ -447,28 +452,15 @@ const PrintReceipt = () => {
 
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800 print:divide-slate-300">
                     {items.map((item, index) => {
-                      const quantity = toNumber(item.quantity);
+                      const quantity = toNumber(item.remainingQuantity);
+                      const returnedQuantity = Math.max(0, toNumber(item.quantity) - quantity);
+                      const netQuantity = quantity;
                       const unitPrice = toNumber(item.salePrice ?? item.unitPrice);
                       const lineTotal = quantity * unitPrice;
-                      const itemReturns = (bill.returns || []).filter(
-                        (returnItem) =>
-                          String(returnItem.medicineId) === String(item.medicineId)
-                      );
-                      const returnedQuantity = itemReturns.reduce(
-                        (sum, returnItem) => sum + toNumber(returnItem.quantityReturned),
-                        0
-                      );
-                      const netQuantity = Math.max(0, quantity - returnedQuantity);
-                      const itemRefund = itemReturns.reduce(
-                        (sum, returnItem) => sum + toNumber(returnItem.refundAmount),
-                        0
-                      );
-                      const itemDiscount =
-                        subtotal > 0 ? (discount * lineTotal) / subtotal : 0;
-                      const netLineTotal = Math.max(
-                        0,
-                        lineTotal - itemDiscount - itemRefund
-                      );
+                      const itemDiscount = originalSubtotal > 0
+                        ? (toNumber(bill.discount) * lineTotal) / originalSubtotal
+                        : 0;
+                      const netLineTotal = Math.max(0, lineTotal - itemDiscount);
 
                       return (
                         <tr

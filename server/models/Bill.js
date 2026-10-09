@@ -174,7 +174,7 @@ const billSchema = new mongoose.Schema(
       type: String,
       required: true,
       // Keep legacy values valid when updating old bills; current bill endpoints only write Cash.
-      enum: ['Cash', 'Card', 'UPI'],
+      enum: ['Cash', 'Card', 'UPI', 'Online'],
       default: 'Cash',
     },
 

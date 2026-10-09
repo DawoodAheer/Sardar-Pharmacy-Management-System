@@ -6,7 +6,7 @@ import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import { checkExpiryStatus } from './expiryCheck.js';
 import { getStockStatus } from './stockStatus.js';
-import { createBackup } from './backupManager.js';
+import { createBackup, markBackupFailure } from './backupManager.js';
 
 // Setup Nodemailer email transporter
 const getEmailTransporter = () => {
@@ -634,6 +634,7 @@ export const initializeNotificationScheduler = () => {
     try {
       await createBackup();
     } catch (err) {
+      await markBackupFailure(err);
       console.error('Daily automated backup failed:', err.message);
     }
   });

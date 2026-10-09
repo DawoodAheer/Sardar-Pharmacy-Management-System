@@ -49,6 +49,11 @@ const paymentRecordSchema = new mongoose.Schema({
     default: '',
     trim: true,
   },
+  paidBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
 }, { _id: true, timestamps: false });
 
 const udharSchema = new mongoose.Schema(

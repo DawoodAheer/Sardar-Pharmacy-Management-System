@@ -47,6 +47,14 @@ const connectDB = async (retryCount = 0) => {
 
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
+    const packSizeMigration = await Medicine.updateMany(
+      { $or: [{ unitsPerPack: { $exists: false } }, { unitsPerPack: null }] },
+      { $set: { unitsPerPack: 1 } }
+    );
+    if (packSizeMigration.modifiedCount > 0) {
+      console.log(`Migrated ${packSizeMigration.modifiedCount} legacy medicines to 1 unit per pack.`);
+    }
+
     // Auto-seed default admin, pharmacist, and customer if database is empty
     await autoSeedIfEmpty();
   } catch (error) {

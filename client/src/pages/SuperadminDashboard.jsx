@@ -9,6 +9,12 @@ import api from '../utils/api';
 import { downloadMedicineInventory } from '../utils/medicineExport';
 import { useAuth } from '../context/AuthContext';
 import ProfitDetailsModal from '../components/ProfitDetailsModal';
+import MedicineImportIssues from '../components/MedicineImportIssues';
+import BackupRestorePanel from '../components/BackupRestorePanel';
+import MedicineExpiryAlerts from '../components/MedicineExpiryAlerts';
+import MedicineAuditHistory from '../components/MedicineAuditHistory';
+import PurchaseOrdersPanel from '../components/PurchaseOrdersPanel';
+import DailyClosingReport from '../components/DailyClosingReport';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 import SalesReturnModal from '../components/SalesReturnModal';
 
@@ -120,6 +126,7 @@ const getBillDate = (bill) => {
 
 const getBillTotal = (bill) => {
   return Number(
+    bill?.netTotal ??
     bill?.totalAmount ??
       bill?.total ??
       bill?.grandTotal ??
@@ -130,6 +137,9 @@ const getBillTotal = (bill) => {
 };
 
 const getBillItems = (bill) => {
+  if (Array.isArray(bill?.netItems)) {
+    return bill.netItems;
+  }
   if (Array.isArray(bill?.items)) {
     return bill.items;
   }
@@ -159,6 +169,7 @@ const getItemName = (item) => {
 
 const getItemQuantity = (item) => {
   return Number(
+    item?.netQuantity ??
     item?.quantity ??
       item?.qty ??
       item?.count ??
@@ -178,6 +189,7 @@ const getItemPrice = (item) => {
 
 const getItemTotal = (item) => {
   const explicitTotal =
+    item?.netSales ??
     item?.total ??
     item?.lineTotal ??
     item?.subtotal ??
@@ -236,7 +248,7 @@ const getMedicinePrice = (medicine) => {
 };
 
 const getMedicinePurchasePrice = (medicine) =>
-  Number(medicine?.purchasePrice ?? 0);
+  (Number(medicine?.purchasePrice ?? 0) / Math.max(1, Number(medicine?.unitsPerPack) || 1));
 
 const getExpiryDate = (medicine) => {
   return (
@@ -428,7 +440,7 @@ const StatCard = ({
 ========================================================= */
 
 export default function SuperadminDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
 
   const [selectedView, setSelectedView] =
@@ -439,13 +451,82 @@ export default function SuperadminDashboard() {
 
   const [message, setMessage] =
     useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', email: '', password: '', role: 'pharmacist' });
 
   const [isProfitModalOpen, setIsProfitModalOpen] =
     useState(false);
+  const [profitDateRange, setProfitDateRange] = useState({ startDate: '', endDate: '' });
   const [stockAdjMedicine, setStockAdjMedicine] =
     useState(null);
   const [returnModalBill, setReturnModalBill] =
     useState(null);
+
+  const { data: deletionRequestsResponse, refetch: refetchDeletionRequests } = useQuery({
+    queryKey: ['adminDeletionRequests'],
+    queryFn: async () => (await api.get('/deletion-requests')).data,
+    refetchInterval: 10000,
+  });
+  const deletionRequests = deletionRequestsResponse?.requests || [];
+  const { data: returnActivityResponse, refetch: refetchReturnActivity } = useQuery({
+    queryKey: ['adminReturnActivity'],
+    queryFn: async () => (await api.get('/bills/return-activity')).data,
+    refetchInterval: 15000,
+  });
+  const returnActivity = returnActivityResponse?.returns || [];
+  const { data: udharPaymentActivityResponse, refetch: refetchUdharPaymentActivity } = useQuery({
+    queryKey: ['adminUdharPaymentActivity'],
+    queryFn: async () => (await api.get('/udhar/payment-activity')).data,
+    refetchInterval: 15000,
+  });
+  const udharPaymentActivity = udharPaymentActivityResponse?.payments || [];
+  const { data: archivedMedicinesResponse, refetch: refetchArchivedMedicines } = useQuery({
+    queryKey: ['superadminDeletedMedicines'],
+    queryFn: async () => (await api.get('/medicines/deleted')).data,
+    refetchInterval: 15000,
+  });
+  const archivedMedicines = Array.isArray(archivedMedicinesResponse) ? archivedMedicinesResponse : [];
+  const reviewDeletionMutation = useMutation({
+    mutationFn: async ({ requestId, decision }) => (await api.patch(`/deletion-requests/${requestId}/review`, { decision })).data,
+    onSuccess: async (result) => {
+      setMessage(result.message);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['adminDeletionRequests'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminDeletedMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminBills'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminSalesSummary'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminProfitSummary'] }),
+        queryClient.invalidateQueries({ queryKey: ['medicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['bills'] }),
+      ]);
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to review deletion request.'),
+  });
+  const adminDeleteMedicineMutation = useMutation({
+    mutationFn: async (medicineId) => (await api.delete(`/medicines/${medicineId}`)).data,
+    onSuccess: async (result) => {
+      setMessage(result.message);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminDeletedMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['medicines'] }),
+      ]);
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to delete medicine.'),
+  });
+  const restoreMedicineMutation = useMutation({
+    mutationFn: async (medicineId) => (await api.patch(`/medicines/${medicineId}/restore`)).data,
+    onSuccess: async (result) => {
+      setMessage(result.message);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['superadminDeletedMedicines'] }),
+        queryClient.invalidateQueries({ queryKey: ['medicines'] }),
+      ]);
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to restore medicine.'),
+  });
 
   /* =======================================================
      USERS
@@ -528,6 +609,7 @@ export default function SuperadminDashboard() {
   const {
     data: profitSummary,
     isLoading: isProfitLoading,
+    refetch: refetchProfitSummary,
   } = useQuery({
     queryKey: ['profitSummary'],
     queryFn: async () => {
@@ -724,6 +806,22 @@ export default function SuperadminDashboard() {
         0
     );
 
+  const yearlySales = Number(salesSummary?.year?.totalSales || 0);
+  const yearlyBills = Number(salesSummary?.year?.totalBills || 0);
+
+  const openProfitDetails = (period) => {
+    const now = new Date();
+    const start = period === 'daily'
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      : period === 'monthly'
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const asInputDate = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    setProfitDateRange({ startDate: asInputDate(start), endDate: asInputDate(end) });
+    setIsProfitModalOpen(true);
+  };
+
   /* =======================================================
      TODAY BILLS
   ======================================================= */
@@ -775,6 +873,17 @@ export default function SuperadminDashboard() {
             ).getTime()
         );
     }, [bills]);
+
+  const yearlyBillsList = useMemo(() => {
+    const year = new Date().getFullYear();
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+    return bills.filter((bill) => {
+      const date = new Date(getBillDate(bill) || '');
+      return Number.isFinite(date.getTime()) && date >= start && date < end &&
+        !['PENDING', 'REJECTED'].includes(bill?.orderStatus) && getBillTotal(bill) > 0;
+    }).sort((a, b) => new Date(getBillDate(b) || 0) - new Date(getBillDate(a) || 0));
+  }, [bills]);
 
   /* =======================================================
      SOLD MEDICINES
@@ -852,6 +961,11 @@ export default function SuperadminDashboard() {
         ),
       [monthlyBillsList]
     );
+
+  const yearlySoldMedicines = useMemo(
+    () => aggregateSoldMedicines(yearlyBillsList),
+    [yearlyBillsList]
+  );
 
   /* =======================================================
      APPROVE PHARMACIST
@@ -935,6 +1049,40 @@ export default function SuperadminDashboard() {
       },
     });
 
+  const createStaffMutation = useMutation({
+    mutationFn: async () => (await api.post('/users/staff', newStaff)).data,
+    onSuccess: () => {
+      setNewStaff({ name: '', email: '', password: '', role: 'pharmacist' });
+      setMessage('Staff account created successfully.');
+      queryClient.invalidateQueries({ queryKey: ['superadminUsers'] });
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to create staff account.'),
+  });
+
+  const setActiveMutation = useMutation({
+    mutationFn: async ({ userId, isActive }) => (await api.patch(`/users/${userId}/active`, { isActive })).data,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['superadminUsers'] }),
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to update account status.'),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }) => (await api.put(`/users/${userId}/password`, { password })).data,
+    onSuccess: async (_, variables) => {
+      setMessage('Password reset successfully.');
+      if (String(variables.userId) === String(user?._id || user?.id)) await logout();
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to reset password.'),
+  });
+
+  const editUserMutation = useMutation({
+    mutationFn: async ({ userId, name, email }) => (await api.patch(`/users/${userId}`, { name, email })).data,
+    onSuccess: () => {
+      setMessage('User details updated successfully.');
+      queryClient.invalidateQueries({ queryKey: ['superadminUsers'] });
+    },
+    onError: (error) => setMessage(error?.response?.data?.message || 'Unable to edit user.'),
+  });
+
   /* =======================================================
      DELETE USER
   ======================================================= */
@@ -981,17 +1129,21 @@ export default function SuperadminDashboard() {
 
   const handleRefresh = async () => {
     setMessage('');
-
-    await Promise.all([
-      refetchUsers(),
-      refetchMedicines(),
-      refetchBills(),
-      refetchSales(),
-    ]);
-
-    setMessage(
-      'Dashboard data refreshed.'
-    );
+    setIsRefreshing(true);
+    try {
+      const results = await Promise.allSettled([
+        refetchUsers({ throwOnError: true }), refetchMedicines({ throwOnError: true }),
+        refetchBills({ throwOnError: true }), refetchSales({ throwOnError: true }),
+        refetchProfitSummary({ throwOnError: true }), refetchDeletionRequests({ throwOnError: true }),
+        refetchReturnActivity({ throwOnError: true }), refetchUdharPaymentActivity({ throwOnError: true }),
+        refetchArchivedMedicines({ throwOnError: true }),
+      ]);
+      setMessage(results.some((result) => result.status === 'rejected')
+        ? 'Some dashboard data could not be refreshed. Check the connection and try again.'
+        : 'All Admin dashboard data refreshed.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const exportMedicinesToExcel = () => {
@@ -1081,6 +1233,21 @@ export default function SuperadminDashboard() {
         case 'pharmacistRequests':
           return pendingPharmacistRequests;
 
+        case 'deletionRequests':
+          return deletionRequests;
+
+        case 'deletedMedicines':
+          return archivedMedicines;
+
+        case 'refundActivity':
+          return returnActivity;
+
+        case 'udharPaymentActivity':
+          return udharPaymentActivity;
+
+        case 'yearlySales':
+          return yearlyBillsList;
+
         case 'medicines':
           return medicines;
 
@@ -1100,6 +1267,11 @@ export default function SuperadminDashboard() {
       selectedView,
       users,
       pendingPharmacistRequests,
+      deletionRequests,
+      archivedMedicines,
+      returnActivity,
+      udharPaymentActivity,
+      yearlyBillsList,
       medicines,
       lowStockMedicines,
       expiredMedicines,
@@ -1154,7 +1326,7 @@ export default function SuperadminDashboard() {
 
               <div>
                 <h1 className="text-2xl font-bold text-white">
-                  Superadmin Dashboard
+                  Admin Dashboard
                 </h1>
 
                 <p className="mt-1 text-sm text-teal-100">
@@ -1186,10 +1358,11 @@ export default function SuperadminDashboard() {
             <button
               type="button"
               onClick={handleRefresh}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              disabled={isRefreshing}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
-              <RefreshCw size={18} />
-              Refresh
+              <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+              {isRefreshing ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
 
@@ -1216,6 +1389,13 @@ export default function SuperadminDashboard() {
 
           </div>
         )}
+
+        <MedicineImportIssues />
+        <BackupRestorePanel />
+        <DailyClosingReport compact />
+        <MedicineExpiryAlerts compact />
+        <PurchaseOrdersPanel compact />
+        <MedicineAuditHistory compact />
 
         {/* WARNINGS */}
 
@@ -1257,7 +1437,47 @@ export default function SuperadminDashboard() {
             </p>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+              <div className="mb-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <StatCard
+                  title="Deletion Requests"
+                  value={deletionRequests.filter((request) => request.status === 'pending').length}
+                  description="Review medicine and bill deletion requests"
+                  icon={Trash2}
+                  iconWrapperClass="bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400"
+                  valueClass="text-rose-600 dark:text-rose-400"
+                  hasNotification={deletionRequests.some((request) => request.status === 'pending')}
+                  onClick={() => setSelectedView('deletionRequests')}
+                />
+                <StatCard
+                  title="Refund Activity"
+                  value={returnActivity.length}
+                  description={`Latest refunds: ${getCurrency(returnActivity.reduce((sum, item) => sum + Number(item.refund_amount || 0), 0))}`}
+                  icon={RefreshCw}
+                  iconWrapperClass="bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
+                  valueClass="text-amber-600 dark:text-amber-400"
+                  onClick={() => setSelectedView('refundActivity')}
+                />
+                <StatCard
+                  title="Udhar Payments"
+                  value={udharPaymentActivity.length}
+                  description={`Latest payments: ${getCurrency(udharPaymentActivity.reduce((sum, item) => sum + Number(item.amount || 0), 0))}`}
+                  icon={BarChart3}
+                  iconWrapperClass="bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400"
+                  valueClass="text-sky-600 dark:text-sky-400"
+                  onClick={() => setSelectedView('udharPaymentActivity')}
+                />
+                <StatCard
+                  title="Archived Medicines"
+                  value={archivedMedicines.length}
+                  description="Review and restore removed stock records"
+                  icon={Package}
+                  iconWrapperClass="bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400"
+                  valueClass="text-violet-600 dark:text-violet-400"
+                  onClick={() => setSelectedView('deletedMedicines')}
+                />
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
 
             <button
               type="button"
@@ -1359,6 +1579,21 @@ export default function SuperadminDashboard() {
 
             </button>
 
+            <button type="button" onClick={() => setSelectedView('yearlySales')} className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Yearly Sales · {new Date().getFullYear()}</p>
+                  <p className="mt-2 text-3xl font-bold text-violet-600 dark:text-violet-400">{getCurrency(yearlySales)}</p>
+                  <p className="mt-2 text-sm text-slate-500">{yearlyBills} net sales bills</p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-400"><CalendarDays size={22} /></div>
+              </div>
+              <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+                <span className="text-xs font-semibold text-slate-500 group-hover:text-violet-600">Open this year’s sales</span>
+                <ChevronRight size={16} className="text-slate-400" />
+              </div>
+            </button>
+
           </div>
 
         </section>
@@ -1376,7 +1611,7 @@ export default function SuperadminDashboard() {
             </div>
             <button
               type="button"
-              onClick={() => setIsProfitModalOpen(true)}
+              onClick={() => { setProfitDateRange({ startDate: '', endDate: '' }); setIsProfitModalOpen(true); }}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
             >
               <BarChart3 size={18} />
@@ -1385,32 +1620,35 @@ export default function SuperadminDashboard() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('daily')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Today's Profit
               </p>
               <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {isProfitLoading ? '...' : getCurrency(profitSummary?.dailyProfit || 0)}
               </p>
-            </div>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">View today’s profit details <ChevronRight size={14} /></span>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('monthly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 This Month's Profit
               </p>
               <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {isProfitLoading ? '...' : getCurrency(profitSummary?.monthlyProfit || 0)}
               </p>
-            </div>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">View this month’s profit details <ChevronRight size={14} /></span>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('yearly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 This Year's Profit
               </p>
               <p className="mt-2 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {isProfitLoading ? '...' : getCurrency(profitSummary?.yearlyProfit || 0)}
               </p>
-            </div>
+              <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">View this year’s profit details <ChevronRight size={14} /></span>
+            </button>
           </div>
         </section>
 
@@ -1424,9 +1662,26 @@ export default function SuperadminDashboard() {
             </h2>
 
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Manage users and pharmacist registration requests.
+              Admin and Pharmacist accounts, customer access, and pharmacist registration requests.
             </p>
           </div>
+
+          <form
+            className="mb-5 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-800/50"
+            onSubmit={(event) => { event.preventDefault(); createStaffMutation.mutate(); }}
+          >
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 sm:col-span-2">Create staff account</h3>
+            <input required value={newStaff.name} onChange={(event) => setNewStaff({ ...newStaff, name: event.target.value })} placeholder="Full name" className="rounded-lg border px-3 py-2 text-sm dark:bg-slate-900" />
+            <input required type="email" value={newStaff.email} onChange={(event) => setNewStaff({ ...newStaff, email: event.target.value })} placeholder="Email" className="rounded-lg border px-3 py-2 text-sm dark:bg-slate-900" />
+            <input required minLength={6} type="password" value={newStaff.password} onChange={(event) => setNewStaff({ ...newStaff, password: event.target.value })} placeholder="Temporary password (6+ characters)" className="rounded-lg border px-3 py-2 text-sm dark:bg-slate-900" />
+            <div className="flex gap-3">
+              <select value={newStaff.role} onChange={(event) => setNewStaff({ ...newStaff, role: event.target.value })} className="flex-1 rounded-lg border px-3 py-2 text-sm dark:bg-slate-900">
+                <option value="pharmacist">Pharmacist</option>
+                <option value="superadmin">Admin</option>
+              </select>
+              <button disabled={createStaffMutation.isPending} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Create</button>
+            </div>
+          </form>
 
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
 
@@ -1444,7 +1699,7 @@ export default function SuperadminDashboard() {
             />
 
             <StatCard
-              title="Superadmins"
+              title="Admins"
               value={totalSuperadmins}
               description="System controllers"
               icon={ShieldCheck}
@@ -1515,14 +1770,14 @@ export default function SuperadminDashboard() {
 
         <section>
 
-          <div className="mb-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               Inventory Overview
             </h2>
-
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Click any inventory card to see all related medicines.
-            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-slate-500 dark:text-slate-400">Click any inventory card to see all related medicines.</p>
+              <button type="button" onClick={() => setSelectedView('medicines')} className="rounded-lg bg-rose-600 px-3 py-2 text-xs font-bold text-white hover:bg-rose-700">Manage / Delete Medicines</button>
+            </div>
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-5">
@@ -1602,9 +1857,7 @@ export default function SuperadminDashboard() {
                       medicine
                     ) =>
                       total +
-                      getMedicinePrice(
-                        medicine
-                      ) *
+                      getMedicinePurchasePrice(medicine) *
                         getMedicineStock(
                           medicine
                         ),
@@ -1614,7 +1867,7 @@ export default function SuperadminDashboard() {
               </p>
 
               <p className="mt-2 text-xs text-slate-500">
-                Current stock × medicine price
+                Current tablet/unit stock × purchase cost per tablet/unit
               </p>
 
               <div className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800">
@@ -1802,7 +2055,7 @@ export default function SuperadminDashboard() {
                               </option>
 
                               <option value="superadmin">
-                                Superadmin
+                                Admin
                               </option>
 
                             </select>
@@ -1822,8 +2075,7 @@ export default function SuperadminDashboard() {
                                   : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                               }`}
                             >
-                              {item?.accountStatus ||
-                                'active'}
+                              {item?.isActive === false ? 'Inactive' : (item?.accountStatus || 'Active')}
                             </span>
 
                           </td>
@@ -1835,6 +2087,38 @@ export default function SuperadminDashboard() {
                           </td>
 
                           <td className="px-5 py-4 text-right">
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const name = window.prompt('User name:', item?.name || '');
+                                if (name === null) return;
+                                const email = window.prompt('User email:', item?.email || '');
+                                if (email === null) return;
+                                editUserMutation.mutate({ userId: itemId, name, email });
+                              }}
+                              disabled={editUserMutation.isPending}
+                              className="mr-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50"
+                            >Edit</button>
+
+                            <button
+                              type="button"
+                              disabled={isCurrentUser || setActiveMutation.isPending}
+                              onClick={() => setActiveMutation.mutate({ userId: itemId, isActive: item?.isActive === false })}
+                              className="mr-2 inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 disabled:opacity-50"
+                            >
+                              {item?.isActive === false ? 'Activate' : 'Deactivate'}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const password = window.prompt('Enter a temporary password (at least 6 characters):');
+                                if (password) resetPasswordMutation.mutate({ userId: itemId, password });
+                              }}
+                              disabled={resetPasswordMutation.isPending}
+                              className="mr-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 disabled:opacity-50"
+                            >Reset password</button>
 
                             <button
                               type="button"
@@ -2035,7 +2319,7 @@ export default function SuperadminDashboard() {
                             Sale: {getCurrency(getMedicinePrice(medicine))}
                           </div>
                           <div className="mt-1 text-xs text-slate-500">
-                            Cost: {getCurrency(getMedicinePurchasePrice(medicine))}
+                            Unit cost: {getCurrency(getMedicinePurchasePrice(medicine))}
                           </div>
                         </td>
 
@@ -2116,13 +2400,15 @@ export default function SuperadminDashboard() {
                     'monthlySales' &&
                     'Monthly Sales Details'}
 
+                  {selectedView === 'yearlySales' && `${new Date().getFullYear()} Yearly Sales Details`}
+
                   {selectedView ===
                     'users' &&
                     'All Users'}
 
                   {selectedView ===
                     'superadmins' &&
-                    'All Superadmins'}
+                    'All Admins'}
 
                   {selectedView ===
                     'pharmacists' &&
@@ -2135,6 +2421,13 @@ export default function SuperadminDashboard() {
                   {selectedView ===
                     'pharmacistRequests' &&
                     'Pharmacist Registration Requests'}
+
+                  {selectedView === 'deletionRequests' && 'Medicine & Bill Deletion Requests'}
+                  {selectedView === 'deletedMedicines' && 'Archived Medicines'}
+
+                  {selectedView === 'refundActivity' && 'Refund & Return Activity'}
+
+                  {selectedView === 'udharPaymentActivity' && 'Udhar Payment Activity'}
 
                   {selectedView ===
                     'medicines' &&
@@ -2174,10 +2467,9 @@ export default function SuperadminDashboard() {
                       }
                     )}
 
-                  {![
-                    'todaySales',
-                    'monthlySales',
-                  ].includes(
+                  {selectedView === 'yearlySales' && `Net sales and bills from ${new Date().getFullYear()}.`}
+
+                  {!['todaySales', 'monthlySales', 'yearlySales'].includes(
                     selectedView
                   ) &&
                     `${selectedViewData.length} record${
@@ -2380,6 +2672,86 @@ export default function SuperadminDashboard() {
                     )
                   )}
 
+                </div>
+              )}
+
+              {selectedView === 'deletionRequests' && (
+                <div className="space-y-3">
+                  {reviewDeletionMutation.isError && (
+                    <div role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-medium text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+                      {reviewDeletionMutation.error?.response?.data?.message || 'Request could not be processed. Please try again.'}
+                    </div>
+                  )}
+                  {deletionRequests.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500 dark:border-slate-700">
+                      No deletion requests have been submitted.
+                    </div>
+                  ) : deletionRequests.map((request) => (
+                    <article key={request._id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{request.targetType === 'medicine' ? 'Medicine' : 'Bill'}: {request.targetLabel}</p>
+                          <p className="mt-1 text-sm text-slate-500">Requested by {request.requestedBy?.name || 'Unknown'} ({request.requestedBy?.email || 'no email'}) · {formatDateTime(request.createdAt)}</p>
+                          {request.requestReason && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Reason: {request.requestReason}</p>}
+                          {request.reviewNote && <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Admin note: {request.reviewNote}</p>}
+                        </div>
+                        <span className={`w-fit rounded-full px-3 py-1 text-xs font-bold uppercase ${request.status === 'pending' ? 'bg-amber-100 text-amber-800' : request.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}>{request.status}</span>
+                      </div>
+                      {request.status === 'pending' && (
+                        <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                          <button type="button" disabled={reviewDeletionMutation.isPending} onClick={() => reviewDeletionMutation.mutate({ requestId: request._id, decision: 'reject' })} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200">Reject</button>
+                          <button type="button" disabled={reviewDeletionMutation.isPending} onClick={() => reviewDeletionMutation.mutate({ requestId: request._id, decision: 'approve' })} className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-50">
+                            {reviewDeletionMutation.isPending && reviewDeletionMutation.variables?.requestId === request._id ? 'Approving…' : 'Approve & Delete'}
+                          </button>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {selectedView === 'medicines' && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
+                  <span>Admin can remove a medicine from active inventory immediately. Its bill and return history stays archived.</span>
+                  <button type="button" onClick={() => setSelectedView('deletedMedicines')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold hover:bg-violet-100 dark:border-violet-700 dark:hover:bg-violet-900/50">View archived ({archivedMedicines.length})</button>
+                </div>
+              )}
+
+              {selectedView === 'refundActivity' && (
+                <div className="space-y-3">
+                  {returnActivity.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500 dark:border-slate-700">No refunds or returns recorded yet.</div>
+                  ) : returnActivity.map((item) => (
+                    <article key={item._id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">Bill {item.bill_number || item.sale_id?.billNumber || 'Record unavailable'} · {item.item_name || item.item_id?.name || 'Medicine'}</p>
+                          <p className="mt-1 text-sm text-slate-500">Qty returned: {item.qty_returned} · Processed by: {item.processed_by?.name || 'Unknown'} · {formatDateTime(item.date)}</p>
+                          {item.reason && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Reason: {item.reason}</p>}
+                        </div>
+                        <p className="font-bold text-amber-700 dark:text-amber-300">Refund {getCurrency(item.refund_amount)}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {selectedView === 'udharPaymentActivity' && (
+                <div className="space-y-3">
+                  {udharPaymentActivity.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500 dark:border-slate-700">No Udhar payments have been recorded yet.</div>
+                  ) : udharPaymentActivity.map((payment) => (
+                    <article key={payment._id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{payment.customerName || 'Customer'} {payment.customerPhone ? `· ${payment.customerPhone}` : ''}</p>
+                          <p className="mt-1 text-sm text-slate-500">Received by: {payment.paidBy?.name || payment.recordedBy?.name || 'Unknown'} · {formatDateTime(payment.paidAt)}</p>
+                          {payment.note && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Note: {payment.note}</p>}
+                        </div>
+                        <p className="font-bold text-emerald-700 dark:text-emerald-300">Paid {getCurrency(payment.amount)}</p>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               )}
 
@@ -2931,6 +3303,49 @@ export default function SuperadminDashboard() {
                 </div>
               )}
 
+              {selectedView === 'yearlySales' && (
+                <div className="space-y-6">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="rounded-xl bg-violet-50 p-4 dark:bg-violet-950/30">
+                      <p className="text-xs font-semibold uppercase text-violet-700">Net Sales · {new Date().getFullYear()}</p>
+                      <p className="mt-2 text-2xl font-bold text-violet-800 dark:text-violet-200">{getCurrency(yearlySales)}</p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-800">
+                      <p className="text-xs font-semibold uppercase text-slate-500">Bills</p>
+                      <p className="mt-2 text-2xl font-bold">{yearlyBills}</p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 p-4 dark:bg-emerald-950/30">
+                      <p className="text-xs font-semibold uppercase text-emerald-700">Units Sold</p>
+                      <p className="mt-2 text-2xl font-bold text-emerald-800 dark:text-emerald-200">{yearlySoldMedicines.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-3 font-bold text-slate-900 dark:text-white">Medicine sales for the year</h4>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                      <table className="min-w-full">
+                        <thead><tr className="bg-slate-50 text-left dark:bg-slate-800"><th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Medicine</th><th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Units</th><th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Bills</th><th className="px-4 py-3 text-xs font-semibold uppercase text-slate-500">Net Sales</th></tr></thead>
+                        <tbody>
+                          {yearlySoldMedicines.length ? yearlySoldMedicines.map((item) => (
+                            <tr key={item.medicineName} className="border-t border-slate-100 dark:border-slate-800"><td className="px-4 py-3 font-medium">{item.medicineName}</td><td className="px-4 py-3">{item.quantity}</td><td className="px-4 py-3">{item.orders}</td><td className="px-4 py-3 font-semibold">{getCurrency(item.sales)}</td></tr>
+                          )) : <tr><td colSpan="4" className="px-4 py-10 text-center text-sm text-slate-500">No medicine sales recorded this year.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-slate-900 dark:text-white">Bills during {new Date().getFullYear()}</h4>
+                    {yearlyBillsList.length ? yearlyBillsList.map((bill, index) => (
+                      <article key={bill._id || index} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
+                        <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold">Bill #{bill.billNumber || bill._id}</p><p className="text-xs text-slate-500">{formatDateTime(getBillDate(bill))} · {getCustomerName(bill)}</p></div><p className="font-bold text-emerald-700">{getCurrency(getBillTotal(bill))}</p></div>
+                        <div className="mt-3 space-y-1 border-t pt-3 dark:border-slate-700">{getBillItems(bill).map((item, indexItem) => <p key={`${bill._id}-${indexItem}`} className="flex justify-between gap-3 text-sm"><span>{getItemName(item)} × {getItemQuantity(item)}</span><span>{getCurrency(getItemTotal(item))}</span></p>)}</div>
+                      </article>
+                    )) : <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">No net sales bills recorded this year.</div>}
+                  </div>
+                </div>
+              )}
+
               {/* =============================================
                   USER DETAILS
               ============================================= */}
@@ -3061,6 +3476,7 @@ export default function SuperadminDashboard() {
                 'lowStock',
                 'expired',
                 'expiring',
+                'deletedMedicines',
               ].includes(
                 selectedView
               ) && (
@@ -3096,6 +3512,10 @@ export default function SuperadminDashboard() {
                           Status
                         </th>
 
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">
+                          Admin Action
+                        </th>
+
                       </tr>
 
                     </thead>
@@ -3106,7 +3526,7 @@ export default function SuperadminDashboard() {
                       0 ? (
                         <tr>
                           <td
-                            colSpan="6"
+                            colSpan="7"
                             className="px-4 py-12 text-center text-sm text-slate-500"
                           >
                             No medicines found.
@@ -3179,7 +3599,7 @@ export default function SuperadminDashboard() {
                                     Sale: {getCurrency(getMedicinePrice(medicine))}
                                   </div>
                                   <div className="mt-1 text-xs text-slate-500">
-                                    Cost: {getCurrency(getMedicinePurchasePrice(medicine))}
+                                    Unit cost: {getCurrency(getMedicinePurchasePrice(medicine))}
                                   </div>
                                 </td>
 
@@ -3212,6 +3632,23 @@ export default function SuperadminDashboard() {
                                       </span>
                                     ) : null}
                                   </div>
+                                </td>
+
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (selectedView === 'deletedMedicines') {
+                                        restoreMedicineMutation.mutate(medicine._id || medicine.id);
+                                      } else if (window.confirm(`Remove ${medicine.name || 'this medicine'} from active inventory now as Admin? The record stays archived so bill and return history remain intact.`)) {
+                                        adminDeleteMedicineMutation.mutate(medicine._id || medicine.id);
+                                      }
+                                    }}
+                                    disabled={adminDeleteMedicineMutation.isPending || restoreMedicineMutation.isPending}
+                                    className={`inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${selectedView === 'deletedMedicines' ? 'border-violet-200 text-violet-700 hover:bg-violet-50' : 'border-rose-200 text-rose-700 hover:bg-rose-50'}`}
+                                  >
+                                    {selectedView === 'deletedMedicines' ? <><RefreshCw size={14} /> Restore</> : <><Trash2 size={14} /> Delete</>}
+                                  </button>
                                 </td>
 
                               </tr>
@@ -3257,8 +3694,11 @@ export default function SuperadminDashboard() {
       )}
 
       <ProfitDetailsModal
+        key={`${profitDateRange.startDate}-${profitDateRange.endDate}`}
         isOpen={isProfitModalOpen}
         onClose={() => setIsProfitModalOpen(false)}
+        initialStartDate={profitDateRange.startDate}
+        initialEndDate={profitDateRange.endDate}
       />
 
       <StockAdjustmentModal

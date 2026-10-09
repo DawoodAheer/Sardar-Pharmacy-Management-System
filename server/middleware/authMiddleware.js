@@ -20,6 +20,13 @@ export const protect = async (req, res, next) => {
         return res.status(401).json({ message: 'User not found' });
       }
 
+      if (!req.user.isActive) {
+        return res.status(403).json({ message: 'This account is inactive' });
+      }
+      if (Number(decoded.tokenVersion || 0) !== Number(req.user.tokenVersion || 0)) {
+        return res.status(401).json({ message: 'Session revoked. Please log in again', code: 'SESSION_REVOKED' });
+      }
+
       if (
         req.user.role !== 'superadmin' &&
         req.user.accountStatus !== 'approved'

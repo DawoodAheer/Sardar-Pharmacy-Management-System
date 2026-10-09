@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getBillReturnSummary } from './billReturnSummary.js';
+import { getAvailableReturnQuantity, getBillReturnSummary } from './billReturnSummary.js';
 
 const bill = {
   subtotal: 1300,
@@ -67,4 +67,13 @@ test('returns are allocated across duplicate invoice lines for the same medicine
     [0, 1]
   );
   assert.equal(summary.netQuantity, 1);
+});
+
+test('duplicate return attempts cannot exceed the remaining sold quantity', () => {
+  const sold = 10;
+  const returnedPreviously = 5;
+  const available = getAvailableReturnQuantity(sold, returnedPreviously);
+  assert.equal(available, 5);
+  assert.equal(6 > available, true);
+  assert.equal(getAvailableReturnQuantity(sold, 12), 0);
 });

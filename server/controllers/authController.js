@@ -34,6 +34,7 @@ const buildUserResponse = (user, accessToken = null) => {
     phone: user.phone || "",
     role: user.role,
     accountStatus: user.accountStatus,
+    isActive: user.isActive !== false,
     createdAt: user.createdAt,
   };
 
@@ -222,6 +223,10 @@ export const loginUser = async (req, res, next) => {
       });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'This account is inactive. Contact an Admin.' });
+    }
+
     const passwordMatched =
       await user.matchPassword(password);
 
@@ -258,11 +263,13 @@ export const loginUser = async (req, res, next) => {
      */
     const accessToken = generateAccessToken(
       user._id,
-      user.role
+      user.role,
+      user.tokenVersion || 0
     );
 
     const refreshToken = generateRefreshToken(
-      user._id
+      user._id,
+      user.tokenVersion || 0
     );
 
     sendRefreshTokenCookie(res, refreshToken);
@@ -354,6 +361,10 @@ export const refreshAccessToken = async (
       });
     }
 
+    if (!user.isActive || Number(decoded.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
+      return res.status(401).json({ success: false, message: 'Session revoked. Please log in again' });
+    }
+
     // Do not refresh token for rejected/pending non-admin accounts
     if (
       user.role !== "superadmin" &&
@@ -369,11 +380,12 @@ export const refreshAccessToken = async (
     const newAccessToken =
       generateAccessToken(
         user._id,
-        user.role
+        user.role,
+        user.tokenVersion || 0
       );
 
     const newRefreshToken =
-      generateRefreshToken(user._id);
+      generateRefreshToken(user._id, user.tokenVersion || 0);
 
     sendRefreshTokenCookie(
       res,
@@ -677,6 +689,7 @@ export const resetPassword = async (req, res, next) => {
 
     // Set new password
     user.password = password;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     user.resetPasswordOtp = undefined;

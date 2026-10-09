@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Html5Qrcode, Html5QrcodeScanner } from 'html5-qrcode';
 
 // ── Icons (inline SVG to avoid any import issues on mobile) ──────────────────
 const Icon = {
@@ -32,40 +31,52 @@ const Icon = {
   ),
 };
 
-const DEBOUNCE_MS = 3000;
+const REARM_AFTER_MS = 1400;
 
 export default function MobileScanner() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
 
-  const [phase, setPhase] = useState('connecting'); // connecting | ready | scanning | error
+  const [phase, setPhase] = useState('ready'); // ready | scanning | error
   const [wsStatus, setWsStatus] = useState('disconnected'); // connected | disconnected | reconnecting
+  const [laptopConnected, setLaptopConnected] = useState(false);
   const [lastScan, setLastScan] = useState(null);
   const [scanCount, setScanCount] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
-  const [cameras, setCameras] = useState([]);
-  const [selectedCamId, setSelectedCamId] = useState('');
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [imageScanning, setImageScanning] = useState(false);
   const [ackMsg, setAckMsg] = useState('');
 
   const wsRef = useRef(null);
+  const captureInputRef = useRef(null);
+  const pageActiveRef = useRef(false);
   const html5QrRef = useRef(null);
   const lastSentRef = useRef('');
   const lastSentTimeRef = useRef(0);
   const ackTimerRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const pingIntervalRef = useRef(null);
+  const ocrIntervalRef = useRef(null);
   const isScanningRef = useRef(false);
+  const lastDetectionAtRef = useRef(0);
+  const lastBarcodeAtRef = useRef(0);
+  const ocrBusyRef = useRef(false);
+  const pendingScanRef = useRef(null);
 
   // ── Build WS URL ──────────────────────────────────────────────────────────
   const buildWsUrl = useCallback(() => {
     const host = window.location.host; // e.g. 192.168.100.50:5173
-    return `ws://${host}/ws/scanner?sessionId=${sessionId}&role=mobile`;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${host}/ws/scanner?sessionId=${encodeURIComponent(sessionId)}&role=mobile`;
   }, [sessionId]);
 
   // ── WebSocket connection ──────────────────────────────────────────────────
   const connectWs = useCallback(() => {
     if (!sessionId) return;
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (
+      wsRef.current?.readyState === WebSocket.OPEN ||
+      wsRef.current?.readyState === WebSocket.CONNECTING
+    ) return;
 
     setWsStatus('reconnecting');
     const ws = new WebSocket(buildWsUrl());
@@ -74,7 +85,8 @@ export default function MobileScanner() {
     ws.onopen = () => {
       setWsStatus('connected');
       setPhase('ready');
-      setErrorMsg('');
+      setErrorMsg((current) => current.startsWith('Laptop connection') ? '' : current);
+      if (pendingScanRef.current) ws.send(pendingScanRef.current);
 
       // Send heartbeat every 20s
       pingIntervalRef.current = setInterval(() => {
@@ -87,27 +99,43 @@ export default function MobileScanner() {
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
+        if (msg.type === 'connected' && msg.role === 'mobile') setLaptopConnected(Boolean(msg.laptopConnected));
         if (msg.type === 'ack') {
+          pendingScanRef.current = null;
           if (!msg.duplicate) {
             showAck('✓ Sent to laptop!');
           }
+          if (msg.invalid) showAck('This barcode could not be read. Try again.', true);
         }
         if (msg.type === 'laptop_disconnected') {
+          setLaptopConnected(false);
           showAck('⚠ Laptop disconnected', true);
         }
         if (msg.type === 'laptop_connected') {
+          setLaptopConnected(true);
           showAck('✓ Laptop reconnected');
         }
       } catch {}
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setWsStatus('disconnected');
+      setLaptopConnected(false);
       clearInterval(pingIntervalRef.current);
-      // Auto-reconnect after 3 seconds
+      if (wsRef.current === ws) wsRef.current = null;
+      if (event.code === 4001) {
+        isScanningRef.current = false;
+        setPhase('error');
+        setErrorMsg('This scanner session expired. Pair again from the laptop to continue.');
+        return;
+      }
+      // Keep the mobile page usable and retry even before the user starts scanning.
+      if (pageActiveRef.current) setWsStatus('reconnecting');
+      // Auto-reconnect after 2 seconds while this page remains open.
+      clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = setTimeout(() => {
-        if (isScanningRef.current) connectWs();
-      }, 3000);
+        if (pageActiveRef.current) connectWs();
+      }, 2000);
     };
 
     ws.onerror = () => {
@@ -125,73 +153,151 @@ export default function MobileScanner() {
   // ── Send scan result ──────────────────────────────────────────────────────
   const sendScan = useCallback((text) => {
     const now = Date.now();
-    if (text === lastSentRef.current && now - lastSentTimeRef.current < DEBOUNCE_MS) {
-      return; // duplicate — skip
-    }
+    if (!text) return;
+    lastDetectionAtRef.current = now;
+    lastBarcodeAtRef.current = now;
+    if (text === lastSentRef.current) return;
     lastSentRef.current = text;
     lastSentTimeRef.current = now;
-
     setLastScan(text);
     setScanCount(c => c + 1);
 
     const payload = JSON.stringify({ type: 'scan_result', data: { barcode: text, timestamp: now } });
+    pendingScanRef.current = payload;
 
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(payload);
+      return Promise.resolve(true);
     } else {
       // HTTP fallback
       fetch('/api/mobile-scanner/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, data: { barcode: text } }),
-      }).catch(() => {});
+      })
+        .then((response) => {
+          if (!response.ok) return false;
+          pendingScanRef.current = null;
+          return true;
+        })
+        .catch(() => false);
+    }
+  }, [sessionId]);
+
+  const scanCapturedImage = async (event) => {
+    const imageFile = event.target.files?.[0];
+    event.target.value = '';
+    if (!imageFile) return;
+
+    setImageScanning(true);
+    setErrorMsg('');
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const decoder = new Html5Qrcode('qr-reader');
+      const barcode = await decoder.scanFile(imageFile, true);
+      const accepted = await sendScan(barcode);
+      if (!accepted) throw new Error('Scanner connection unavailable');
+      showAck('Barcode sent to pharmacy computer');
+    } catch {
+      setErrorMsg('Barcode not found in that photo. Take a clear, close photo of the barcode and try again.');
+    } finally {
+      setImageScanning(false);
+    }
+  };
+
+  const scanLabelFrame = useCallback(async () => {
+    if (ocrBusyRef.current || Date.now() - lastBarcodeAtRef.current < 5000) return;
+    const video = document.querySelector('#qr-reader video');
+    if (!video?.videoWidth || !video?.videoHeight) return;
+    ocrBusyRef.current = true;
+    try {
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, 900 / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.72));
+      if (!blob || blob.size > 2 * 1024 * 1024) return;
+      const form = new FormData();
+      form.append('image', blob, 'label.jpg');
+      form.append('sessionId', sessionId);
+      const response = await fetch('/api/mobile-scanner/ocr', { method: 'POST', body: form });
+      if (response.status === 404) {
+        setErrorMsg('This scanner link has expired. Close this page and pair again from the laptop.');
+        return;
+      }
+      if (!response.ok) return;
+      const result = await response.json();
+      if (result.success && !result.duplicate) {
+        showAck('Label text sent to laptop');
+      }
+    } catch {
+      // A brief OCR/network failure is retried on the next camera frame interval.
+    } finally {
+      ocrBusyRef.current = false;
     }
   }, [sessionId]);
 
   // ── Start continuous camera scanner ──────────────────────────────────────
-  const startScanner = useCallback(() => {
-    if (!selectedCamId && cameras.length === 0) return;
-    const camId = selectedCamId || cameras[0]?.id;
-    if (!camId) return;
-
-    const qr = new Html5Qrcode('qr-reader');
-    html5QrRef.current = qr;
+  const startScanner = useCallback(async () => {
+    if (cameraStarting || isScanningRef.current) return;
     isScanningRef.current = true;
-    setPhase('scanning');
+    setCameraStarting(true);
+    setErrorMsg('');
+    try {
+      // Keep the QR decoder out of the initial mobile page bundle. The page
+      // renders immediately; load the camera library only after a user tap.
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const qr = new Html5Qrcode('qr-reader');
+      html5QrRef.current = qr;
+      isScanningRef.current = true;
+      setPhase('scanning');
 
-    qr.start(
-      camId,
-      {
-        fps: 10,
-        qrbox: (vw, vh) => ({
-          width: Math.min(vw * 0.8, 280),
-          height: Math.min(vh * 0.5, 200),
-        }),
-        aspectRatio: 1.0,
-        disableFlip: false,
-      },
-      (decodedText) => {
-        sendScan(decodedText);
-      },
-      () => {} // per-frame fail — ignore
-    ).catch((err) => {
+      await qr.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: (vw, vh) => ({
+            width: Math.min(vw * 0.8, 280),
+            height: Math.min(vh * 0.5, 200),
+          }),
+          aspectRatio: 1.0,
+          disableFlip: false,
+        },
+        (decodedText) => {
+          sendScan(decodedText);
+        },
+        () => {
+          if (Date.now() - lastDetectionAtRef.current >= REARM_AFTER_MS) lastSentRef.current = '';
+        } // Per-frame misses re-arm scanning after the medicine leaves view.
+      );
+      ocrIntervalRef.current = setInterval(scanLabelFrame, 5000);
+      setCameraStarting(false);
+    } catch (err) {
       setErrorMsg(
-        err?.message?.includes('Permission')
+        !window.isSecureContext
+          ? 'Android Chrome blocks camera access on a plain HTTP local network page. Use the USB localhost link from the laptop, or a trusted HTTPS origin.'
+          : err?.message?.includes('Permission')
           ? 'Camera permission denied. Please allow camera access in your browser settings.'
-          : 'Could not start camera: ' + (err?.message || err)
+          : 'The camera could not start. Check that another app is not using it, then retry.'
       );
       setPhase('ready');
       isScanningRef.current = false;
-    });
+      setCameraStarting(false);
+      clearInterval(ocrIntervalRef.current);
+      wsRef.current?.close();
+      html5QrRef.current = null;
+    }
 
     connectWs();
-  }, [selectedCamId, cameras, sendScan, connectWs]);
+  }, [cameraStarting, sendScan, connectWs, scanLabelFrame]);
 
   // ── Stop scanner ──────────────────────────────────────────────────────────
   const stopScanner = useCallback(async () => {
     isScanningRef.current = false;
     clearTimeout(reconnectTimerRef.current);
     clearInterval(pingIntervalRef.current);
+    clearInterval(ocrIntervalRef.current);
     wsRef.current?.close();
     wsRef.current = null;
     if (html5QrRef.current?.isScanning) {
@@ -210,31 +316,16 @@ export default function MobileScanner() {
       return;
     }
 
-    Html5Qrcode.getCameras()
-      .then((devs) => {
-        if (!devs?.length) {
-          setPhase('error');
-          setErrorMsg('No camera found on this device.');
-          return;
-        }
-        setCameras(devs);
-        // prefer back camera
-        const back = devs.find(d => /back|rear|environment/i.test(d.label));
-        setSelectedCamId((back || devs[0]).id);
-        setPhase('ready');
-      })
-      .catch(() => {
-        setPhase('error');
-        setErrorMsg('Camera permission denied or camera unavailable. Please allow camera access and refresh this page.');
-      });
-
     // Connect WS immediately (laptop is waiting)
+    pageActiveRef.current = true;
     connectWs();
 
     return () => {
+      pageActiveRef.current = false;
       isScanningRef.current = false;
       clearTimeout(reconnectTimerRef.current);
       clearInterval(pingIntervalRef.current);
+      clearInterval(ocrIntervalRef.current);
       clearTimeout(ackTimerRef.current);
       if (html5QrRef.current?.isScanning) {
         html5QrRef.current.stop().catch(() => {});
@@ -292,7 +383,8 @@ export default function MobileScanner() {
         </div>
         <div className="flex items-center gap-1.5 text-xs text-slate-400">
           <span className={`h-2.5 w-2.5 rounded-full ${statusDot}`} />
-          {wsStatus === 'connected' ? 'Laptop Connected' :
+          {wsStatus === 'connected' && laptopConnected ? 'Laptop Connected' :
+           wsStatus === 'connected' ? 'Waiting for Laptop' :
            wsStatus === 'reconnecting' ? 'Reconnecting...' : 'Laptop Disconnected'}
         </div>
       </div>
@@ -314,31 +406,39 @@ export default function MobileScanner() {
 
         {phase === 'ready' && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+            {errorMsg && <div role="alert" className="w-full max-w-sm rounded-xl border border-rose-700 bg-rose-900/60 p-3 text-center text-sm text-rose-100">{errorMsg}</div>}
             <div className="w-32 h-32 rounded-3xl bg-slate-800 flex items-center justify-center border border-slate-700">
               {Icon.camera('h-16 w-16 text-slate-600')}
             </div>
 
-            {cameras.length > 1 && (
-              <select
-                value={selectedCamId}
-                onChange={e => setSelectedCamId(e.target.value)}
-                className="w-full max-w-xs bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none"
-              >
-                {cameras.map(c => (
-                  <option key={c.id} value={c.id}>{c.label || `Camera ${c.id.substring(0, 8)}`}</option>
-                ))}
-              </select>
-            )}
-
             <button
               onClick={startScanner}
-              className="w-full max-w-xs py-4 rounded-2xl bg-teal-600 text-white font-bold text-lg shadow-[0_0_30px_rgba(13,148,136,0.4)] active:scale-95 transition-transform"
+              disabled={cameraStarting}
+              className="w-full max-w-xs py-4 rounded-2xl bg-teal-600 text-white font-bold text-lg shadow-[0_0_30px_rgba(13,148,136,0.4)] active:scale-95 transition-transform disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Start Scanning
+              {cameraStarting ? 'Opening camera…' : 'Start Scanning'}
+            </button>
+
+            <input
+              ref={captureInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={scanCapturedImage}
+              className="hidden"
+              aria-label="Take a barcode photo"
+            />
+            <button
+              type="button"
+              onClick={() => captureInputRef.current?.click()}
+              disabled={imageScanning}
+              className="w-full max-w-xs rounded-2xl border border-slate-600 bg-slate-800 px-4 py-3 text-sm font-bold text-slate-100 disabled:opacity-60"
+            >
+              {imageScanning ? 'Reading barcode…' : 'Use phone camera / choose barcode photo'}
             </button>
 
             <p className="text-slate-500 text-xs text-center">
-              Make sure your phone and laptop are on the same Wi-Fi network.
+              Keep the phone and pharmacy computer on the same Wi-Fi. If live camera access is blocked on this HTTP link, use the camera/photo button above.
             </p>
           </div>
         )}

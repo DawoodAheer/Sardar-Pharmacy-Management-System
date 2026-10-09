@@ -6,7 +6,7 @@
   "scripts": {
     "install:all": "npm install && npm install --prefix server && npm install --prefix client --legacy-peer-deps",
     "dev:server": "npm run dev --prefix server",
-    "dev:client": "npm run dev --prefix client -- --host 127.0.0.1 --port 5173 --strictPort",
+    "dev:client": "npm run dev --prefix client -- --host 0.0.0.0 --port 5174 --strictPort",
     "predev": "node scripts/prepare-dev.mjs",
     "dev": "node scripts/dev.mjs",
     "test": "npm test --prefix server && node --test client/src/utils/medicineExport.test.js",

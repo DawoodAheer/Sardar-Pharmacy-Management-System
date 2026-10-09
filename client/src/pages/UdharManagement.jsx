@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import {
   Wallet,
   Plus,
@@ -64,6 +65,8 @@ const blankForm = () => ({ customerName: '', customerPhone: '', customerAddress:
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export default function UdharManagement() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'superadmin';
   const qc = useQueryClient();
 
   // list state
@@ -81,6 +84,7 @@ export default function UdharManagement() {
   const [payNote, setPayNote] = useState('');
   const [newItem, setNewItem] = useState(blankItem());
   const [editForm, setEditForm] = useState({ customerName: '', customerPhone: '', customerAddress: '', notes: '', billRef: '' });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ── queries ──────────────────────────────────────────────────────────────
   const { data: summaryData, refetch: refetchUdharSummary } = useQuery({
@@ -102,6 +106,19 @@ export default function UdharManagement() {
   });
 
   const records = listData?.records || [];
+
+  const refreshUdhar = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        refetchUdharSummary({ throwOnError: true }),
+        refetchUdharList({ throwOnError: true }),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // ── mutations ─────────────────────────────────────────────────────────────
   const invalidate = () => {
@@ -220,11 +237,13 @@ export default function UdharManagement() {
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => { refetchUdharSummary(); refetchUdharList(); }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
+            type="button"
+            onClick={refreshUdhar}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
           >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           <button
             onClick={() => { setForm(blankForm()); setShowCreateModal(true); }}
@@ -365,13 +384,13 @@ export default function UdharManagement() {
                     <button onClick={() => openEdit(selectedRecord)} className="rounded-lg bg-white/20 p-2 hover:bg-white/30 transition" title="Edit Info">
                       <Edit3 className="h-4 w-4" />
                     </button>
-                    <button
+                    {isAdmin && <button
                       onClick={() => { if (window.confirm('Yeh record delete karo?')) deleteMut.mutate(selectedRecord._id); }}
                       className="rounded-lg bg-white/20 p-2 hover:bg-red-500/40 transition"
                       title="Delete"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </button>}
                   </div>
                 </div>
 
@@ -429,7 +448,7 @@ export default function UdharManagement() {
                             <th className="px-3 py-2">Rate</th>
                             <th className="px-3 py-2">Total</th>
                             <th className="px-3 py-2">Date</th>
-                            {selectedRecord.status !== 'PAID' && <th className="px-3 py-2"></th>}
+                            {isAdmin && selectedRecord.status !== 'PAID' && <th className="px-3 py-2"></th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -443,7 +462,7 @@ export default function UdharManagement() {
                               <td className="px-3 py-2.5 text-slate-700 dark:text-slate-300">{PKR(item.unitPrice)}</td>
                               <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-white">{PKR(item.totalPrice)}</td>
                               <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap">{fmt(item.dateTaken)}</td>
-                              {selectedRecord.status !== 'PAID' && (
+                              {isAdmin && selectedRecord.status !== 'PAID' && (
                                 <td className="px-3 py-2.5">
                                   <button
                                     onClick={() => { if (window.confirm('Yeh item remove karo?')) removeItemMut.mutate({ id: selectedRecord._id, itemId: item._id }); }}

@@ -3,8 +3,10 @@ import Bill from '../models/Bill.js';
 import Medicine from '../models/Medicine.js';
 import User from '../models/User.js';
 import StockAdjustment from '../models/StockAdjustment.js';
-import { getBillReturnSummary } from '../utils/billReturnSummary.js';
+import SaleReturn from '../models/SaleReturn.js';
+import { getAvailableReturnQuantity, getBillReturnSummary } from '../utils/billReturnSummary.js';
 import { checkExpiryStatus } from '../utils/expiryCheck.js';
+import { getPurchaseCostPerUnit } from '../utils/medicinePricing.js';
 import {
   getDiscountedReturnRefund,
   getNetItemAmounts,
@@ -12,6 +14,22 @@ import {
 } from '../utils/billCalculations.js';
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
+import Udhar from '../models/Udhar.js';
+import { summarizeDailyClosing } from '../utils/dailyClosing.js';
+
+const getLocalDateRange = (startDate, endDate) => {
+  const parseDate = (value, endOfDay = false) => {
+    const dateOnly = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const parsed = dateOnly
+      ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+      : new Date(value);
+    if (!Number.isFinite(parsed.getTime())) return null;
+    parsed.setHours(endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+    return parsed;
+  };
+
+  return { start: parseDate(startDate), end: parseDate(endDate, true) };
+};
 
 const sendOrderStatusEmail = async (bill, status, rejectionReason = '') => {
   const email = bill?.customerId?.email;
@@ -157,6 +175,10 @@ export const createBill = async (req, res, next) => {
           )
         );
       }
+      if (medicine.isDeleted) {
+        res.status(404);
+        return next(new Error(`${medicine.name} is archived and cannot be added to a new bill`));
+      }
 
       const expiryStatus = checkExpiryStatus(
         medicine.expiryDate
@@ -199,7 +221,7 @@ export const createBill = async (req, res, next) => {
         quantity: requestedQuantity,
         unitPrice: effectivePrice,
         salePrice: effectivePrice,
-        purchasePrice: medicine.purchasePrice || 0,
+        purchasePrice: getPurchaseCostPerUnit(medicine.purchasePrice, medicine.unitsPerPack),
         expiryStatus,
         expiryDate: medicine.expiryDate,
         rackLocation: medicine.rackLocation || '',
@@ -387,6 +409,8 @@ export const generateBillPDF = async (
       res.status(404);
       throw new Error('Bill not found');
     }
+
+    const billSummary = getBillReturnSummary(bill);
 
     if (
       req.user.role === 'customer' &&
@@ -623,26 +647,11 @@ export const generateBillPDF = async (
 
     let y = tableTop + 25;
 
-    bill.items.forEach((item) => {
-      const quantity = Number(item.quantity) || 0;
+    billSummary.netItems.forEach((item) => {
+      const quantity = Number(item.netQuantity) || 0;
+      if (quantity <= 0) return;
       const salePrice = Number(item.salePrice ?? item.unitPrice) || 0;
-      const grossLineTotal = salePrice * quantity;
-      const itemReturns = (bill.returns || []).filter(
-        (returnItem) => String(returnItem.medicineId) === String(item.medicineId)
-      );
-      const returnedQuantity = itemReturns.reduce(
-        (sum, returnItem) => sum + (Number(returnItem.quantityReturned) || 0),
-        0
-      );
-      const netQuantity = Math.max(0, quantity - returnedQuantity);
-      const itemRefund = itemReturns.reduce(
-        (sum, returnItem) => sum + (Number(returnItem.refundAmount) || 0),
-        0
-      );
-      const itemDiscount = bill.subtotal > 0
-        ? (Number(bill.discount || 0) * grossLineTotal) / bill.subtotal
-        : 0;
-      const netLineTotal = Math.max(0, grossLineTotal - itemDiscount - itemRefund);
+      const netLineTotal = Number(item.netSales) || 0;
       const expDate = item.expiryDate
         ? new Date(
             item.expiryDate
@@ -682,7 +691,7 @@ export const generateBillPDF = async (
           }
         )
         .text(
-          `${quantity} / ${netQuantity}`,
+          `${quantity}`,
           420,
           y,
           {
@@ -725,7 +734,7 @@ export const generateBillPDF = async (
         }
       )
       .text(
-        `PKR ${bill.subtotal.toFixed(
+        `PKR ${billSummary.netItems.reduce((sum, item) => sum + (Number(item.salePrice ?? item.unitPrice) || 0) * item.netQuantity, 0).toFixed(
           2
         )}`,
         480,
@@ -745,7 +754,7 @@ export const generateBillPDF = async (
         }
       )
       .text(
-        `-PKR ${bill.discount.toFixed(
+        `-PKR ${Math.max(0, billSummary.netItems.reduce((sum, item) => sum + (Number(item.salePrice ?? item.unitPrice) || 0) * item.netQuantity, 0) - billSummary.netTotal).toFixed(
           2
         )}`,
         480,
@@ -768,7 +777,7 @@ export const generateBillPDF = async (
         }
       )
       .text(
-        `PKR ${Math.max(0, bill.total - (bill.totalRefunded || 0)).toFixed(2)}`,
+        `PKR ${billSummary.netTotal.toFixed(2)}`,
         480,
         subtotalY + 45,
         {
@@ -941,6 +950,11 @@ export const acceptOnlineOrder = async (
           const medicine = await Medicine.findById(item.medicineId).session(session);
           if (!medicine) {
             const error = new Error(`Medicine not found: ${item.name}`);
+            error.statusCode = 404;
+            throw error;
+          }
+          if (medicine.isDeleted) {
+            const error = new Error(`${medicine.name} is archived and cannot be sold`);
             error.statusCode = 404;
             throw error;
           }
@@ -1213,8 +1227,14 @@ export const createInstoreBill = async (
     customerPhone,
     customerId,
     discount,
+    paymentMethod = 'Cash',
     items,
   } = req.body;
+
+  if (!['Cash', 'Card', 'UPI', 'Online'].includes(paymentMethod)) {
+    res.status(400);
+    return next(new Error('Choose a valid payment method'));
+  }
 
   if (req.user.role === 'customer') {
     res.status(403);
@@ -1286,6 +1306,10 @@ export const createInstoreBill = async (
           )
         );
       }
+      if (medicine.isDeleted) {
+        res.status(404);
+        return next(new Error(`${medicine.name} is archived and cannot be added to a new bill`));
+      }
 
       const expiryStatus =
         checkExpiryStatus(
@@ -1309,7 +1333,10 @@ export const createInstoreBill = async (
 
       let salePrice;
       try {
-        salePrice = getSalePrice(item.salePrice, medicine.price, medicine.purchasePrice);
+        salePrice = getSalePrice(
+          item.salePrice,
+          medicine.price
+        );
       } catch (error) {
         res.status(400);
         return next(error);
@@ -1328,7 +1355,7 @@ export const createInstoreBill = async (
         quantity,
         unitPrice: salePrice,
         salePrice,
-        purchasePrice: Number(medicine.purchasePrice) || 0,
+        purchasePrice: getPurchaseCostPerUnit(medicine.purchasePrice, medicine.unitsPerPack),
         expiryStatus,
         expiryDate:
           medicine.expiryDate,
@@ -1408,7 +1435,7 @@ export const createInstoreBill = async (
             subtotal,
             discount: finalDiscount,
             total,
-            paymentMethod: 'Cash',
+            paymentMethod,
           }],
           { session }
         );
@@ -1497,6 +1524,8 @@ export const getSalesSummary = async (
         now.getMonth() + 1,
         1
       );
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1);
 
     const acceptedMatch = {
       orderStatus: {
@@ -1507,7 +1536,7 @@ export const getSalesSummary = async (
       },
     };
 
-    const [todayBills, monthBills] = await Promise.all([
+    const [todayBills, monthBills, yearBills] = await Promise.all([
       Bill.find({
         ...acceptedMatch,
         createdAt: { $gte: startOfDay, $lt: startOfTomorrow },
@@ -1515,6 +1544,10 @@ export const getSalesSummary = async (
       Bill.find({
         ...acceptedMatch,
         createdAt: { $gte: startOfMonth, $lt: startOfNextMonth },
+      }).lean(),
+      Bill.find({
+        ...acceptedMatch,
+        createdAt: { $gte: startOfYear, $lt: startOfNextYear },
       }).lean(),
     ]);
     const summarizeSales = (records) =>
@@ -1530,6 +1563,7 @@ export const getSalesSummary = async (
         );
     const todaySummary = summarizeSales(todayBills);
     const monthlySummary = summarizeSales(monthBills);
+    const yearlySummary = summarizeSales(yearBills);
 
     res.json({
       success: true,
@@ -1543,6 +1577,11 @@ export const getSalesSummary = async (
         totalSales: monthlySummary.totalSales,
         totalBills: monthlySummary.totalBills,
       },
+
+      year: {
+        totalSales: yearlySummary.totalSales,
+        totalBills: yearlySummary.totalBills,
+      },
     });
   } catch (error) {
     next(error);
@@ -1551,6 +1590,27 @@ export const getSalesSummary = async (
 // @desc    Get profit summary (daily, monthly, yearly, custom date range)
 // @route   GET /api/bills/profit-summary
 // @access  Private/Pharmacist/Superadmin
+export const getDailyClosingReport = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const day = req.query.date || localToday;
+    const range = getLocalDateRange(day, day);
+    if (!range.start || !range.end) return res.status(400).json({ message: 'Provide a valid report date in YYYY-MM-DD format.' });
+    const billFilter = { createdAt: { $gte: range.start, $lte: range.end }, orderStatus: { $nin: ['PENDING', 'REJECTED'] } };
+    const [bills, returns, udharIssued, udharPayments] = await Promise.all([
+      Bill.find(billFilter).select('total paymentMethod').lean(),
+      SaleReturn.find({ date: { $gte: range.start, $lte: range.end } }).populate('sale_id', 'paymentMethod').lean(),
+      Udhar.aggregate([{ $match: { createdAt: { $gte: range.start, $lte: range.end } } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
+      Udhar.aggregate([{ $unwind: '$payments' }, { $match: { 'payments.paidAt': { $gte: range.start, $lte: range.end } } }, { $group: { _id: null, total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }]),
+    ]);
+    const creditIssued = Number(udharIssued[0]?.total || 0);
+    const creditRecovered = Number(udharPayments[0]?.total || 0);
+    res.json({ date: day, billCount: bills.length, ...summarizeDailyClosing({ bills, returns, creditIssued, creditRecovered }),
+      udharEntries: Number(udharIssued[0]?.count || 0), udharPayments: Number(udharPayments[0]?.count || 0) });
+  } catch (error) { next(error); }
+};
+
 export const getProfitSummary = async (req, res, next) => {
   try {
     if (req.user.role !== 'pharmacist' && req.user.role !== 'superadmin') {
@@ -1564,20 +1624,25 @@ export const getProfitSummary = async (req, res, next) => {
     };
 
     if (startDate && endDate) {
+      const range = getLocalDateRange(startDate, endDate);
+      if (!range.start || !range.end || range.start > range.end) {
+        res.status(400);
+        return next(new Error('A valid start and end date are required'));
+      }
       matchStage.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        $gte: range.start,
+        $lte: range.end,
       };
     }
 
     const [bills, medicines] = await Promise.all([
       Bill.find(matchStage).lean(),
-      Medicine.find().select('_id purchasePrice').lean(),
+      Medicine.find().select('_id purchasePrice unitsPerPack').lean(),
     ]);
     const purchasePriceByMedicine = new Map(
       medicines.map((medicine) => [
         String(medicine._id),
-        Number(medicine.purchasePrice) || 0,
+        getPurchaseCostPerUnit(medicine.purchasePrice, medicine.unitsPerPack),
       ])
     );
 
@@ -1649,9 +1714,14 @@ export const getProfitDetails = async (req, res, next) => {
     };
 
     if (startDate && endDate) {
+      const range = getLocalDateRange(startDate, endDate);
+      if (!range.start || !range.end || range.start > range.end) {
+        res.status(400);
+        return next(new Error('A valid start and end date are required'));
+      }
       matchStage.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+        $gte: range.start,
+        $lte: range.end,
       };
     }
 
@@ -1676,7 +1746,9 @@ export const getProfitDetails = async (req, res, next) => {
         if (netQty === 0) return;
 
         const medObj = medMap[String(item.medicineId)];
-        const itemPurchasePrice = item.purchasePrice ?? (medObj ? medObj.purchasePrice : 0);
+        const itemPurchasePrice = item.purchasePrice ?? (
+          medObj ? getPurchaseCostPerUnit(medObj.purchasePrice, medObj.unitsPerPack) : 0
+        );
         const itemSalePrice =
           item.salePrice ?? item.unitPrice ?? (medObj ? medObj.price : 0);
 
@@ -1803,7 +1875,7 @@ export const processSalesReturn = async (req, res, next) => {
             (sum, item) => sum + item.quantity,
             0
           );
-          const availableToReturn = totalItemQuantity - previouslyReturned;
+          const availableToReturn = getAvailableReturnQuantity(totalItemQuantity, previouslyReturned);
           if (qtyToReturn > availableToReturn) {
             const error = new Error(
               `Cannot return ${qtyToReturn} of "${billItem.name}". Maximum available to return is ${availableToReturn}.`
@@ -1871,6 +1943,17 @@ export const processSalesReturn = async (req, res, next) => {
             returnedAt: new Date(),
             returnedBy: req.user._id,
           });
+          await SaleReturn.create([{
+            sale_id: bill._id,
+            item_id: billItem.medicineId,
+            item_name: billItem.name,
+            bill_number: bill.billNumber,
+            qty_returned: qtyToReturn,
+            refund_amount: refundAmount,
+            reason: String(reason || '').trim() || 'Customer Sale Return',
+            processed_by: req.user._id,
+            date: new Date(),
+          }], { session });
           totalRefundThisCall += refundAmount;
         }
 
@@ -1897,4 +1980,19 @@ export const processSalesReturn = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// @desc    Admin audit feed for refunds/returns
+// @route   GET /api/bills/return-activity
+export const getReturnActivity = async (req, res, next) => {
+  try {
+    const returns = await SaleReturn.find()
+      .sort({ date: -1, createdAt: -1 })
+      .limit(200)
+      .populate('processed_by', 'name email')
+      .populate('item_id', 'name')
+      .populate('sale_id', 'billNumber customerName customerPhone')
+      .lean();
+    res.json({ success: true, returns });
+  } catch (error) { next(error); }
 };

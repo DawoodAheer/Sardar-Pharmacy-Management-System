@@ -12,7 +12,7 @@ const Sidebar = () => {
     switch (user.role) {
       case 'superadmin':
         return [
-          { name: 'User Control Panel', path: '/superadmin', icon: Users },
+          { name: 'Admin Settings', path: '/superadmin', icon: Users },
           { name: 'Inventory Manager', path: '/pharmacist', icon: Pill },
         ];
       case 'pharmacist':
@@ -33,7 +33,7 @@ const Sidebar = () => {
   };
 
   const links = getLinks();
-  const portalLabel = user?.role === 'superadmin' ? 'Superadmin Portal' : user?.role === 'pharmacist' ? 'Pharmacist Portal' : 'Customer Portal';
+  const portalLabel = user?.role === 'superadmin' ? 'Admin Portal' : user?.role === 'pharmacist' ? 'Pharmacist Portal' : 'Customer Portal';
 
   return (
     <>
@@ -86,7 +86,7 @@ const Sidebar = () => {
         {links.map((link) => {
           const Icon = link.icon;
           let shortName = link.name;
-          if (link.name === 'User Control Panel') shortName = 'Users';
+          if (link.name === 'Admin Settings') shortName = 'Admin';
           if (link.name === 'Inventory Manager') shortName = 'Inventory';
           if (link.name === 'Medication Reminders') shortName = 'Reminders';
           if (link.name === 'Invoice History') shortName = 'Bills';

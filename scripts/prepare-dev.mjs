@@ -1,9 +1,61 @@
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const isWindows = process.platform === 'win32';
+
+function ensureDependencies(packageDirectory, label) {
+  const manifestPath = path.join(packageDirectory, 'package.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const declared = {
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+  };
+  const missing = Object.keys(declared).filter((name) => {
+    const dependencyPath = path.join(packageDirectory, 'node_modules', ...name.split('/'));
+    return !fs.existsSync(dependencyPath);
+  });
+
+  if (missing.length === 0) return true;
+
+  const lockPath = path.join(packageDirectory, 'package-lock.json');
+  if (!fs.existsSync(lockPath)) {
+    console.error(`${label} dependencies are missing and ${path.relative(projectRoot, lockPath)} was not found.`);
+    console.error('Restore the package lockfile before starting the app.');
+    return false;
+  }
+
+  console.log(`${label} dependencies are missing; installing from the package lockfile...`);
+  const installArgs = ['ci'];
+  // The client lockfile intentionally uses legacy peer resolution (React 19
+  // with packages that still declare React 18 peer ranges), matching the
+  // repository's install:all command.
+  if (label === 'Frontend') installArgs.push('--legacy-peer-deps');
+
+  const result = spawnSync(isWindows ? 'npm.cmd' : 'npm', installArgs, {
+    cwd: packageDirectory,
+    stdio: 'inherit',
+    shell: isWindows,
+    windowsHide: true,
+  });
+
+  if (result.error || result.status !== 0) {
+    console.error(`Could not install ${label} dependencies.`);
+    console.error('The first setup needs internet access or a populated npm cache. Once dependencies are installed, the pharmacy app runs locally.');
+    return false;
+  }
+
+  return true;
+}
+
+if (!ensureDependencies(path.join(projectRoot, 'server'), 'Backend') ||
+    !ensureDependencies(path.join(projectRoot, 'client'), 'Frontend')) {
+  process.exit(1);
+}
+
 const serverRequire = createRequire(path.join(projectRoot, 'server', 'package.json'));
 const mongoose = serverRequire('mongoose');
 const dotenv = serverRequire('dotenv');
@@ -13,57 +65,6 @@ dotenv.config({ path: path.join(projectRoot, 'server', '.env') });
 const mongoUri = process.env.MONGO_URI ||
   'mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true';
 
-function getListeningPorts() {
-  const result = spawnSync('powershell', [
-    '-NoProfile',
-    '-Command',
-    '$ports = 5000,5173; Get-NetTCPConnection -State Listen -LocalPort $ports -ErrorAction SilentlyContinue | Select-Object LocalPort,OwningProcess | ConvertTo-Json -Compress',
-  ], { encoding: 'utf8', windowsHide: true });
-
-  if (result.error || result.status !== 0) {
-    throw new Error('Unable to inspect whether development ports 5000 and 5173 are in use.');
-  }
-
-  const raw = result.stdout.trim();
-  if (!raw) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [parsed];
-  } catch {
-    return [];
-  }
-}
-
-async function isProjectServiceReady(port) {
-  try {
-    const response = await fetch(`http://localhost:${port}/`, {
-      signal: AbortSignal.timeout(2500),
-    });
-    if (!response.ok) return false;
-    const body = await response.text();
-    return port === 5000
-      ? body.includes('Sardar Medical Store API is running')
-      : body.includes('/@vite/client');
-  } catch {
-    return false;
-  }
-}
-
-async function ensureDevPortsAvailable() {
-  const listeners = getListeningPorts();
-  for (const port of [5000, 5173]) {
-    if (await isProjectServiceReady(port)) continue;
-    const listener = listeners.find((entry) => Number(entry.LocalPort) === port);
-    if (listener) {
-      throw new Error(
-        `Port ${port} is occupied by another process (PID ${listener.OwningProcess}) and is not serving this pharmacy app. Stop that process or configure the port before starting.`
-      );
-    }
-  }
-}
 async function verifyDatabase() {
   await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 2500 });
   const session = await mongoose.startSession();
@@ -78,7 +79,6 @@ async function verifyDatabase() {
 }
 
 try {
-  await ensureDevPortsAvailable();
   await verifyDatabase();
   console.log('Local MongoDB is reachable and transaction-ready.');
 } catch (initialError) {
