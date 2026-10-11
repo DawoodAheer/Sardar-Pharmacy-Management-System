@@ -23,7 +23,7 @@ const medicineSchema = new mongoose.Schema(
     // Expiry date
     expiryDate: {
       type: Date,
-      required: [true, 'Please add an expiry date'],
+      // Optional now
     },
 
     // Available stock
@@ -39,13 +39,14 @@ const medicineSchema = new mongoose.Schema(
     // Selling price (default sale rate)
     price: {
       type: Number,
-      required: [true, 'Please add a price'],
       min: [0, 'Price cannot be negative'],
+      default: 0,
     },
 
     // Total purchase cost for one package. Existing records default to one unit/package.
     purchasePrice: {
       type: Number,
+      required: [true, 'Please add a purchase price'],
       min: [0, 'Purchase price cannot be negative'],
       default: 0,
     },

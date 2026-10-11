@@ -13,6 +13,8 @@ import {
   restoreMedicine,
   getMedicineImportIssues,
   resolveMedicineImportIssue,
+  discardMedicineImportIssue,
+  discardAllMedicineImportIssues,
   getMedicineAuditHistory,
 } from '../controllers/medicineController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
@@ -38,6 +40,8 @@ router.post(
 router.post('/bulk', authorize('pharmacist', 'superadmin'), bulkImportMedicines);
 router.get('/import-issues', authorize('pharmacist', 'superadmin'), getMedicineImportIssues);
 router.post('/import-issues/:id/resolve', authorize('pharmacist', 'superadmin'), resolveMedicineImportIssue);
+router.delete('/import-issues', authorize('pharmacist', 'superadmin'), discardAllMedicineImportIssues);
+router.delete('/import-issues/:id', authorize('pharmacist', 'superadmin'), discardMedicineImportIssue);
 router.get('/audit-history', authorize('pharmacist', 'superadmin'), getMedicineAuditHistory);
 
 // Stock adjustments

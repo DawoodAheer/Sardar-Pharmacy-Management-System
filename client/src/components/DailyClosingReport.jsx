@@ -44,22 +44,6 @@ export default function DailyClosingReport({ compact = false }) {
           iconColor: 'text-emerald-600',
         },
         {
-          label: 'Card Sales',
-          value: data.salesByMethod?.Card,
-          icon: CreditCard,
-          color: 'bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/40',
-          valueColor: 'text-blue-700 dark:text-blue-400',
-          iconColor: 'text-blue-600',
-        },
-        {
-          label: 'Online / UPI',
-          value: data.salesByMethod?.Online,
-          icon: Smartphone,
-          color: 'bg-violet-50 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/40',
-          valueColor: 'text-violet-700 dark:text-violet-400',
-          iconColor: 'text-violet-600',
-        },
-        {
           label: 'Refunds',
           value: data.refunds,
           icon: RotateCcw,
@@ -114,7 +98,7 @@ export default function DailyClosingReport({ compact = false }) {
         ) : (
           <div className="space-y-4">
             {/* Payment Method Cards */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
               {sections.map(({ label, value, icon: Icon, color, valueColor, iconColor, negative }) => (
                 <div key={label} className={'rounded-xl border p-3.5 ' + color}>
                   <div className="flex items-center justify-between">

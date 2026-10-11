@@ -35,7 +35,7 @@ cloudinary.config({
 // @route   GET /api/medicines
 // @access  Private
 export const getAllMedicines = async (req, res, next) => {
-  const { search, status } = req.query;
+  const { search, status, reorder } = req.query;
 
   try {
     const query = { isDeleted: { $ne: true } };
@@ -119,37 +119,44 @@ export const createMedicine = async (req, res, next) => {
   } = req.body;
 
   try {
-    if (!String(name || '').trim() || !String(manufacturer || '').trim() || !isValidDate(expiryDate)) {
+    if (!String(name || '').trim()) {
       res.status(400);
-      return next(new Error('Medicine name, manufacturer, and a valid expiry date are required'));
+      return next(new Error('Medicine name is required'));
     }
-    const numericPurchasePrice = purchasePrice !== undefined ? Number(purchasePrice) : NaN;
-    const numericPrice = price !== undefined ? Number(price) : NaN;
-    const numericUnitsPerPack = unitsPerPack !== undefined ? Number(unitsPerPack) : 1;
+    const numericPurchasePrice = purchasePrice !== undefined && purchasePrice !== '' ? Number(purchasePrice) : NaN;
+    if (!Number.isFinite(numericPurchasePrice) || numericPurchasePrice <= 0) {
+      res.status(400);
+      return next(new Error('Purchase price per pack is required and must be greater than zero'));
+    }
 
-    if (!isValidUnitsPerPack(numericUnitsPerPack)) {
-      res.status(400);
-      return next(new Error('Units per pack must be a positive whole number'));
+    const numericUnitsPerPack = unitsPerPack !== undefined && Number(unitsPerPack) > 0 ? Number(unitsPerPack) : 1;
+    let numericPrice = price !== undefined && price !== '' ? Number(price) : NaN;
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      numericPrice = Number((numericPurchasePrice / numericUnitsPerPack).toFixed(2));
     }
-    if (!Number.isFinite(numericPurchasePrice) || numericPurchasePrice <= 0 || !Number.isFinite(numericPrice) || numericPrice <= 0) {
-      res.status(400);
-      return next(new Error('Pack purchase price and unit sale price must both be greater than zero'));
+
+    let parsedQuantity = quantity !== undefined && quantity !== '' ? Number(quantity) : 0;
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+      parsedQuantity = 0;
     }
-    if (quantity === undefined || !Number.isInteger(Number(quantity)) || Number(quantity) < 0) {
-      res.status(400);
-      return next(new Error('Stock quantity is required and must be a non-negative whole number of tablets or units'));
-    }
-    
+
+    const parsedExpiryDate = expiryDate ? (parseMedicineExpiryDate(expiryDate) || (new Date(expiryDate).getTime() ? new Date(expiryDate) : null)) : null;
 
     const session = await mongoose.startSession();
     let medicine;
     try {
       await session.withTransaction(async () => {
         [medicine] = await Medicine.create([{
-          name, manufacturer, expiryDate,
-          quantity, price, purchasePrice: numericPurchasePrice,
-          unitsPerPack: numericUnitsPerPack, rackLocation,
-          labelImageUrl, createdBy: req.user._id,
+          name: String(name).trim(),
+          manufacturer: String(manufacturer || '').trim(),
+          expiryDate: parsedExpiryDate,
+          quantity: parsedQuantity,
+          price: numericPrice,
+          purchasePrice: numericPurchasePrice,
+          unitsPerPack: numericUnitsPerPack,
+          rackLocation: String(rackLocation || '').trim(),
+          labelImageUrl: labelImageUrl || '',
+          createdBy: req.user._id,
         }], { session });
         await recordMedicineAudit({ medicine, action: 'created', newValues: snapshotMedicine(medicine), performedBy: req.user._id, session });
       });
@@ -200,10 +207,9 @@ export const updateMedicine = async (req, res, next) => {
         const nextUnitsPerPack = unitsPerPack !== undefined ? Number(unitsPerPack) : Number(medicine.unitsPerPack) || 1;
         const nextName = name !== undefined ? String(name).trim() : medicine.name;
         const nextManufacturer = manufacturer !== undefined ? String(manufacturer).trim() : medicine.manufacturer;
-        const nextExpiryDate = expiryDate !== undefined ? expiryDate : medicine.expiryDate;
-        if (!nextName || !nextManufacturer || !isValidDate(nextExpiryDate)) { const error = new Error('Medicine name, manufacturer, and a valid expiry date are required'); error.statusCode = 400; throw error; }
-        if (!isValidUnitsPerPack(nextUnitsPerPack)) { const error = new Error('Units per pack must be a positive whole number'); error.statusCode = 400; throw error; }
-        if (!Number.isFinite(nextPurchasePrice) || nextPurchasePrice <= 0 || !Number.isFinite(nextSalePrice) || nextSalePrice <= 0) { const error = new Error('Pack purchase price and unit sale price must both be greater than zero'); error.statusCode = 400; throw error; }
+        if (!nextName) { const error = new Error('Medicine name is required'); error.statusCode = 400; throw error; }
+        if (!Number.isFinite(nextPurchasePrice) || nextPurchasePrice <= 0) { const error = new Error('Purchase price per pack must be greater than zero'); error.statusCode = 400; throw error; }
+        if (nextSalePrice !== undefined && (!Number.isFinite(nextSalePrice) || nextSalePrice < 0)) { const error = new Error('Unit sale price cannot be negative'); error.statusCode = 400; throw error; }
         if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }
         
 
@@ -441,6 +447,28 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
       await session.endSession();
     }
     res.status(201).json({ message: `${created.name} was corrected and added to inventory.`, medicine: created });
+  } catch (error) { next(error); }
+};
+
+export const discardMedicineImportIssue = async (req, res, next) => {
+  try {
+    const issue = await MedicineImportIssue.findOne({ _id: req.params.id, status: 'pending' });
+    if (!issue) return res.status(404).json({ message: 'Issue not found or already resolved.' });
+    issue.status = 'ignored';
+    issue.resolvedBy = req.user._id;
+    issue.resolvedAt = new Date();
+    await issue.save();
+    res.json({ success: true, message: 'Import row discarded.' });
+  } catch (error) { next(error); }
+};
+
+export const discardAllMedicineImportIssues = async (req, res, next) => {
+  try {
+    await MedicineImportIssue.updateMany(
+      { status: 'pending' },
+      { $set: { status: 'ignored', resolvedBy: req.user._id, resolvedAt: new Date() } }
+    );
+    res.json({ success: true, message: 'All pending import rows discarded.' });
   } catch (error) { next(error); }
 };
 

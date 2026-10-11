@@ -96,7 +96,9 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
     const expiredList = [];
 
     medicines.forEach((med) => {
+      if (!med.expiryDate) return;
       const exp = new Date(med.expiryDate);
+      if (Number.isNaN(exp.getTime())) return;
       exp.setHours(0, 0, 0, 0);
       const diffDays = Math.ceil((exp.getTime() - today.getTime()) / msInDay);
 

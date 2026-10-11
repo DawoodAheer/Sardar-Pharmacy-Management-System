@@ -2014,7 +2014,7 @@ export const getMedicineSalesRanking = async (req, res, next) => {
         const id = String(item.medicine || item.medicineId || '');
         if (!id) continue;
         const qty = Number(item.quantity) || 0;
-        const revenue = Number(item.price || 0) * qty;
+        const revenue = Number(item.salePrice || item.unitPrice || 0) * qty;
         if (salesMap.has(id)) {
           const entry = salesMap.get(id);
           entry.totalUnits += qty;
@@ -2032,8 +2032,8 @@ export const getMedicineSalesRanking = async (req, res, next) => {
     }
 
     const allMedicines = Array.from(salesMap.values()).filter((m) => m.totalUnits > 0);
-    const topSelling = [...allMedicines].sort((a, b) => b.totalUnits - a.totalUnits).slice(0, 20);
-    const leastSelling = [...allMedicines].sort((a, b) => a.totalUnits - b.totalUnits).slice(0, 20);
+    const topSelling = [...allMedicines].sort((a, b) => b.totalUnits - a.totalUnits).slice(0, 100);
+    const leastSelling = [...allMedicines].sort((a, b) => a.totalUnits - b.totalUnits).slice(0, 100);
 
     res.json({ success: true, topSelling, leastSelling, totalMedicinesWithSales: allMedicines.length });
   } catch (error) {

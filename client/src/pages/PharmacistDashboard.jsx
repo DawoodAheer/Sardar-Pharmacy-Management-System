@@ -72,6 +72,9 @@ import {
   ArrowRight,
   Camera,
   Smartphone,
+  ChevronRight,
+  PackageSearch,
+  Clock3,
 } from 'lucide-react';
 
 // ============================================================================
@@ -248,6 +251,73 @@ const CategoryBadge = ({ category }) => {
 // ============================================================================
 // DASHBOARD
 // ============================================================================
+// STAT CARD
+// ============================================================================
+
+const StatCard = ({
+  title,
+  value,
+  description,
+  icon: Icon,
+  iconWrapperClass,
+  valueClass,
+  onClick,
+  hasNotification = false,
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
+    >
+      {hasNotification && (
+        <span className="absolute right-4 top-4 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
+          {value}
+        </span>
+      )}
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="pr-4">
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {title}
+          </p>
+
+          <p
+            className={`mt-2 text-3xl font-bold ${
+              valueClass ||
+              'text-slate-900 dark:text-white'
+            }`}
+          >
+            {value}
+          </p>
+
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            {description}
+          </p>
+        </div>
+
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${iconWrapperClass}`}
+        >
+          <Icon size={22} />
+        </div>
+      </div>
+
+      <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+        <span className="text-xs font-semibold text-slate-500 transition group-hover:text-slate-900 dark:text-slate-400 dark:group-hover:text-white">
+          View details
+        </span>
+
+        <ChevronRight
+          size={16}
+          className="text-slate-400 transition group-hover:translate-x-1"
+        />
+      </div>
+    </button>
+  );
+};
+
+// ============================================================================
 
 const PharmacistDashboard = () => {
   const {
@@ -304,6 +374,11 @@ const PharmacistDashboard = () => {
 
   // Sales Ranking Modal
   const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
+
+  // Modal states for dashboard cards
+  const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
+  const [isPurchaseOrdersModalOpen, setIsPurchaseOrdersModalOpen] = useState(false);
+  const [isAuditHistoryModalOpen, setIsAuditHistoryModalOpen] = useState(false);
 
   // ==========================================================================
   // MEDICINE MODAL
@@ -1079,6 +1154,28 @@ const PharmacistDashboard = () => {
     setSelectedBill(null);
   };
 
+  // Option-1 direct print: loads receipt in a hidden iframe and calls print()
+  const printReceiptInPage = (billId) => {
+    const existing = document.getElementById('__receipt_iframe__');
+    if (existing) existing.remove();
+    const iframe = document.createElement('iframe');
+    iframe.id = '__receipt_iframe__';
+    iframe.src = `/pharmacist/receipt/${billId}?print=1`;
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
+    document.body.appendChild(iframe);
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (err) {
+        // fallback: open in new tab if iframe print blocked
+        window.open(`/pharmacist/receipt/${billId}`, '_blank');
+      }
+      // clean up after short delay
+      setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 3000);
+    };
+  };
+
   const openSalesDetails = (type) => {
     setSalesDetailsType(type);
   };
@@ -1245,52 +1342,35 @@ const PharmacistDashboard = () => {
 
     setError('');
 
-    if (
-      !name.trim() ||
-      !manufacturer.trim() ||
-      !expiryDate ||
-      purchasePrice === '' ||
-      price === '' ||
-      quantity === ''
-    ) {
-      setError(
-        'Please fill all required medicine fields'
-      );
-
+    if (!name.trim()) {
+      setError('Please enter medicine name.');
       return;
     }
 
-    const purchaseValue = Number(purchasePrice) || 0;
-    const saleValue = Number(price);
-    const packSize = Number(unitsPerPack);
-
-    if (!Number.isInteger(packSize) || packSize < 1) {
-      setError('Units per pack must be a positive whole number.');
+    const purchaseValue = Number(purchasePrice);
+    if (!Number.isFinite(purchaseValue) || purchaseValue <= 0) {
+      setError('Purchase price is required and must be greater than zero.');
       return;
     }
 
-    if (!Number.isFinite(purchaseValue) || purchaseValue <= 0 || !Number.isFinite(saleValue) || saleValue <= 0) {
-      setError('Pack purchase price and unit sale price must both be greater than zero.');
-      return;
+    const packSize = Number(unitsPerPack) > 0 ? Number(unitsPerPack) : 1;
+    let saleValue = price !== '' && price !== undefined ? Number(price) : NaN;
+    if (!Number.isFinite(saleValue) || saleValue < 0) {
+      saleValue = Number((purchaseValue / packSize).toFixed(2));
     }
+
+    const stockQty = quantity !== '' && quantity !== undefined && !Number.isNaN(Number(quantity)) ? Number(quantity) : 0;
 
     const medicineData = {
       name: name.trim(),
-      
-      
-      expiryDate,
-      quantity:
-        Number(quantity),
-      
-      price: Number(price),
-      purchasePrice: Number(purchasePrice) || 0,
+      manufacturer: (manufacturer || '').trim(),
+      expiryDate: expiryDate || null,
+      quantity: stockQty,
+      price: saleValue,
+      purchasePrice: purchaseValue,
       unitsPerPack: packSize,
-      
-      
-      rackLocation:
-        rackLocation.trim(),
-      labelImageUrl:
-        labelImageUrl.trim(),
+      rackLocation: (rackLocation || '').trim(),
+      labelImageUrl: (labelImageUrl || '').trim(),
     };
 
     if (editingMedicine) {
@@ -2701,9 +2781,33 @@ const PharmacistDashboard = () => {
 
               <MedicineImportIssues compact />
               <DailyClosingReport compact />
-              <MedicineExpiryAlerts compact />
-              <PurchaseOrdersPanel compact />
-              <MedicineAuditHistory compact />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6">
+                <StatCard
+                  title="Stock Expiry Alerts"
+                  value="View Alerts"
+                  description="Expired & Expiring Medicines"
+                  icon={AlertTriangle}
+                  iconWrapperClass="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
+                  onClick={() => setIsExpiryModalOpen(true)}
+                />
+                <StatCard
+                  title="Purchase Orders"
+                  value="Manage Orders"
+                  description="Low Stock & Ordering"
+                  icon={PackageSearch}
+                  iconWrapperClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                  onClick={() => setIsPurchaseOrdersModalOpen(true)}
+                />
+                <StatCard
+                  title="Audit History"
+                  value="View History"
+                  description="Recent Medicine Changes"
+                  icon={Clock3}
+                  iconWrapperClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  onClick={() => setIsAuditHistoryModalOpen(true)}
+                />
+              </div>
 
               {/* STAT CARDS */}
 
@@ -4317,7 +4421,7 @@ const PharmacistDashboard = () => {
                   <div>
                     <h3 className="font-bold text-sm">Medicine Catalog</h3>
                     <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                      {ocrLoading ? 'Scanning image...' : 'Search by name, rack, or barcode; scan a label to add it to this bill.'}
+                      Search by name, rack, or barcode
                     </p>
                   </div>
                   <button type="button" onClick={() => { refetchMeds(); refetchBills(); }} disabled={isMedsFetching || isBillsFetching} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800 ml-auto">
@@ -4337,32 +4441,6 @@ const PharmacistDashboard = () => {
                         event.target.value = '';
                       }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => startCamera('bill')}
-                      disabled={ocrLoading}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white"
-                    >
-                      <Camera className="h-4 w-4" />
-                      Open Camera
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => startMobileScanner('bill')}
-                      className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-xs font-bold text-white hover:bg-teal-700 transition"
-                    >
-                      <Smartphone className="h-4 w-4" />
-                      Mobile Scanner
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => billScanInputRef.current?.click()}
-                      disabled={ocrLoading}
-                      className="inline-flex items-center gap-2 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700"
-                    >
-                      <Barcode className="h-4 w-4" />
-                      Scan Image
-                    </button>
                   </div>
                 </div>
 
@@ -4576,7 +4654,7 @@ const PharmacistDashboard = () => {
                   {isBillingPending ? 'Processing...' : 'Commit & Post Bill'}
                 </button>
 
-                <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto">
 
                   {billItems.length ===
                   0 ? (
@@ -4621,10 +4699,10 @@ const PharmacistDashboard = () => {
                               ×{' '}
                               {getCurrency(item.salePrice ?? item.price)}
                             </div>
-                            <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                              <span>Cost/unit (fixed): {getCurrency(item.purchasePrice)}</span>
-                              <label className="flex items-center gap-1">
-                                Sale/unit:
+                            <div className="mt-2 flex flex-col gap-1">
+                              <span className="text-[10px] text-slate-400">Cost/unit (fixed): {getCurrency(item.purchasePrice)}</span>
+                              <label className="flex items-center gap-2">
+                                <span className="text-lg font-extrabold text-slate-800 dark:text-slate-200 whitespace-nowrap">Sale Price (PKR):</span>
                                 <input
                                   type="number"
                                   min="0"
@@ -4640,7 +4718,7 @@ const PharmacistDashboard = () => {
                                       )
                                     );
                                   }}
-                                  className="w-20 rounded border px-1 py-0.5 text-[10px]"
+                                  className="flex-1 min-w-0 rounded-xl border-2 border-blue-600 bg-blue-100 px-4 py-3 text-xl font-bold text-blue-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 />
                               </label>
                             </div>
@@ -4698,7 +4776,8 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <div className="p-4 border-t bg-slate-50 space-y-3">
+
+                <div className="p-4 border-t bg-slate-50 space-y-3 shrink-0">
 
                   <div className="grid grid-cols-2 gap-2">
 
@@ -5452,68 +5531,7 @@ const PharmacistDashboard = () => {
               </div>
             )}
 
-            {!editingMedicine && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-xl">
-
-                <div className="flex items-center gap-2 text-blue-700 font-bold text-xs">
-
-                  <Barcode className="w-4 h-4" />
-
-                  OCR Smart Scanner
-
-                </div>
-
-                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 mb-3">
-                  Use the camera on this device, choose a label image, or use your phone camera as a remote scanner.
-                </p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <button type="button" onClick={() => startMobileScanner('medicine')} className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-3 py-1.5 text-[10px] font-bold text-white shadow hover:bg-teal-700 transition">
-                    <Smartphone className="w-3.5 h-3.5" />
-                    Connect Mobile Scanner
-                  </button>
-                </div>
-                <p className="mb-3 text-[10px] text-amber-700 dark:text-amber-300">Android Chrome blocks live camera access on plain HTTP Wi-Fi links. Use the USB localhost link from the pairing dialog, or a trusted HTTPS address.</p>
-
-                {ocrLoading && (
-                  <div className="mb-3 flex items-center gap-2 text-[10px] font-bold text-blue-700">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    Scanning label, please wait...
-                  </div>
-                )}
-
-                <input
-                  ref={
-                    fileInputRef
-                  }
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  disabled={
-                    ocrLoading
-                  }
-                  onChange={
-                    handleOcrFileChange
-                  }
-                  className="text-xs"
-                />
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => startCamera('medicine')}
-                    disabled={ocrLoading}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Open Camera
-                  </button>
-                  <span className="self-center text-[10px] text-slate-500">
-                    Android camera access needs HTTPS or localhost. USB can provide a localhost connection with ADB; the phone browser still controls its own camera.
-                  </span>
-                </div>
-
-              </div>
-            )}
+            {/* OCR Smart Scanner section removed */}
 
             {ocrPreview && (
               <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900/50 dark:bg-emerald-950/20">
@@ -5588,9 +5606,8 @@ const PharmacistDashboard = () => {
 
               <div className="grid grid-cols-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Manufacturer
+                  Manufacturer (Optional)
                 <input
-                  required
                   value={
                     manufacturer
                   }
@@ -5599,7 +5616,7 @@ const PharmacistDashboard = () => {
                       event.target.value
                     )
                   }
-                  placeholder="Manufacturer"
+                  placeholder="Manufacturer (optional)"
                   className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                 />
                 </label>
@@ -5608,9 +5625,8 @@ const PharmacistDashboard = () => {
 
               <div className="grid grid-cols-1 gap-3">
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Expiry date
+                  Expiry date (Optional)
                 <input
-                  required
                   type="date"
                   value={
                     expiryDate
@@ -5628,7 +5644,7 @@ const PharmacistDashboard = () => {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Purchase cost per pack (PKR)
+                  Purchase cost per pack (PKR) *
                   <input
                     required
                     type="number"
@@ -5641,41 +5657,38 @@ const PharmacistDashboard = () => {
                 </label>
 
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Units per pack
+                  Units per pack (Optional)
                   <input
-                    required
                     type="number"
                     min="1"
                     step="1"
                     value={unitsPerPack}
                     onChange={(event) => setUnitsPerPack(event.target.value)}
-                    placeholder="e.g. 20 tablets"
+                    placeholder="Default 1"
                     className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                   />
                 </label>
 
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Sale price per unit (PKR)
+                  Sale price per unit (PKR) (Optional)
                   <input
-                    required
                     type="number"
                     step="0.01"
                     value={price}
                     onChange={(event) => setPrice(event.target.value)}
-                    placeholder="One tablet price"
+                    placeholder="Auto from purchase"
                     className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                   />
                 </label>
 
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Stock quantity (units)
+                  Stock quantity (units) (Optional)
                   <input
-                    required
                     type="number"
                     min="0"
                     value={quantity}
                     onChange={(event) => setQuantity(event.target.value)}
-                    placeholder="Tablets in stock"
+                    placeholder="Default 0"
                     className="w-full min-w-0 rounded-lg border px-3 py-2 text-xs font-normal"
                   />
                 </label>
@@ -6886,15 +6899,10 @@ const PharmacistDashboard = () => {
                 </button>
 
                 <button
-                  onClick={() =>
-                    window.open(
-                      `/pharmacist/receipt/${selectedBill._id}`,
-                      '_blank'
-                    )
-                  }
-                  className="px-4 py-2 border border-blue-700 text-blue-700 rounded-lg text-xs font-bold"
+                  onClick={() => printReceiptInPage(selectedBill._id)}
+                  className="px-4 py-2 border border-blue-700 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1"
                 >
-                  Print Receipt
+                  🖨️ Print Receipt
                 </button>
 
                 <button
@@ -6938,8 +6946,8 @@ const PharmacistDashboard = () => {
 
               <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto" />
 
-              <h3 className="text-xl font-bold mt-2">
-                Payment Done!
+              <h3 className="text-2xl font-bold mt-2 text-emerald-700">
+                ✅ Bill Done!
               </h3>
 
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
@@ -7040,15 +7048,10 @@ const PharmacistDashboard = () => {
             <div className="flex gap-3 mt-5">
 
               <button
-                onClick={() =>
-                  window.open(
-                    `/pharmacist/receipt/${confirmedBill._id}`,
-                    '_blank'
-                  )
-                }
-                className="flex-1 py-2 border border-blue-700 text-blue-700 rounded-xl text-xs font-bold"
+                onClick={() => printReceiptInPage(confirmedBill._id)}
+                className="flex-1 py-2 border border-blue-700 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1"
               >
-                Print Receipt
+                🖨️ Print Receipt
               </button>
 
               <button
@@ -7179,6 +7182,50 @@ const PharmacistDashboard = () => {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+      {/* Expiry Alerts Modal */}
+      {isExpiryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsExpiryModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><MedicineExpiryAlerts /></div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders Modal */}
+      {isPurchaseOrdersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsPurchaseOrdersModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><PurchaseOrdersPanel /></div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit History Modal */}
+      {isAuditHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsAuditHistoryModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><MedicineAuditHistory /></div>
           </div>
         </div>
       )}

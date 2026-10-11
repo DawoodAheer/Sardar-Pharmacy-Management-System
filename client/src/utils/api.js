@@ -38,11 +38,32 @@ api.interceptors.request.use(
  *
  * Keeps API errors consistent without interfering
  * with the existing AuthContext refresh/logout logic.
+ *
+ * Special handling for 502/503/504:
+ * These occur when the Vite proxy can't reach the backend
+ * (e.g. during nodemon restarts). We mark these with
+ * error.isServerUnavailable = true so AuthContext
+ * does NOT log the user out in this scenario.
  */
 api.interceptors.response.use(
   (response) => response,
 
   (error) => {
+    const status = error.response?.status;
+
+    // 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout
+    // = Vite proxy could not reach the backend (nodemon is restarting).
+    // This is NOT an auth error — do not clear tokens or log the user out.
+    if (status === 502 || status === 503 || status === 504) {
+      error.isServerUnavailable = true;
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[API] Server unavailable (${status}) — backend may be restarting. Request: ${error.config?.url || ''}`
+        );
+      }
+      return Promise.reject(error);
+    }
+
     if (import.meta.env.DEV) {
       if (error.response) {
         console.error(

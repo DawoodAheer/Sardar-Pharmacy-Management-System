@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node --import ./env-loader.js server.js",
-    "dev": "nodemon --import ./env-loader.js server.js",
+    "dev": "nodemon --config nodemon.json --import ./env-loader.js server.js",
     "test": "node --test",
     "seed": "node --import ./env-loader.js seed.js",
     "db:backup": "node --import ./env-loader.js utils/backupManager.js backup",

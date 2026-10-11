@@ -206,10 +206,14 @@ export const AuthProvider = ({ children }) => {
           } catch (error) {
             /*
              * Refresh failed.
-             * Current authentication session
-             * is no longer valid.
+             * If the error is because the server is temporarily
+             * unavailable (502/503/504 — backend is restarting via
+             * nodemon), do NOT clear the session. The token is still
+             * valid; the server just isn't up yet.
              */
-            clearLocalAuth();
+            if (!error?.isServerUnavailable) {
+              clearLocalAuth();
+            }
 
             throw error;
           } finally {
@@ -482,13 +486,23 @@ export const AuthProvider = ({ children }) => {
           }
 
           setUser(currentUser);
-        } catch {
+        } catch (err) {
           /*
            * No active session is completely normal
            * when the visitor has not logged in.
            *
-           * We intentionally do not show a popup here.
+           * However, if the server is temporarily unavailable
+           * (backend restarting via nodemon), do NOT clear the
+           * session. Keep loading=true so the UI waits for the
+           * backend to come back instead of showing the login page.
            */
+          if (err?.isServerUnavailable) {
+            if (!cancelled) {
+              console.warn('[Auth] Backend unavailable during session restore — will retry when server is ready.');
+            }
+            return; // keep loading=true, don't clear auth
+          }
+
           clearLocalAuth();
 
           console.log(

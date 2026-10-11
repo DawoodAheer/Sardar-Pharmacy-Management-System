@@ -154,8 +154,8 @@ if ($mongoReady) {
 }
 
 # 3B. Wait for Backend API
-Write-Host "  * Checking Express Backend API (http://localhost:5000)..." -NoNewline -ForegroundColor Cyan
-$backendReady = Test-HttpEndpoint -Url "http://localhost:5000/" -TimeoutSeconds 30
+Write-Host "  * Checking Express Backend API (http://localhost:5001)..." -NoNewline -ForegroundColor Cyan
+$backendReady = Test-HttpEndpoint -Url "http://localhost:5001/" -TimeoutSeconds 45
 if ($backendReady) {
     Write-Host "  [OK] Backend API is ready!" -ForegroundColor Green
 } else {

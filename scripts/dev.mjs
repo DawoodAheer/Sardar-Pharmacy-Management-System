@@ -48,7 +48,7 @@ function shutdown(exitCode = 0) {
   process.exitCode = exitCode;
 }
 
-function startService(label, npmArgs, env = process.env) {
+function startService(label, npmArgs, env = process.env, isServer = false) {
   console.log(`Starting ${label}...`);
   // npm sets this to its CLI entrypoint. Running it through node avoids the
   // Windows shell=true .cmd shim and its DEP0190 warning/argument ambiguity.
@@ -69,11 +69,22 @@ function startService(label, npmArgs, env = process.env) {
   });
   child.once('exit', (code, signal) => {
     if (!shuttingDown) {
-      const unexpectedExit = code !== 0;
-      console.error(
-        `${label} stopped${signal ? ` (${signal})` : ` (exit ${code})`}.`
-      );
-      shutdown(unexpectedExit ? code || 1 : 0);
+      if (isServer) {
+        // Server may exit during nodemon restarts — this is expected.
+        // nodemon will bring it back up. Don't kill the frontend.
+        if (code !== 0 && signal !== 'SIGTERM' && signal !== 'SIGINT') {
+          console.warn(
+            `[dev] API server stopped unexpectedly${signal ? ` (${signal})` : ` (exit ${code})`}. nodemon will restart it automatically.`
+          );
+        }
+      } else {
+        // If the client exits, shut everything down.
+        const unexpectedExit = code !== 0;
+        console.error(
+          `${label} stopped${signal ? ` (${signal})` : ` (exit ${code})`}.`
+        );
+        shutdown(unexpectedExit ? code || 1 : 0);
+      }
     }
   });
 }
@@ -95,7 +106,7 @@ else {
     MONGO_URI: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/pharmadesk?replicaSet=rs0&directConnection=true',
     JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET || 'pharmadesk-local-development-access-secret-change-in-production',
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'pharmadesk-local-development-refresh-secret-change-in-production',
-  });
+  }, true /* isServer — nodemon handles restarts, don't kill frontend on server exit */);
 }
 
 const clientIsReady = await isReady(clientPort, apiPort);

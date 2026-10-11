@@ -51,23 +51,45 @@ export const normalizeMedicineImportRow = (row = {}) => {
   const unitsRaw = readAlias(row, aliases.unitsPerPack);
   const priceRaw = readAlias(row, aliases.price);
   const quantityRaw = readAlias(row, aliases.quantity);
+
+  const parsedUnits = unitsRaw !== undefined && unitsRaw !== '' && !Number.isNaN(Number(unitsRaw)) ? Number(unitsRaw) : 1;
+  const parsedUnitsPerPack = parsedUnits > 0 ? parsedUnits : 1;
+  const parsedPurchasePrice = purchaseRaw !== undefined && purchaseRaw !== '' ? Number(purchaseRaw) : NaN;
+  
+  let parsedSalePrice = priceRaw !== undefined && priceRaw !== '' ? Number(priceRaw) : NaN;
+  if (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0) {
+    // If not provided or empty, default to cost per unit or 0
+    parsedSalePrice = Number.isFinite(parsedPurchasePrice) && parsedPurchasePrice > 0 
+      ? Number((parsedPurchasePrice / parsedUnitsPerPack).toFixed(2)) 
+      : 0;
+  }
+
+  let parsedQuantity = quantityRaw !== undefined && quantityRaw !== '' ? Number(quantityRaw) : 0;
+  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
+    parsedQuantity = 0;
+  }
+
+  const parsedExpiry = expiryRaw ? parseMedicineExpiryDate(expiryRaw) : null;
+
   const medicine = {
     name: String(name ?? '').trim(),
     manufacturer: String(manufacturer ?? '').trim(),
-    expiryDate: parseMedicineExpiryDate(expiryRaw),
-    purchasePrice: purchaseRaw === undefined ? NaN : Number(purchaseRaw),
-    unitsPerPack: unitsRaw === undefined ? 1 : Number(unitsRaw),
-    price: priceRaw === undefined ? NaN : Number(priceRaw),
-    quantity: quantityRaw === undefined ? NaN : Number(quantityRaw),
+    expiryDate: parsedExpiry,
+    purchasePrice: parsedPurchasePrice,
+    unitsPerPack: parsedUnitsPerPack,
+    price: parsedSalePrice,
+    quantity: parsedQuantity,
     rackLocation: String(readAlias(row, aliases.rackLocation) ?? '').trim(),
   };
+
   const errors = [];
   if (!medicine.name) errors.push('Medicine name is required.');
-  if (!medicine.manufacturer) errors.push('Manufacturer is required.');
-  if (!medicine.expiryDate) errors.push('A valid expiry date is required (DD/MM/YYYY or YYYY-MM-DD).');
-  if (!Number.isFinite(medicine.purchasePrice) || medicine.purchasePrice <= 0) errors.push('Purchase price per pack must be greater than zero.');
-  if (!isValidUnitsPerPack(medicine.unitsPerPack)) errors.push('Units per pack must be a positive whole number.');
-  if (!Number.isFinite(medicine.price) || medicine.price <= 0) errors.push('Sale price per unit must be greater than zero.');
-  if (!Number.isInteger(medicine.quantity) || medicine.quantity < 0) errors.push('Stock quantity must be a non-negative whole number of units.');
+  if (!Number.isFinite(medicine.purchasePrice) || medicine.purchasePrice <= 0) {
+    errors.push('Purchase price per pack is required and must be greater than zero.');
+  }
+  if (expiryRaw && !parsedExpiry) {
+    errors.push('Expiry date format is invalid (use DD/MM/YYYY or YYYY-MM-DD).');
+  }
+
   return { medicine, errors };
 };

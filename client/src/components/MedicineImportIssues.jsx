@@ -17,7 +17,12 @@ const FIELDS = [
 ];
 
 const OPTIONAL = [
-  'rackLocation'
+  'manufacturer',
+  'expiryDate',
+  'unitsPerPack',
+  'price',
+  'quantity',
+  'rackLocation',
 ];
 
 const toFormVal = (v) => {
@@ -129,6 +134,21 @@ export default function MedicineImportIssues({ compact = false }) {
     onError: (e) => setMsg(e?.response?.data?.message || 'Import failed.'),
   });
 
+  const discardMutation = useMutation({
+    mutationFn: async (id) => (await api.delete(`/medicines/import-issues/${id}`)).data,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['medicineImportIssues'] });
+    },
+  });
+
+  const discardAllMutation = useMutation({
+    mutationFn: async () => (await api.delete('/medicines/import-issues')).data,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['medicineImportIssues'] });
+      setMsg('All pending import issues discarded.');
+    },
+  });
+
   const issues = Array.isArray(data) ? data : [];
 
   const beginFix = (issue) => {
@@ -238,14 +258,30 @@ export default function MedicineImportIssues({ compact = false }) {
             {issues.length}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-900 disabled:opacity-60 dark:border-amber-700 dark:text-amber-300"
-        >
-          <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} /> Refresh
-        </button>
+        <div className="flex gap-2">
+          {issues.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Are you sure you want to discard all pending rows? They will not be imported.')) {
+                  discardAllMutation.mutate();
+                }
+              }}
+              disabled={discardAllMutation.isPending}
+              className="inline-flex items-center gap-1 rounded-lg border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/30 transition"
+            >
+              <XCircle size={12} /> Discard All
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 px-2 py-1 text-xs font-semibold text-amber-900 disabled:opacity-60 dark:border-amber-700 dark:text-amber-300 transition"
+          >
+            <RefreshCw size={12} className={isFetching ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
       </div>
 
       {msg && (
@@ -278,13 +314,24 @@ export default function MedicineImportIssues({ compact = false }) {
                   ))}
                 </ul>
               </div>
-              <button
-                type="button"
-                onClick={() => beginFix(issue)}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-teal-800"
-              >
-                <Wrench size={12} /> Fix &amp; Add
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => beginFix(issue)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-teal-700 px-3 py-2 text-xs font-bold text-white transition hover:bg-teal-800"
+                >
+                  <Wrench size={12} /> Fix &amp; Add
+                </button>
+                <button
+                  type="button"
+                  onClick={() => discardMutation.mutate(issue._id)}
+                  title="Discard this row"
+                  disabled={discardMutation.isPending}
+                  className="inline-flex items-center justify-center rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 p-2 transition dark:bg-slate-700 dark:hover:bg-rose-900/30"
+                >
+                  <XCircle size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -322,7 +369,9 @@ export default function MedicineImportIssues({ compact = false }) {
                   type={type}
                   min={
                     type === 'number'
-                      ? ['quantity', 'reorderLevel'].includes(key)
+                      ? ['unitsPerPack'].includes(key)
+                        ? '1'
+                        : ['quantity', 'reorderLevel'].includes(key)
                         ? '0'
                         : '0.01'
                       : undefined

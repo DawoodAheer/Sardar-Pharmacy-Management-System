@@ -41,6 +41,8 @@ import {
   UsersRound,
   UserPlus,
   X,
+  TrendingUp,
+  ShoppingCart,
 } from 'lucide-react';
 
 /* =========================================================
@@ -463,6 +465,11 @@ export default function SuperadminDashboard() {
     useState(null);
   const [returnModalBill, setReturnModalBill] =
     useState(null);
+
+  // Modal states for dashboard cards
+  const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
+  const [isPurchaseOrdersModalOpen, setIsPurchaseOrdersModalOpen] = useState(false);
+  const [isAuditHistoryModalOpen, setIsAuditHistoryModalOpen] = useState(false);
 
   const { data: deletionRequestsResponse, refetch: refetchDeletionRequests } = useQuery({
     queryKey: ['adminDeletionRequests'],
@@ -1407,9 +1414,49 @@ export default function SuperadminDashboard() {
         <MedicineImportIssues />
         <BackupRestorePanel />
         <DailyClosingReport compact />
-        <MedicineExpiryAlerts compact />
-        <PurchaseOrdersPanel compact />
-        <MedicineAuditHistory compact />
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 my-6">
+          <StatCard
+            title="Stock Expiry Alerts"
+            value="View Alerts"
+            description="Expired & Expiring Medicines"
+            icon={AlertTriangle}
+            iconWrapperClass="bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400"
+            onClick={() => setIsExpiryModalOpen(true)}
+          />
+          <StatCard
+            title="Purchase Orders"
+            value="Manage Orders"
+            description="Low Stock & Ordering"
+            icon={PackageSearch}
+            iconWrapperClass="bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            onClick={() => setIsPurchaseOrdersModalOpen(true)}
+          />
+          <StatCard
+            title="Audit History"
+            value="View History"
+            description="Recent Medicine Changes"
+            icon={Clock3}
+            iconWrapperClass="bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
+            onClick={() => setIsAuditHistoryModalOpen(true)}
+          />
+          <StatCard
+            title="Profit Analytics"
+            value="P&L Report"
+            description="Monthly Profit & Margins"
+            icon={TrendingUp}
+            iconWrapperClass="bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+            onClick={() => setIsProfitModalOpen(true)}
+          />
+          <StatCard
+            title="Top Selling"
+            value="Best Sellers"
+            description="Highest Volume Medicines"
+            icon={ShoppingCart}
+            iconWrapperClass="bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+            onClick={() => setSalesRankingModal('top')}
+          />
+        </div>
 
         {/* WARNINGS */}
 
@@ -3801,44 +3848,71 @@ export default function SuperadminDashboard() {
                 </div>
               </div>
               <button type="button" onClick={() => setSalesRankingModal(null)}
-                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-lg font-bold transition">×</button>
+                className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center text-lg font-bold transition">&times;</button>
             </div>
-
-            <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2">
+            {/* List (Grid Cards) */}
+            <div className="max-h-[70vh] overflow-y-auto p-5 bg-slate-50/50 dark:bg-slate-900/50">
               {isMedicineSalesLoading ? (
-                <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
+                <div className="text-center py-8 text-slate-400 text-sm flex items-center justify-center gap-2">
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  Loading...
+                </div>
               ) : (() => {
                 const list = salesRankingModal === 'top'
                   ? (medicineSalesRanking?.topSelling || [])
                   : (medicineSalesRanking?.leastSelling || []);
-                if (!list.length) return <div className="text-center py-8 text-slate-400 text-sm">No sales data available yet.</div>;
-                return list.map((med, index) => (
-                  <div key={med.medicineId}
-                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 ${
-                      salesRankingModal === 'top'
-                        ? 'border-emerald-100 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
-                        : 'border-rose-100 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
-                    }`}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-extrabold shrink-0 ${
-                      salesRankingModal === 'top'
-                        ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-300 text-slate-800' : index === 2 ? 'bg-amber-600 text-white' : 'bg-emerald-100 text-emerald-700'
-                        : 'bg-rose-100 text-rose-700'
-                    }`}>
-                      {salesRankingModal === 'top' && index === 0 ? '🥇' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{med.name || 'Unknown'}</div>
-                      {med.manufacturer && <div className="text-[10px] text-slate-500 truncate">{med.manufacturer}</div>}
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className={`text-sm font-extrabold ${salesRankingModal === 'top' ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                        {med.totalUnits} units
+                if (!list.length) {
+                  return <div className="text-center py-12 text-slate-400 text-sm bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700">No sales data available yet.</div>;
+                }
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {list.map((med, index) => (
+                      <div
+                        key={med.medicineId}
+                        className={`relative flex flex-col rounded-2xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
+                          salesRankingModal === 'top'
+                            ? 'border-emerald-100 bg-white dark:border-emerald-900/30 dark:bg-slate-800'
+                            : 'border-rose-100 bg-white dark:border-rose-900/30 dark:bg-slate-800'
+                        }`}
+                      >
+                        {/* Rank Badge */}
+                        <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-xl shadow-sm flex items-center justify-center text-xs font-black ${
+                          salesRankingModal === 'top'
+                            ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-200 text-slate-800' : index === 2 ? 'bg-amber-700 text-amber-50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
+                            : 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
+                        }`}>
+                          {salesRankingModal === 'top' && index === 0 ? '🏆' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
+                        </div>
+
+                        <div className="flex-1 mt-2">
+                          <div className="text-sm font-bold text-slate-800 dark:text-slate-100 line-clamp-2 leading-snug">
+                            {med.name || 'Unknown Medicine'}
+                          </div>
+                          {med.manufacturer && (
+                            <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 mt-1 line-clamp-1">
+                              {med.manufacturer}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50 grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Units Sold</div>
+                            <div className={`text-sm font-black ${salesRankingModal === 'top' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                              {med.totalUnits}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Revenue</div>
+                            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                              {getCurrency(med.totalRevenue)}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-[10px] text-slate-500">{getCurrency(med.totalRevenue)} rev</div>
-                    </div>
+                    ))}
                   </div>
-                ));
+                );
               })()}
             </div>
 
@@ -3849,6 +3923,51 @@ export default function SuperadminDashboard() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Expiry Alerts Modal */}
+      {isExpiryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsExpiryModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><MedicineExpiryAlerts /></div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchase Orders Modal */}
+      {isPurchaseOrdersModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsPurchaseOrdersModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><PurchaseOrdersPanel /></div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit History Modal */}
+      {isAuditHistoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
+            <button
+              onClick={() => setIsAuditHistoryModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full dark:hover:bg-slate-800 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <div className="p-1 mt-6"><MedicineAuditHistory /></div>
           </div>
         </div>
       )}

@@ -1,3 +1,19 @@
 {
-  "ignore": ["backups/*", "logs/*", "*.test.js"]
+  "ignore": [
+    "backups/**",
+    "backups/*",
+    "logs/**",
+    "logs/*",
+    "uploads/**",
+    "uploads/*",
+    "node_modules/**",
+    "*.test.js",
+    "*.test.mjs",
+    "*.log",
+    "*.tmp",
+    "*.lock"
+  ],
+  "watch": ["."],
+  "ext": "js,mjs,cjs,json",
+  "delay": 500
 }
