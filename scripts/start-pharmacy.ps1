@@ -5,8 +5,7 @@
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
-$AppUrl = "http://localhost:5173"
+$AppUrl = "http://localhost:5174"
 
 Set-Location $ProjectRoot
 
@@ -102,17 +101,21 @@ $elapsed = 0
 $maxWait = 90
 
 while ($elapsed -lt $maxWait) {
-    try {
-        $req = [System.Net.WebRequest]::Create($AppUrl)
-        $req.Timeout = 2000
-        $res = $req.GetResponse()
-        $code = [int]$res.StatusCode
-        $res.Close()
-        if ($code -ge 200 -and $code -lt 400) {
-            $ready = $true
-            break
-        }
-    } catch {}
+    foreach ($url in @("http://localhost:5174", "http://localhost:5173")) {
+        try {
+            $req = [System.Net.WebRequest]::Create($url)
+            $req.Timeout = 2000
+            $res = $req.GetResponse()
+            $code = [int]$res.StatusCode
+            $res.Close()
+            if ($code -ge 200 -and $code -lt 400) {
+                $AppUrl = $url
+                $ready = $true
+                break
+            }
+        } catch {}
+    }
+    if ($ready) { break }
     Start-Sleep -Seconds 2
     $elapsed += 2
     Write-Host "." -NoNewline -ForegroundColor Gray

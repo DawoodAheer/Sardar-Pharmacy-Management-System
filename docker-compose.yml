@@ -83,6 +83,7 @@ services:
     container_name: pharmadesk-frontend
     restart: unless-stopped
     ports:
+      - "5174:80"
       - "5173:80"
       - "3000:80"
     healthcheck:
