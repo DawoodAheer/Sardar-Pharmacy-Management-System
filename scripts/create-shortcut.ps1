@@ -3,23 +3,16 @@ param (
 )
 
 # =====================================================================
-# Sardar Medical Store - Windows Desktop Shortcut Installer (PowerShell)
-# Creates TWO shortcuts:
-#   1. Sardar Medical Store (Docker Launcher)
-#   2. Sardar Medical Store App (PWA-like Chrome/Edge window without address bar)
+# Sardar Medical Store - Windows Desktop Shortcut Creator
+# Creates ONE shortcut: Start-Sardar-Pharmacy.bat launcher
+# (App opens in Chrome/Edge app mode via the launcher itself)
 # =====================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "SilentlyContinue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 
-Set-Location $ProjectRoot
-
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "     Sardar Medical Store DESKTOP SHORTCUT CREATOR        " -ForegroundColor Green
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host ""
-
+# Find where the desktop is (handles OneDrive desktop too)
 $PossibleDesktopPaths = @(
     [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop),
     "$env:USERPROFILE\Desktop",
@@ -29,95 +22,52 @@ $PossibleDesktopPaths = @(
 $TargetBat = Join-Path $ProjectRoot "Start-Sardar-Pharmacy.bat"
 
 if (-not (Test-Path $TargetBat)) {
-    Write-Host "[ERROR] Target batch launcher file not found at: $TargetBat" -ForegroundColor Red
+    Write-Host "[ERROR] Launcher file not found: $TargetBat" -ForegroundColor Red
     if (-not $NoPause) { Read-Host "Press Enter to exit..." }
     exit 1
 }
 
-# -----------------------------------------------------------------
-# Detect browser path: prefer Chrome, then Edge
-# -----------------------------------------------------------------
-$BrowserPath = ""
-$BrowserName = ""
-
-$ChromePaths = @(
-    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
-    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-)
-
-$EdgePaths = @(
-    "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-)
-
-foreach ($p in $ChromePaths) {
-    if (Test-Path $p) {
-        $BrowserPath = $p
-        $BrowserName = "Google Chrome"
-        break
-    }
-}
-
-if (-not $BrowserPath) {
-    foreach ($p in $EdgePaths) {
-        if (Test-Path $p) {
-            $BrowserPath = $p
-            $BrowserName = "Microsoft Edge"
-            break
-        }
-    }
-}
+# Pick a nice icon - use a pharmacy/store icon from shell32
+$IconPath = "$env:SystemRoot\System32\shell32.dll"
+$IconIndex = 14  # briefcase/store style icon
 
 $WshShell = New-Object -ComObject WScript.Shell
-$AppUrl = "http://localhost:5173"
 
+$created = 0
 foreach ($DesktopFolder in $PossibleDesktopPaths) {
-    # 1. Launcher Shortcut
-    try {
-        $ShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store.lnk"
-        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-        $Shortcut.TargetPath = $TargetBat
-        $Shortcut.WorkingDirectory = $ProjectRoot
-        $Shortcut.Description = "Launch Sardar Medical Store Management System (1-Click)"
-        
-        $shell32Path = "$env:SystemRoot\System32\shell32.dll"
-        if (Test-Path $shell32Path) {
-            $Shortcut.IconLocation = "$shell32Path, 14"
-        }
-        
-        $Shortcut.Save()
-        Write-Host "[OK] DESKTOP LAUNCHER CREATED: $ShortcutPath" -ForegroundColor Green
-    } catch {
-        Write-Host "[WARN] Could not create launcher shortcut at $DesktopFolder" -ForegroundColor Yellow
+    $ShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store.lnk"
+
+    # Skip if shortcut already exists (don't recreate unnecessarily)
+    if (Test-Path $ShortcutPath) {
+        Write-Host "[INFO] Shortcut already exists at: $ShortcutPath" -ForegroundColor Gray
+        $created++
+        continue
     }
 
-    # 2. App Window Shortcut
-    if ($BrowserPath) {
-        try {
-            $AppShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store App.lnk"
-            $AppShortcut = $WshShell.CreateShortcut($AppShortcutPath)
-            $AppShortcut.TargetPath = $BrowserPath
-            $AppShortcut.Arguments = "--app=$AppUrl --new-window"
-            $AppShortcut.WorkingDirectory = $ProjectRoot
-            $AppShortcut.Description = "Sardar Medical Store - Desktop App Window (No Address Bar)"
-            $AppShortcut.IconLocation = "$BrowserPath, 0"
-            $AppShortcut.Save()
-            Write-Host "[OK] DESKTOP APP SHORTCUT CREATED: $AppShortcutPath" -ForegroundColor Green
-        } catch {
-            Write-Host "[WARN] Could not create app shortcut at $DesktopFolder" -ForegroundColor Yellow
+    try {
+        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+        $Shortcut.TargetPath    = $TargetBat
+        $Shortcut.WorkingDirectory = $ProjectRoot
+        $Shortcut.Description   = "Sardar Medical Store - 1-Click Launch"
+        $Shortcut.WindowStyle   = 1
+        if (Test-Path $IconPath) {
+            $Shortcut.IconLocation = "$IconPath, $IconIndex"
         }
+        $Shortcut.Save()
+        Write-Host "[OK] Desktop shortcut created: $ShortcutPath" -ForegroundColor Green
+        $created++
+    } catch {
+        Write-Host "[WARN] Could not create shortcut at $DesktopFolder : $_" -ForegroundColor Yellow
     }
 }
 
-Write-Host ""
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host "  SHORTCUTS CREATED ON YOUR DESKTOP!" -ForegroundColor Green
-Write-Host "  1. Sardar Medical Store     -- Full Docker launcher" -ForegroundColor White
-Write-Host "  2. Sardar Medical Store App -- Frameless Desktop App Window" -ForegroundColor White
-Write-Host "=====================================================" -ForegroundColor Cyan
-Write-Host ""
+if ($created -gt 0) {
+    Write-Host ""
+    Write-Host "  Double-click 'Sardar Medical Store' on your Desktop to launch!" -ForegroundColor Cyan
+}
+
 if (-not $NoPause) {
-    Write-Host "Press any key to close..." -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Press any key to close..." -ForegroundColor DarkGray
     try { $null = [Console]::ReadKey() } catch {}
 }
