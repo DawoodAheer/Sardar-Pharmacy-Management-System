@@ -8,16 +8,16 @@ param (
 # (App opens in Chrome/Edge app mode via the launcher itself)
 # =====================================================================
 
-$ErrorActionPreference = "SilentlyContinue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 
-# Find where the desktop is (handles OneDrive desktop too)
+# Find all valid Desktop paths (Personal Desktop, OneDrive Desktop, Public Desktop)
 $PossibleDesktopPaths = @(
     [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop),
+    [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::CommonDesktopDirectory),
     "$env:USERPROFILE\Desktop",
     "$env:USERPROFILE\OneDrive\Desktop"
-) | Select-Object -Unique | Where-Object { Test-Path $_ }
+) | Where-Object { [string]::IsNullOrWhiteSpace($_) -eq $false } | Select-Object -Unique | Where-Object { Test-Path $_ }
 
 $TargetBat = Join-Path $ProjectRoot "Start-Sardar-Pharmacy.bat"
 
@@ -37,24 +37,17 @@ $created = 0
 foreach ($DesktopFolder in $PossibleDesktopPaths) {
     $ShortcutPath = Join-Path $DesktopFolder "Sardar Medical Store.lnk"
 
-    # Skip if shortcut already exists (don't recreate unnecessarily)
-    if (Test-Path $ShortcutPath) {
-        Write-Host "[INFO] Shortcut already exists at: $ShortcutPath" -ForegroundColor Gray
-        $created++
-        continue
-    }
-
     try {
         $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-        $Shortcut.TargetPath    = $TargetBat
+        $Shortcut.TargetPath       = $TargetBat
         $Shortcut.WorkingDirectory = $ProjectRoot
-        $Shortcut.Description   = "Sardar Medical Store - 1-Click Launch"
-        $Shortcut.WindowStyle   = 1
+        $Shortcut.Description      = "Sardar Medical Store - 1-Click Launch"
+        $Shortcut.WindowStyle      = 1
         if (Test-Path $IconPath) {
             $Shortcut.IconLocation = "$IconPath, $IconIndex"
         }
         $Shortcut.Save()
-        Write-Host "[OK] Desktop shortcut created: $ShortcutPath" -ForegroundColor Green
+        Write-Host "[OK] Desktop shortcut created / updated: $ShortcutPath" -ForegroundColor Green
         $created++
     } catch {
         Write-Host "[WARN] Could not create shortcut at $DesktopFolder : $_" -ForegroundColor Yellow

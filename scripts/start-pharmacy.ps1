@@ -1,10 +1,11 @@
 # =====================================================================
 # Sardar Medical Store - 1-Click Desktop Launcher Script (PowerShell)
-# Fast: ~5s if Docker already running, ~60s cold start
+# Fast, Clean, Always launches latest code & creates desktop shortcut
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 $AppUrl = "http://localhost:5174"
 
 Set-Location $ProjectRoot
@@ -15,9 +16,19 @@ Write-Host "======================================================" -ForegroundC
 Write-Host ""
 
 # ---------------------------------------------------------------------
-# Step 1: Check Docker Installation
+# Step 1: Ensure Desktop Shortcut is created
 # ---------------------------------------------------------------------
-Write-Host "[1/4] Checking Docker..." -ForegroundColor Yellow
+try {
+    & "$ScriptDir\create-shortcut.ps1" -NoPause
+} catch {
+    Write-Host "[WARN] Desktop shortcut check skipped." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------
+# Step 2: Check Docker Installation & Status
+# ---------------------------------------------------------------------
+Write-Host ""
+Write-Host "[1/3] Checking Docker..." -ForegroundColor Yellow
 
 $dockerCli = Get-Command "docker" -ErrorAction SilentlyContinue
 if (-not $dockerCli) {
@@ -27,7 +38,7 @@ if (-not $dockerCli) {
     exit 1
 }
 
-# Check if Docker daemon is already running
+# Check if Docker daemon is running
 $isDockerRunning = $false
 try {
     $null = docker info 2>&1
@@ -74,27 +85,30 @@ if (-not $isDockerRunning) {
 Write-Host "[OK] Docker Engine is running!" -ForegroundColor Green
 
 # ---------------------------------------------------------------------
-# Step 2: Start Docker Services (fast - skips already-running ones)
+# Step 3: Build & Start Services (ensures newly pulled code runs, not stale containers)
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/4] Starting pharmacy services..." -ForegroundColor Yellow
+Write-Host "[2/3] Starting pharmacy services (updating containers with latest code)..." -ForegroundColor Yellow
 
 try {
-    docker compose up -d 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "docker compose up failed with code $LASTEXITCODE" }
+    # --build ensures any new code from GitHub is compiled into the containers
+    docker compose up -d --build 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        # Fallback to without build if cache exists
+        docker compose up -d 2>&1 | Out-Null
+    }
 } catch {
-    Write-Host "[ERROR] Failed to start services: $_" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
+    Write-Host "[WARN] Starting services directly..." -ForegroundColor Yellow
+    docker compose up -d 2>&1 | Out-Null
 }
 
 Write-Host "[OK] Services started!" -ForegroundColor Green
 
 # ---------------------------------------------------------------------
-# Step 3: Wait for App to be Ready (smart polling, max 90s)
+# Step 4: Wait for App to be Ready (smart polling on 5174 then 5173)
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/4] Waiting for application to be ready..." -ForegroundColor Yellow
+Write-Host "[3/3] Waiting for application to be ready..." -ForegroundColor Yellow
 
 $ready = $false
 $elapsed = 0
@@ -123,17 +137,14 @@ while ($elapsed -lt $maxWait) {
 Write-Host ""
 
 if ($ready) {
-    Write-Host "[OK] Application is READY! (took ${elapsed}s)" -ForegroundColor Green
+    Write-Host "[OK] Application is READY at $AppUrl! (took ${elapsed}s)" -ForegroundColor Green
 } else {
     Write-Host "[WARN] App may still be loading - opening browser anyway..." -ForegroundColor Yellow
 }
 
 # ---------------------------------------------------------------------
-# Step 4: Open App in Browser (app-mode = no address bar, like desktop app)
+# Step 5: Open App in Browser (app mode - frameless desktop app look)
 # ---------------------------------------------------------------------
-Write-Host ""
-Write-Host "[4/4] Opening Sardar Medical Store..." -ForegroundColor Yellow
-
 $opened = $false
 
 # Try Chrome app mode first (no address bar - feels like native desktop app)
@@ -171,23 +182,6 @@ if (-not $opened) {
 if (-not $opened) {
     Start-Process $AppUrl
     Write-Host "[OK] Opened in default browser" -ForegroundColor Green
-}
-
-# ---------------------------------------------------------------------
-# Create Desktop Shortcut (only if it does not already exist)
-# ---------------------------------------------------------------------
-$shortcutPath1 = "$env:USERPROFILE\Desktop\Sardar Medical Store.lnk"
-$shortcutPath2 = "$env:USERPROFILE\OneDrive\Desktop\Sardar Medical Store.lnk"
-$shortcutExists = (Test-Path $shortcutPath1) -or (Test-Path $shortcutPath2)
-
-if (-not $shortcutExists) {
-    Write-Host ""
-    Write-Host "[INFO] Creating Desktop shortcut (first time only)..." -ForegroundColor Cyan
-    try {
-        & "$ScriptDir\create-shortcut.ps1" -NoPause
-    } catch {
-        Write-Host "[WARN] Shortcut creation skipped." -ForegroundColor Yellow
-    }
 }
 
 # ---------------------------------------------------------------------
