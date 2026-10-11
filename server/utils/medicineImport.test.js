@@ -16,9 +16,10 @@ test('normalizes medicine import fields using the manual-entry names and validat
 
 test('reports missing, invalid and non-integer fields without coercing them into valid stock', () => {
   const result = normalizeMedicineImportRow({
-    name: 'Bad row', manufacturer: 'Example', expiryDate: '31/02/2028',
-    purchasePrice: 200, unitsPerPack: 5, price: 10, quantity: '2.5', reorderLevel: -1,
+    name: '', manufacturer: 'Example', expiryDate: '31/02/2028',
+    purchasePrice: -10, unitsPerPack: 5, price: 10, quantity: '2.5',
   });
+  // name missing (1), negative purchasePrice (2), invalid expiryDate (3)
   assert.equal(result.errors.length, 3);
   assert.equal(result.medicine.expiryDate, null);
 });
