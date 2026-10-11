@@ -85,17 +85,27 @@ if (-not $isDockerRunning) {
 Write-Host "[OK] Docker Engine is running!" -ForegroundColor Green
 
 # ---------------------------------------------------------------------
-# Step 3: Build & Start Services (ensures newly pulled code runs, not stale containers)
+# Step 3: Fast Instant Startup (Starts existing containers in 3-5 seconds)
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/3] Starting pharmacy services (updating containers with latest code)..." -ForegroundColor Yellow
+Write-Host "[2/3] Starting pharmacy services..." -ForegroundColor Yellow
 
 try {
-    # --build ensures any new code from GitHub is compiled into the containers
-    docker compose up -d --build 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        # Fallback to without build if cache exists
+    # Check if images already exist
+    $hasImages = $false
+    try {
+        $imgCheck = docker images --filter "reference=sardar-pharmacy-management-system-*" -q
+        if ($imgCheck) { $hasImages = $true }
+    } catch {}
+
+    if ($hasImages) {
+        # Instant startup: fast up without re-building on every single launch
+        Write-Host "[INFO] Launching pre-built containers (instant startup)..." -ForegroundColor Cyan
         docker compose up -d 2>&1 | Out-Null
+    } else {
+        # First time only: build images
+        Write-Host "[INFO] Initializing containers for the first time (please wait 1-2 minutes)..." -ForegroundColor Cyan
+        docker compose up -d --build
     }
 } catch {
     Write-Host "[WARN] Starting services directly..." -ForegroundColor Yellow
@@ -112,13 +122,13 @@ Write-Host "[3/3] Waiting for application to be ready..." -ForegroundColor Yello
 
 $ready = $false
 $elapsed = 0
-$maxWait = 90
+$maxWait = 60
 
 while ($elapsed -lt $maxWait) {
     foreach ($url in @("http://localhost:5174", "http://localhost:5173")) {
         try {
             $req = [System.Net.WebRequest]::Create($url)
-            $req.Timeout = 2000
+            $req.Timeout = 1500
             $res = $req.GetResponse()
             $code = [int]$res.StatusCode
             $res.Close()
