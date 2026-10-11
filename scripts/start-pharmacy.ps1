@@ -1,9 +1,9 @@
 # =====================================================================
 # Sardar Medical Store - 1-Click Desktop Launcher Script (PowerShell)
-# Fast, Clean, Always launches latest code & creates desktop shortcut
+# Fast, Clean, Crash-proof startup
 # =====================================================================
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 $AppUrl = "http://localhost:5174"
@@ -20,9 +20,7 @@ Write-Host ""
 # ---------------------------------------------------------------------
 try {
     & "$ScriptDir\create-shortcut.ps1" -NoPause
-} catch {
-    Write-Host "[WARN] Desktop shortcut check skipped." -ForegroundColor Yellow
-}
+} catch {}
 
 # ---------------------------------------------------------------------
 # Step 2: Check Docker Installation & Status
@@ -41,7 +39,7 @@ if (-not $dockerCli) {
 # Check if Docker daemon is running
 $isDockerRunning = $false
 try {
-    $null = docker info 2>&1
+    $null = docker info 2>$null
     if ($LASTEXITCODE -eq 0) { $isDockerRunning = $true }
 } catch {}
 
@@ -55,7 +53,7 @@ if (-not $isDockerRunning) {
     $dockerExe = $dockerDesktopPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
     if (-not $dockerExe) {
-        Write-Host "[ERROR] Docker Desktop not found. Please start it manually then re-run." -ForegroundColor Red
+        Write-Host "[ERROR] Docker Desktop not found. Please start Docker Desktop manually then re-run." -ForegroundColor Red
         Read-Host "Press Enter to exit..."
         exit 1
     }
@@ -68,7 +66,7 @@ if (-not $isDockerRunning) {
         Start-Sleep -Seconds 3
         $waited += 3
         try {
-            $null = docker info 2>&1
+            $null = docker info 2>$null
             if ($LASTEXITCODE -eq 0) { $isDockerRunning = $true; break }
         } catch {}
         Write-Host "." -NoNewline -ForegroundColor Gray
@@ -76,7 +74,7 @@ if (-not $isDockerRunning) {
     Write-Host ""
 
     if (-not $isDockerRunning) {
-        Write-Host "[ERROR] Docker failed to start after 90 seconds." -ForegroundColor Red
+        Write-Host "[ERROR] Docker failed to start after 90 seconds. Please start Docker Desktop and try again." -ForegroundColor Red
         Read-Host "Press Enter to exit..."
         exit 1
     }
@@ -85,32 +83,13 @@ if (-not $isDockerRunning) {
 Write-Host "[OK] Docker Engine is running!" -ForegroundColor Green
 
 # ---------------------------------------------------------------------
-# Step 3: Fast Instant Startup (Starts existing containers in 3-5 seconds)
+# Step 3: Fast Instant Startup (Runs docker compose up safely)
 # ---------------------------------------------------------------------
 Write-Host ""
 Write-Host "[2/3] Starting pharmacy services..." -ForegroundColor Yellow
 
-try {
-    # Check if images already exist
-    $hasImages = $false
-    try {
-        $imgCheck = docker images --filter "reference=sardar-pharmacy-management-system-*" -q
-        if ($imgCheck) { $hasImages = $true }
-    } catch {}
-
-    if ($hasImages) {
-        # Instant startup: fast up without re-building on every single launch
-        Write-Host "[INFO] Launching pre-built containers (instant startup)..." -ForegroundColor Cyan
-        docker compose up -d 2>&1 | Out-Null
-    } else {
-        # First time only: build images
-        Write-Host "[INFO] Initializing containers for the first time (please wait 1-2 minutes)..." -ForegroundColor Cyan
-        docker compose up -d --build
-    }
-} catch {
-    Write-Host "[WARN] Starting services directly..." -ForegroundColor Yellow
-    docker compose up -d 2>&1 | Out-Null
-}
+# Run docker compose using cmd /c so PowerShell NativeCommandError never triggers on stderr informational logs
+cmd /c "docker compose up -d"
 
 Write-Host "[OK] Services started!" -ForegroundColor Green
 
