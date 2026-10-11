@@ -88,26 +88,55 @@ Write-Host "[OK] Docker Engine is running!" -ForegroundColor Green
 Write-Host ""
 Write-Host "[2/3] Starting pharmacy services..." -ForegroundColor Yellow
 
-# Run docker compose using cmd /c so PowerShell NativeCommandError never triggers on stderr informational logs
-cmd /c "docker compose up -d"
+# Run docker compose and capture exit code
+$composeOutput = cmd /c "docker compose up -d 2>&1"
+$composeExitCode = $LASTEXITCODE
+
+if ($composeExitCode -ne 0) {
+    Write-Host "[ERROR] Docker Compose failed to start services!" -ForegroundColor Red
+    Write-Host $composeOutput -ForegroundColor Yellow
+    Read-Host "Press Enter to exit..."
+    exit 1
+}
 
 # Self-heal replica set member host so backend can always resolve internal mongodb:27017
 $fixJs = 'try { let c = rs.conf(); if (c.members[0].host !== "mongodb:27017") { c.members[0].host = "mongodb:27017"; rs.reconfig(c, { force: true }); } } catch (e) {}'
 docker exec pharmadesk-mongodb mongosh --quiet --eval $fixJs 2>$null
 
-Write-Host "[OK] Services started!" -ForegroundColor Green
+Write-Host "[OK] Containers launched!" -ForegroundColor Green
 
 # ---------------------------------------------------------------------
-# Step 4: Wait for App to be Ready (smart polling on 5174 then 5173)
+# Step 4: Verify Health of MongoDB, Backend, and Frontend
 # ---------------------------------------------------------------------
 Write-Host ""
-Write-Host "[3/3] Waiting for application to be ready..." -ForegroundColor Yellow
+Write-Host "[3/3] Verifying services health (MongoDB, Backend, Frontend)..." -ForegroundColor Yellow
 
-$ready = $false
+$mongoHealthy = $false
+$backendHealthy = $false
+$frontendHealthy = $false
 $elapsed = 0
 $maxWait = 60
 
 while ($elapsed -lt $maxWait) {
+    # 1. Check MongoDB container health
+    if (-not $mongoHealthy) {
+        $mStatus = & docker inspect --format='{{json .State.Health.Status}}' pharmadesk-mongodb 2>$null
+        if ($mStatus -like '*healthy*') {
+            $mongoHealthy = $true
+            Write-Host " [MongoDB: HEALTHY]" -ForegroundColor Green -NoNewline
+        }
+    }
+
+    # 2. Check Backend container health
+    if (-not $backendHealthy) {
+        $bStatus = & docker inspect --format='{{json .State.Health.Status}}' pharmadesk-backend 2>$null
+        if ($bStatus -like '*healthy*') {
+            $backendHealthy = $true
+            Write-Host " [Backend: HEALTHY]" -ForegroundColor Green -NoNewline
+        }
+    }
+
+    # 3. Check Frontend HTTP response on 5174 then 5173
     foreach ($url in @("http://localhost:5174", "http://localhost:5173")) {
         try {
             $req = [System.Net.WebRequest]::Create($url)
@@ -117,22 +146,32 @@ while ($elapsed -lt $maxWait) {
             $res.Close()
             if ($code -ge 200 -and $code -lt 400) {
                 $AppUrl = $url
-                $ready = $true
+                $frontendHealthy = $true
                 break
             }
         } catch {}
     }
-    if ($ready) { break }
+
+    if ($mongoHealthy -and $backendHealthy -and $frontendHealthy) {
+        break
+    }
+
     Start-Sleep -Seconds 2
     $elapsed += 2
     Write-Host "." -NoNewline -ForegroundColor Gray
 }
 Write-Host ""
 
-if ($ready) {
-    Write-Host "[OK] Application is READY at $AppUrl! (took ${elapsed}s)" -ForegroundColor Green
+if ($mongoHealthy -and $backendHealthy -and $frontendHealthy) {
+    Write-Host "[OK] All pharmacy services are HEALTHY & READY at $AppUrl! (took ${elapsed}s)" -ForegroundColor Green
 } else {
-    Write-Host "[WARN] App may still be loading - opening browser anyway..." -ForegroundColor Yellow
+    Write-Host "[ERROR] One or more services failed to report healthy within ${maxWait}s:" -ForegroundColor Red
+    Write-Host " - MongoDB  : $(if ($mongoHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
+    Write-Host " - Backend  : $(if ($backendHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
+    Write-Host " - Frontend : $(if ($frontendHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
+    Write-Host "Check container logs via: docker compose logs" -ForegroundColor Gray
+    Read-Host "Press Enter to exit..."
+    exit 1
 }
 
 # ---------------------------------------------------------------------
