@@ -92,7 +92,8 @@ Write-Host "[2/3] Starting pharmacy services..." -ForegroundColor Yellow
 cmd /c "docker compose up -d"
 
 # Self-heal replica set member host so backend can always resolve internal mongodb:27017
-cmd /c "docker exec pharmadesk-mongodb mongosh --quiet --eval ""try { let c = rs.conf(); if (c.members[0].host !== 'mongodb:27017') { c.members[0].host = 'mongodb:27017'; rs.reconfig(c, { force: true }); } } catch (e) {}""" 2>nul"
+$fixJs = 'try { let c = rs.conf(); if (c.members[0].host !== "mongodb:27017") { c.members[0].host = "mongodb:27017"; rs.reconfig(c, { force: true }); } } catch (e) {}'
+docker exec pharmadesk-mongodb mongosh --quiet --eval $fixJs 2>$null
 
 Write-Host "[OK] Services started!" -ForegroundColor Green
 
