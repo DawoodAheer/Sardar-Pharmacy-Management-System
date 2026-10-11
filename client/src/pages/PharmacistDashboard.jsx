@@ -1772,10 +1772,16 @@ const PharmacistDashboard = () => {
       try {
         const bstr = evt.target.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'dd/mm/yy' });
-        setBulkData(data);
+
+        // Read ALL sheets and merge rows — supports multi-sheet Excel files
+        let allData = [];
+        wb.SheetNames.forEach((sheetName) => {
+          const ws = wb.Sheets[sheetName];
+          const sheetRows = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'dd/mm/yy' });
+          allData = allData.concat(sheetRows);
+        });
+
+        setBulkData(allData);
         setBulkError('');
       } catch {
         setBulkError('Error parsing Excel file. Ensure it matches the template.');
