@@ -20,7 +20,7 @@ export const generateAccessToken = (
     },
     process.env.JWT_ACCESS_SECRET,
     {
-      expiresIn: "15m",
+      expiresIn: "3650d", // 10 years for offline pharmacy uninterrupted use
     }
   );
 };
@@ -29,7 +29,7 @@ export const generateAccessToken = (
 |--------------------------------------------------------------------------
 | Generate Refresh Token
 |--------------------------------------------------------------------------
-| Long-lived token used to obtain a new access token.
+| Long-lived token used to obtain a new access token (10 years offline).
 |--------------------------------------------------------------------------
 */
 export const generateRefreshToken = (
@@ -43,7 +43,7 @@ export const generateRefreshToken = (
     },
     process.env.JWT_REFRESH_SECRET,
     {
-      expiresIn: "7d",
+      expiresIn: "3650d", // 10 years for offline pharmacy uninterrupted use
     }
   );
 };
@@ -54,6 +54,7 @@ export const generateRefreshToken = (
 |--------------------------------------------------------------------------
 | Refresh token is stored in an httpOnly cookie so JavaScript
 | running in the browser cannot directly read it.
+| In offline local environment (HTTP), secure is false unless COOKIE_SECURE is true.
 |--------------------------------------------------------------------------
 */
 export const sendRefreshTokenCookie = (
@@ -63,14 +64,14 @@ export const sendRefreshTokenCookie = (
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
 
-    secure:
-      process.env.NODE_ENV === "production",
+    // Set false for offline local network HTTP so browsers don't discard the cookie
+    secure: process.env.COOKIE_SECURE === "true",
 
     sameSite: "lax",
 
     path: "/",
 
     maxAge:
-      7 * 24 * 60 * 60 * 1000,
+      10 * 365 * 24 * 60 * 60 * 1000, // 10 years
   });
 };
