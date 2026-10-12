@@ -2836,9 +2836,30 @@ export default function SuperadminDashboard() {
               )}
 
               {selectedView === 'refundActivity' && (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/20 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                        Sales Returns & Audit Log
+                      </h4>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                        Track previous refunds or process a return on any original sales bill.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedView('todaySales')}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-sm"
+                    >
+                      <RotateCcw size={14} />
+                      View All Bills to Process Return
+                    </button>
+                  </div>
+
                   {returnActivity.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500 dark:border-slate-700">No refunds or returns recorded yet.</div>
+                    <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500 dark:border-slate-700">
+                      No refunds or returns recorded yet.
+                    </div>
                   ) : returnActivity.map((item) => (
                     <article key={item._id} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -3141,6 +3162,24 @@ export default function SuperadminDashboard() {
                                   )
                                 )}
 
+                              </div>
+
+                              <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                <button
+                                  type="button"
+                                  onClick={() => setReturnModalBill(bill)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-sm"
+                                >
+                                  <RotateCcw size={13} />
+                                  Return / Refund
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => window.open(`/pharmacist/receipt/${bill._id}?print=1`, '_blank')}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                >
+                                  🖨️ Print Bill
+                                </button>
                               </div>
 
                             </div>

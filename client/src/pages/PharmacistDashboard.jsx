@@ -75,6 +75,7 @@ import {
   ChevronRight,
   PackageSearch,
   Clock3,
+  RotateCcw,
 } from 'lucide-react';
 
 // ============================================================================
@@ -448,6 +449,7 @@ const PharmacistDashboard = () => {
     useState('');
   const [labelImageUrl, setLabelImageUrl] =
     useState('');
+  const [refundSearchTerm, setRefundSearchTerm] = useState('');
 
   // ==========================================================================
   // ONLINE ORDER ACTIONS
@@ -1155,25 +1157,17 @@ const PharmacistDashboard = () => {
   };
 
   // Option-1 direct print: loads receipt in a hidden iframe and calls print()
+  // Direct print: Opens receipt in dedicated print window with loaded bill data
   const printReceiptInPage = (billId) => {
-    const existing = document.getElementById('__receipt_iframe__');
-    if (existing) existing.remove();
-    const iframe = document.createElement('iframe');
-    iframe.id = '__receipt_iframe__';
-    iframe.src = `/pharmacist/receipt/${billId}?print=1`;
-    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;';
-    document.body.appendChild(iframe);
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (err) {
-        // fallback: open in new tab if iframe print blocked
-        window.open(`/pharmacist/receipt/${billId}`, '_blank');
-      }
-      // clean up after short delay
-      setTimeout(() => { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); }, 3000);
-    };
+    if (!billId) return;
+    const url = `/pharmacist/receipt/${billId}?print=1`;
+    const printWindow = window.open(url, '_blank', 'width=800,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (printWindow) {
+      printWindow.focus();
+    } else {
+      // Fallback if popup blocked
+      window.location.href = url;
+    }
   };
 
   const openSalesDetails = (type) => {
@@ -2513,6 +2507,12 @@ const PharmacistDashboard = () => {
       name: 'Udhar Khata',
       tab: 'udhar',
       icon: Wallet,
+    },
+
+    {
+      name: 'Returns / Refunds',
+      tab: 'returns',
+      icon: RotateCcw,
     },
 
     {
@@ -5155,6 +5155,184 @@ const PharmacistDashboard = () => {
           {/* ================================================================= */}
           {activeTab === 'udhar' && (
             <UdharManagement />
+          )}
+
+          {/* ================================================================= */}
+          {/* RETURNS & REFUNDS (SALES RETURN MANAGEMENT) */}
+          {/* ================================================================= */}
+          {activeTab === 'returns' && (
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                      <RotateCcw className="w-4 h-4" />
+                    </div>
+                    <h2 className="font-bold text-base text-slate-900 dark:text-white">
+                      Sales Returns & Refund Processing
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                    Select any original bill below to process partial or full medicine returns, restore stock, and print refund receipts.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={refundSearchTerm}
+                      onChange={(e) => setRefundSearchTerm(e.target.value)}
+                      placeholder="Search bill #, customer, phone..."
+                      className="pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-amber-500 w-64"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => refetchBills()}
+                    disabled={isBillsFetching}
+                    className="px-3 py-2 rounded-xl border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 disabled:opacity-60 flex items-center gap-1.5"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isBillsFetching ? 'animate-spin' : ''}`} />
+                    Refresh Bills
+                  </button>
+                </div>
+              </div>
+
+              {/* BILLS LIST FOR RETURNS */}
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Original Sales Bills ({bills.filter((b) => b?.orderStatus !== 'PENDING' && b?.orderStatus !== 'REJECTED').length})
+                  </h3>
+                  <span className="text-[11px] text-slate-500">
+                    Showing latest bills available for return & refund
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-bold uppercase text-[10px]">
+                        <th className="p-3">Bill Number</th>
+                        <th className="p-3">Customer</th>
+                        <th className="p-3">Date & Time</th>
+                        <th className="p-3">Items Sold</th>
+                        <th className="p-3">Original Total</th>
+                        <th className="p-3">Refund Status</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {bills
+                        .filter((b) => b?.orderStatus !== 'PENDING' && b?.orderStatus !== 'REJECTED')
+                        .filter((b) => {
+                          if (!refundSearchTerm) return true;
+                          const term = refundSearchTerm.toLowerCase();
+                          const billNum = String(b.billNumber || b._id || '').toLowerCase();
+                          const cust = String(b.customerName || b.customer?.name || '').toLowerCase();
+                          const phone = String(b.customerPhone || b.customer?.phone || '').toLowerCase();
+                          return billNum.includes(term) || cust.includes(term) || phone.includes(term);
+                        })
+                        .map((bill) => {
+                          const totalItems = Array.isArray(bill.items)
+                            ? bill.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+                            : 0;
+                          const returnsCount = Array.isArray(bill.returns) ? bill.returns.length : 0;
+                          const isFullyReturned = bill.isFullyReturned;
+                          const hasReturns = (bill.totalRefunded || 0) > 0;
+
+                          return (
+                            <tr key={bill._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                              <td className="p-3 font-mono font-bold text-slate-900 dark:text-white">
+                                {bill.billNumber || bill._id}
+                              </td>
+                              <td className="p-3">
+                                <div className="font-semibold text-slate-900 dark:text-white">
+                                  {bill.customerName || bill.customer?.name || 'Walk-in Customer'}
+                                </div>
+                                {(bill.customerPhone || bill.customer?.phone) && (
+                                  <div className="text-[10px] text-slate-500 font-mono">
+                                    {bill.customerPhone || bill.customer?.phone}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                                {formatDateTime(bill.createdAt)}
+                              </td>
+                              <td className="p-3">
+                                <span className="font-semibold text-slate-900 dark:text-white">
+                                  {Array.isArray(bill.items) ? bill.items.length : 0} item(s)
+                                </span>
+                                <span className="text-[10px] text-slate-500 block">
+                                  ({totalItems} total qty)
+                                </span>
+                              </td>
+                              <td className="p-3 font-mono font-bold text-slate-900 dark:text-white">
+                                {getCurrency(bill.total)}
+                              </td>
+                              <td className="p-3">
+                                {isFullyReturned ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                                    Fully Returned (-{getCurrency(bill.totalRefunded)})
+                                  </span>
+                                ) : hasReturns ? (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                    Partial Return (-{getCurrency(bill.totalRefunded)})
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                    No Returns
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3 text-right">
+                                <div className="inline-flex items-center gap-1.5">
+                                  {!isFullyReturned && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setReturnModalBill(bill)}
+                                      className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-bold hover:bg-amber-700 flex items-center gap-1"
+                                    >
+                                      <RotateCcw className="w-3 h-3" />
+                                      Process Return
+                                    </button>
+                                  )}
+                                  {hasReturns && (
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(`/pharmacist/receipt/${bill._id}?type=refund`, '_blank')}
+                                      className="px-2.5 py-1.5 border border-amber-600 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                                      title="Print Refund Receipt"
+                                    >
+                                      📄 Refund Slip
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => printReceiptInPage(bill._id)}
+                                    className="px-2.5 py-1.5 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    title="Print Original Receipt"
+                                  >
+                                    🖨️ Bill
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+
+                  {bills.filter((b) => b?.orderStatus !== 'PENDING' && b?.orderStatus !== 'REJECTED').length === 0 && (
+                    <div className="p-12 text-center text-xs text-slate-500">
+                      No sales bills found in the database.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* ================================================================= */}

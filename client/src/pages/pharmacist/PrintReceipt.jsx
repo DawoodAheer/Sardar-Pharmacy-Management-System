@@ -128,12 +128,17 @@ const PrintReceipt = () => {
     };
   }, [billId]);
 
-  // Handle auto-print if opened via iframe or ?print=1
+  // Handle auto-print if opened via ?print=1
   useEffect(() => {
     if (!loading && bill && autoPrint) {
+      // Allow browser to fully paint the receipt sheet and webfonts before opening print preview
       const timer = setTimeout(() => {
-        window.print();
-      }, 350);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            window.print();
+          });
+        });
+      }, 700);
       return () => clearTimeout(timer);
     }
   }, [loading, bill, autoPrint]);
