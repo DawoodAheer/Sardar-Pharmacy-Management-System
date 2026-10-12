@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
-import { X, RotateCcw, AlertTriangle, CheckCircle, Package } from 'lucide-react';
+import { X, RotateCcw, AlertTriangle, CheckCircle, Package, Printer } from 'lucide-react';
 
 const getCurrency = (value) => {
   return new Intl.NumberFormat('en-PK', {
@@ -60,6 +60,14 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
   const [reasons, setReasons] = useState(() => getInitialReasons(bill));
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [processedBillId, setProcessedBillId] = useState(null);
+
+  const handlePrintRefund = (targetId) => {
+    const idToUse = targetId || processedBillId || bill?._id;
+    if (!idToUse) return;
+    const url = `/pharmacist/receipt/${idToUse}?type=refund`;
+    window.open(url, '_blank');
+  };
 
   const returnMutation = useMutation({
     mutationFn: async (payload) => {
@@ -73,6 +81,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
       queryClient.invalidateQueries({ queryKey: ['profitSummary'] });
       queryClient.invalidateQueries({ queryKey: ['profitDetails'] });
 
+      setProcessedBillId(bill._id);
       setSuccess(data.message || 'Sales return processed successfully!');
       setError('');
     },
@@ -176,9 +185,19 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
           )}
 
           {success && (
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-600 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50 dark:text-emerald-300">
-              <CheckCircle size={16} />
-              {success}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900/50 dark:text-emerald-300">
+              <div className="flex items-center gap-2">
+                <CheckCircle size={18} className="text-emerald-600 shrink-0" />
+                <span>{success}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePrintRefund(processedBillId)}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-800 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-900 active:scale-95 transition-all"
+              >
+                <Printer size={14} />
+                Print Refund Receipt
+              </button>
             </div>
           )}
 

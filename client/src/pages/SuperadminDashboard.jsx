@@ -2847,7 +2847,21 @@ export default function SuperadminDashboard() {
                           <p className="mt-1 text-sm text-slate-500">Qty returned: {item.qty_returned} · Processed by: {item.processed_by?.name || 'Unknown'} · {formatDateTime(item.date)}</p>
                           {item.reason && <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Reason: {item.reason}</p>}
                         </div>
-                        <p className="font-bold text-amber-700 dark:text-amber-300">Refund {getCurrency(item.refund_amount)}</p>
+                        <div className="flex flex-col items-end gap-2">
+                          <p className="font-bold text-amber-700 dark:text-amber-300">Refund {getCurrency(item.refund_amount)}</p>
+                          {(item.sale_id?._id || item.sale_id) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetId = item.sale_id?._id || item.sale_id;
+                                window.open(`/pharmacist/receipt/${targetId}?type=refund`, '_blank');
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                              📄 Print Refund Receipt
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </article>
                   ))}

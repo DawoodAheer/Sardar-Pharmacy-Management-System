@@ -6898,15 +6898,24 @@ const PharmacistDashboard = () => {
                   onClick={() => {
                     setReturnModalBill(selectedBill);
                   }}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-2"
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-amber-700"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   Return Items / Refund
                 </button>
 
+                {selectedBill.returns && selectedBill.returns.length > 0 && (
+                  <button
+                    onClick={() => window.open(`/pharmacist/receipt/${selectedBill._id}?type=refund`, '_blank')}
+                    className="px-4 py-2 border border-amber-600 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                  >
+                    📄 Print Refund Receipt
+                  </button>
+                )}
+
                 <button
                   onClick={() => printReceiptInPage(selectedBill._id)}
-                  className="px-4 py-2 border border-blue-700 text-blue-700 rounded-lg text-xs font-bold flex items-center gap-1"
+                  className="px-4 py-2 border border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   🖨️ Print Receipt
                 </button>

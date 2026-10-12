@@ -1133,11 +1133,15 @@ export const getBillById = async (
       )
       .populate(
         'pharmacistId',
-        'name email'
+        'name email role'
       )
       .populate(
         'reviewedBy',
-        'name email'
+        'name email role'
+      )
+      .populate(
+        'returns.returnedBy',
+        'name email role'
       );
 
     if (!bill) {
@@ -1989,7 +1993,7 @@ export const getReturnActivity = async (req, res, next) => {
     const returns = await SaleReturn.find()
       .sort({ date: -1, createdAt: -1 })
       .limit(200)
-      .populate('processed_by', 'name email')
+      .populate('processed_by', 'name email role')
       .populate('item_id', 'name')
       .populate('sale_id', 'billNumber customerName customerPhone')
       .lean();
