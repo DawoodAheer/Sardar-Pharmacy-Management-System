@@ -14,8 +14,9 @@ services:
     container_name: pharmadesk-mongodb
     restart: unless-stopped
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    # Internal communication via Docker network pharmadesk-network (no host port conflict)
-    # Backend connects to mongodb:27017 inside the network.
+    # Expose to host so prepare-dev.mjs / local backend can reach MongoDB at 127.0.0.1:27017
+    ports:
+      - "27017:27017"
     volumes:
       # DATA PERSISTENCE: Stored in named persistent Docker volume.
       # Decoupled from container lifecycle. Stopping/rebuilding containers NEVER deletes data.
