@@ -1349,13 +1349,13 @@ const PharmacistDashboard = () => {
       return;
     }
 
-    const packSize = Number(unitsPerPack) > 0 ? Number(unitsPerPack) : 1;
-    let saleValue = price !== '' && price !== undefined ? Number(price) : NaN;
-    if (!Number.isFinite(saleValue) || saleValue < 0) {
-      saleValue = Number((purchaseValue / packSize).toFixed(2));
+    const packSize = unitsPerPack === '' || unitsPerPack == null ? 1 : Number(unitsPerPack);
+    const saleValue = price === '' || price == null ? Number((purchaseValue / packSize).toFixed(2)) : Number(price);
+    const stockQty = quantity === '' || quantity == null ? 0 : Number(quantity);
+    if (!Number.isInteger(packSize) || packSize < 1 || !Number.isFinite(saleValue) || saleValue < 0 || !Number.isInteger(stockQty) || stockQty < 0) {
+      setError('Units per pack must be a positive whole number; stock must be a non-negative whole number and sale price must be non-negative. Leave optional fields blank to use defaults.');
+      return;
     }
-
-    const stockQty = quantity !== '' && quantity !== undefined && !Number.isNaN(Number(quantity)) ? Number(quantity) : 0;
 
     const medicineData = {
       name: name.trim(),

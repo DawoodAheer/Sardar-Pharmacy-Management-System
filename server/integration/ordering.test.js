@@ -29,7 +29,7 @@ test('manufacturer ordering across inventory, search and pages', { skip: !proces
     ].map(med => ({ ...med, purchasePrice: 10, quantity: 2, createdBy: admin._id })));
     await Medicine.init();
     const snapshot = JSON.stringify(await Medicine.find().sort({ _id: 1 }).lean());
-    const app = express(); app.use('/medicines', medicineRoutes); app.use('/operations', operationsRoutes); app.use('/purchase-orders', purchaseRoutes); app.use(errorHandler);
+    const app = express(); app.use(express.json()); app.use('/medicines', medicineRoutes); app.use('/operations', operationsRoutes); app.use('/purchase-orders', purchaseRoutes); app.use(errorHandler);
     server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
     const get = async path => {
       const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { headers: { Authorization: `Bearer ${generateAccessToken(admin._id, admin.role)}` } });
@@ -57,6 +57,21 @@ test('manufacturer ordering across inventory, search and pages', { skip: !proces
     await t.test('archived medicines use manufacturer order too', async () => {
       await Medicine.updateMany({}, { $set: { isDeleted: true } });
       assert.deepEqual((await get('/medicines/deleted?page=1')).medicines.map(m => m.name), ['Alpha', 'Beta', 'Zinc', 'Aspirin']);
+    });
+    await t.test('name and purchase cost alone save; invalid optional fields never silently change stock', async () => {
+      const post = async body => fetch(`http://127.0.0.1:${server.address().port}/medicines`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${generateAccessToken(admin._id, admin.role)}` }, body: JSON.stringify(body),
+      });
+      const result = await post({ name: 'Minimal medicine', purchasePrice: 100 });
+      assert.equal(result.status, 201, await result.text());
+      const saved = await Medicine.findOne({ name: 'Minimal medicine' });
+      assert.equal(saved.quantity, 0); assert.equal(saved.price, 100); assert.equal(saved.unitsPerPack, 1); assert.equal(saved.expiryDate, null);
+      const before = await Medicine.countDocuments();
+      for (const fields of [{ quantity: -2 }, { quantity: 2.5 }, { unitsPerPack: 1.5 }, { price: -1 }, { expiryDate: '2027-02-30' }]) {
+        const response = await post({ name: 'Invalid optional', purchasePrice: 100, ...fields });
+        assert.equal(response.status, 400, await response.text());
+      }
+      assert.equal(await Medicine.countDocuments(), before);
     });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));

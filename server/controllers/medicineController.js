@@ -142,18 +142,12 @@ export const createMedicine = async (req, res, next) => {
       return next(new Error('Purchase price per pack is required and must be greater than zero'));
     }
 
-    const numericUnitsPerPack = unitsPerPack !== undefined && Number(unitsPerPack) > 0 ? Number(unitsPerPack) : 1;
-    let numericPrice = price !== undefined && price !== '' ? Number(price) : NaN;
-    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
-      numericPrice = Number((numericPurchasePrice / numericUnitsPerPack).toFixed(2));
+    const normalized = normalizeMedicineImportRow(req.body);
+    if (normalized.errors.length) {
+      res.status(400);
+      return next(new Error(normalized.errors.join(' ')));
     }
-
-    let parsedQuantity = quantity !== undefined && quantity !== '' ? Number(quantity) : 0;
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-      parsedQuantity = 0;
-    }
-
-    const parsedExpiryDate = expiryDate ? (parseMedicineExpiryDate(expiryDate) || (new Date(expiryDate).getTime() ? new Date(expiryDate) : null)) : null;
+    const { unitsPerPack: numericUnitsPerPack, price: numericPrice, quantity: parsedQuantity, expiryDate: parsedExpiryDate } = normalized.medicine;
 
     const session = await mongoose.startSession();
     let medicine;
@@ -221,6 +215,7 @@ export const updateMedicine = async (req, res, next) => {
         const nextName = name !== undefined ? String(name).trim() : medicine.name;
         const nextManufacturer = manufacturer !== undefined ? String(manufacturer).trim() : medicine.manufacturer;
         if (!nextName) { const error = new Error('Medicine name is required'); error.statusCode = 400; throw error; }
+        if (!isValidUnitsPerPack(nextUnitsPerPack)) { const error = new Error('Units per pack must be a positive whole number'); error.statusCode = 400; throw error; }
         if (!Number.isFinite(nextPurchasePrice) || nextPurchasePrice <= 0) { const error = new Error('Purchase price per pack must be greater than zero'); error.statusCode = 400; throw error; }
         if (nextSalePrice !== undefined && (!Number.isFinite(nextSalePrice) || nextSalePrice < 0)) { const error = new Error('Unit sale price cannot be negative'); error.statusCode = 400; throw error; }
         if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }

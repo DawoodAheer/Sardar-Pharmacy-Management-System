@@ -20,8 +20,14 @@ function Test-DockerEngine {
 }
 try {
     Write-Host 'Sardar Medical Store - starting' -ForegroundColor Cyan
-    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Install Docker Desktop and complete its initial setup, then run this launcher again.' }
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        $cli = @("$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\resources\bin\docker.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        if ($cli) { $env:PATH = (Split-Path $cli -Parent) + ';' + $env:PATH }
+        else { throw 'Install Docker Desktop and complete its initial setup, then run this launcher again.' }
+    }
     if (-not (Test-DockerEngine)) {
+        $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
+        if ($computer -and -not $computer.HypervisorPresent) { throw 'Windows hypervisor is not running. Run Repair-Docker-Windows.bat, restart Windows when instructed, then retry.' }
         $desktopExecutables = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe")
         $dockerDesktop = $desktopExecutables | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         if (-not $dockerDesktop) { throw 'Docker Engine is unavailable. Start Docker Desktop and retry.' }
@@ -43,6 +49,7 @@ try {
     Invoke-Docker -Arguments @('compose', 'config', '--quiet')
     Write-Host 'Preparing services. The first launch needs internet and can take several minutes.'
     $sourceFiles = @('docker-compose.yml', 'server/Dockerfile', 'server/package.json', 'server/package-lock.json', 'server/server.js', 'server/env-loader.js', 'client/Dockerfile', 'client/nginx.conf', 'client/package.json', 'client/package-lock.json', 'client/index.html', 'client/vite.config.js')
+    $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore') | Where-Object { Test-Path -LiteralPath $_ }
     $sourceDirectories = @('server/controllers','server/models','server/utils','server/routes','server/config','server/middleware','client/src','client/public')
     $sourceFiles += Get-ChildItem -LiteralPath $sourceDirectories -Recurse -File | ForEach-Object { $_.FullName }
     $fingerprint = ($sourceFiles | Sort-Object | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join ''
@@ -51,9 +58,9 @@ try {
     $composeArguments = @('compose', 'up', '-d', '--wait', '--wait-timeout', '180')
     if ($previousBuild -ne $fingerprint) { $composeArguments += '--build' }
     Invoke-Docker -Arguments $composeArguments
-    [IO.File]::WriteAllText($buildMarker, $fingerprint)
     $health = Invoke-RestMethod -Uri 'http://localhost:5174/api/health' -TimeoutSec 10
     if ($health.ready -ne $true -or $health.databaseConnected -ne $true) { throw 'The pharmacy API is not ready. No application window was opened.' }
+    [IO.File]::WriteAllText($buildMarker, $fingerprint)
     if (-not $NoOpen) {
         $browsers = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe")
         $browserExecutable = $browsers | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
