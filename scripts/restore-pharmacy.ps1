@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'docker-path.ps1')
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 
@@ -91,6 +92,7 @@ $ContainerArchivePath = "/tmp/restore_target.archive.gz"
 try {
     # Copy selected backup into container
     docker cp $SelectedBackup.FullName "pharmadesk-mongodb:${ContainerArchivePath}"
+    if ($LASTEXITCODE -ne 0) { throw 'Could not copy the selected backup into MongoDB. Restore was not started.' }
 
     # Execute mongorestore directly inside container with --drop to cleanly overwrite collections
     & docker exec pharmadesk-mongodb mongorestore --drop --archive=$ContainerArchivePath --gzip

@@ -3,6 +3,7 @@
 # =====================================================================
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'docker-path.ps1')
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
 
@@ -19,12 +20,14 @@ Write-Host "Stopping Docker containers safely..." -ForegroundColor Yellow
 # IMPORTANT: docker compose stop stops containers without removing them or volume data
 try {
     docker compose stop
+    if ($LASTEXITCODE -ne 0) { throw "Docker stop failed (exit $LASTEXITCODE)." }
     Write-Host ""
     Write-Host "[OK] All Sardar Medical Store services stopped successfully!" -ForegroundColor Green
     Write-Host "[DATA SAFE] Your MongoDB database and file uploads are preserved." -ForegroundColor Cyan
     Write-Host "You can restart the application anytime using 'Start-Sardar-Pharmacy.bat'." -ForegroundColor Gray
 } catch {
     Write-Host "[ERROR] Error stopping containers: $_" -ForegroundColor Red
+    exit 1
 }
 
 Write-Host ""

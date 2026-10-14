@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'docker-path.ps1')
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Docker Desktop is required for this test.' }
 $testComposePath = Join-Path (Split-Path $PSScriptRoot -Parent) 'docker-compose.test.yml'
 $testProject = 'pharmadesk-capacity-test-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
