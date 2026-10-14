@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
+import { Supplier, SupplierInvoice, CashSession } from '../models/Operations.js';
+import MedicineImportRun from '../models/MedicineImportRun.js';
 import User from '../models/User.js';
 import Medicine from '../models/Medicine.js';
 import Bill from '../models/Bill.js';
@@ -24,9 +26,14 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
 dotenv.config();
 
-const BACKUP_DIR = path.join(__dirname, '../backups');
+const BACKUP_DIR = process.env.PHARMADESK_BACKUP_DIR || path.join(__dirname, '../backups');
+export const SHARE_DIR = process.env.PHARMADESK_BACKUP_SHARE_DIR || path.resolve(__dirname, '../../backup-exports');
 const STATUS_PATH = path.join(BACKUP_DIR, 'backup_status.json');
 const COLLECTION_MODELS = {
+  suppliers: Supplier,
+  supplierInvoices: SupplierInvoice,
+  cashSessions: CashSession,
+  medicineImportRuns: MedicineImportRun,
   users: User,
   medicines: Medicine,
   bills: Bill,
@@ -103,7 +110,7 @@ const writeAtomically = async (filePath, contents) => {
 
 const writeBackupStatus = async (status) => {
   await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
-  const persisted = Object.fromEntries(['lastAttemptAt', 'lastSuccessAt', 'lastBackupName', 'lastError', 'lastRestoreAt'].map((key) => [key, status[key] ?? null]));
+  const persisted = Object.fromEntries(['lastAttemptAt', 'lastSuccessAt', 'lastBackupName', 'lastError', 'lastRestoreAt', 'lastVerifiedAt', 'verificationError', 'sharePath', 'shareError'].map((key) => [key, status[key] ?? null]));
   await writeAtomically(STATUS_PATH, `${JSON.stringify(persisted, null, 2)}\n`);
 };
 
@@ -144,6 +151,11 @@ export const getBackupStatus = async () => {
     lastBackupName: status.lastBackupName || latest?.name || null,
     lastError: status.lastError || null,
     lastRestoreAt: status.lastRestoreAt || null,
+    lastVerifiedAt: status.lastVerifiedAt || null,
+    verificationError: status.verificationError || null,
+    sharePath: status.sharePath || null,
+    shareError: status.shareError || null,
+    shareDirectory: SHARE_DIR,
     backups,
   };
 };
@@ -163,9 +175,12 @@ export async function createBackup() {
     await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
 
   const collections = {};
-  for (const [name, Model] of Object.entries(COLLECTION_MODELS)) {
-    collections[name] = await Model.find({}).lean();
-  }
+  const snapshotSession = await mongoose.startSession();
+  try {
+    await snapshotSession.withTransaction(async () => {
+      for (const [name, Model] of Object.entries(COLLECTION_MODELS)) collections[name] = await Model.find({}).session(snapshotSession).lean();
+    }, { readConcern: { level: 'snapshot' } });
+  } finally { await snapshotSession.endSession(); }
   const backupData = {
     timestamp: new Date().toISOString(),
     version: '2.0.0',
@@ -179,7 +194,14 @@ export async function createBackup() {
 
     await writeAtomically(filePath, contents);
     await writeAtomically(latestPath, contents);
-    await writeBackupStatus({ ...previousStatus, lastAttemptAt: attemptAt, lastSuccessAt: backupData.timestamp, lastBackupName: path.basename(filePath), lastError: null });
+    let sharePath = null, shareError = null;
+    try {
+      await fs.promises.mkdir(SHARE_DIR, { recursive: true });
+      sharePath = path.join(SHARE_DIR, path.basename(filePath));
+      await writeAtomically(sharePath, contents);
+      validateBackup(JSON.parse(await fs.promises.readFile(sharePath, 'utf8')));
+    } catch (error) { shareError = String(error.message).slice(0, 1000); sharePath = null; }
+    await writeBackupStatus({ ...previousStatus, lastAttemptAt: attemptAt, lastSuccessAt: backupData.timestamp, lastBackupName: path.basename(filePath), lastError: null, sharePath, shareError });
     console.log(`Database backup created: ${filePath}`);
     return filePath;
   } catch (error) {
@@ -217,6 +239,65 @@ export async function restoreBackupData(backupData, sourceLabel = 'uploaded back
   await writeBackupStatus({ ...status, lastRestoreAt: restoredAt, lastError: null });
   console.log(`Database restored from ${sourceLabel}`);
   return { restoredFrom: sourceLabel, restoredAt, preRestoreBackup: preRestoreFile };
+}
+
+let verificationRunning = false;
+const canonical = value => {
+  if (value instanceof Date) return value.toISOString();
+  if (value && typeof value.toHexString === 'function') return value.toHexString();
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().filter(key => value[key] !== undefined).map(key => [key, canonical(value[key])]));
+  return value;
+};
+const recoveryDigest = documents => crypto.createHash('sha256').update(JSON.stringify(documents.map(canonical).sort((a, b) => String(a._id).localeCompare(String(b._id))))).digest('hex');
+
+export async function verifyBackupRecovery(selectedBackup) {
+  if (verificationRunning) throw Object.assign(new Error('A recovery verification is already running.'), { statusCode: 409 });
+  verificationRunning = true;
+  let temporary;
+  try {
+    await ensureConnected();
+    let data = selectedBackup;
+    if (!data) {
+      const latest = await getLatestBackupPath();
+      if (!latest) throw new Error('Create or select a backup before verifying recovery.');
+      data = JSON.parse(await fs.promises.readFile(latest, 'utf8'));
+    }
+    validateBackup(data);
+    const databaseName = `pharmadesk_recovery_${crypto.randomUUID().replaceAll('-', '')}`;
+    if (databaseName === mongoose.connection.name || !databaseName.startsWith('pharmadesk_recovery_')) throw new Error('Unsafe recovery database name.');
+    temporary = mongoose.connection.useDb(databaseName, { useCache: false });
+    const verifiedCollections = {};
+    for (const [name, Model] of Object.entries(COLLECTION_MODELS)) {
+      if (data.collections[name] === undefined) continue;
+      const RecoveryModel = temporary.model(Model.modelName, Model.schema, Model.collection.name);
+      await RecoveryModel.createCollection();
+      await RecoveryModel.createIndexes();
+      const documents = [];
+      for (const raw of data.collections[name]) {
+        const prepared = new RecoveryModel(raw);
+        await prepared.validate();
+        documents.push(prepared.toObject());
+      }
+      if (documents.length) await RecoveryModel.collection.insertMany(documents, { ordered: true });
+      const restored = await RecoveryModel.collection.find({}).toArray();
+      if (restored.length !== documents.length || recoveryDigest(restored) !== recoveryDigest(documents)) throw new Error(`Restored data mismatch in ${name}.`);
+      verifiedCollections[name] = restored.length;
+    }
+    const verifiedAt = new Date().toISOString();
+    await writeBackupStatus({ ...(await getBackupStatus()), lastVerifiedAt: verifiedAt, verificationError: null });
+    return { verifiedAt, verifiedCollections };
+  } catch (error) {
+    await writeBackupStatus({ ...(await getBackupStatus()), verificationError: error.message }).catch(() => {});
+    throw error;
+  } finally {
+    verificationRunning = false;
+    if (temporary) {
+      try { await temporary.dropDatabase(); }
+      finally { await mongoose.connection.removeDb(temporary.name); }
+    }
+    verificationRunning = false;
+  }
 }
 
 export async function restoreBackup(specifiedFile = null) {

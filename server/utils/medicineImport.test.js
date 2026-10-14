@@ -19,9 +19,23 @@ test('reports missing, invalid and non-integer fields without coercing them into
     name: '', manufacturer: 'Example', expiryDate: '31/02/2028',
     purchasePrice: -10, unitsPerPack: 5, price: 10, quantity: '2.5',
   });
-  // name missing (1), negative purchasePrice (2), invalid expiryDate (3)
-  assert.equal(result.errors.length, 3);
+  assert.equal(result.errors.length, 4);
+  assert.ok(result.errors.some(error => error.includes('Stock quantity')));
+  assert.equal(result.medicine.quantity, 2.5);
   assert.equal(result.medicine.expiryDate, null);
+});
+
+test('invalid supplied numbers are rejected rather than silently replaced', () => {
+  const result = normalizeMedicineImportRow({ name: 'Test', purchasePrice: 100, unitsPerPack: 0, quantity: -5, price: 'bad' });
+  assert.ok(result.errors.some(error => error.includes('Units per pack')));
+  assert.ok(result.errors.some(error => error.includes('Sale price')));
+  assert.ok(result.errors.some(error => error.includes('Stock quantity')));
+});
+test('valid grouped numbers and zero stock are accepted', () => {
+  const result = normalizeMedicineImportRow({ name: 'Test', purchasePrice: '1,000.50', unitsPerPack: 10, quantity: 0 });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.medicine.purchasePrice, 1000.5);
+  assert.equal(result.medicine.price, 100.05);
 });
 
 test('parses Excel serial dates and common pharmacy date formats', () => {

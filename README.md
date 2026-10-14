@@ -2,6 +2,20 @@
 
 Pharma Desk is a modern, full-stack MERN (MongoDB, Express, React, Node.js) web application designed for pharmacies to manage their inventory, billing, customers, and reminders. It features role-based access control, automated daily inventory checks, OCR-based smart medicine registration, PDF invoice generation, and dual-channel (email + browser) medication reminders.
 
+
+## Windows: download and launch
+
+1. Install and finish setting up **Docker Desktop with Linux containers** once.
+2. Download this repository's ZIP from GitHub and **extract the entire folder** to a permanent location.
+3. Double-click **start pharmacy.bat** (or **Start-Sardar-Pharmacy.bat**).
+4. Wait for the first build, then use the **Sardar Medical Store** desktop shortcut every day.
+
+The launcher starts Docker if needed, generates local installation secrets, creates the shortcut, builds changed source and waits for the pharmacy API to become ready. It opens Edge/Chrome in an app window. Daily launches reuse images and keep your data. The first launch needs internet for Docker images and packages; after those are cached, routine operation works locally. Keep the extracted folder because the shortcut points to it. No Node.js, Git or manual MongoDB installation is needed.
+
+A fresh PC/database starts with **zero medicines and zero bills**, plus the three approved accounts described in [new-PC instructions](docs/NEW-PC.md). Startup never clears an existing database. Stop safely with **Stop-Sardar-Pharmacy.bat**.
+
+Admins can **Delete permanently** from Archived Medicines after typing `DELETE`. A safety backup runs first. Records linked to bills, returns or supplier purchases stay protected. See [docs/NEW-PC.md](docs/NEW-PC.md) and [docs/OPERATIONS.md](docs/OPERATIONS.md) for recovery/testing. No system can guarantee zero data loss or unlimited capacity.
+
 ---
 
 ## 🚀 Key Features
@@ -16,7 +30,7 @@ The application supports three roles, each with a tailored workspace and securit
     *   **Invoice Worksheet**: An integrated point-of-sale compiler with per-unit purchase-cost snapshots, invoice-only sale-price overrides, editable quantities, discounts, and cash-only checkout. It records customer name and phone, supports registered customers and walk-in guests, and places the checkout action at the top of the sticky invoice panel.
     *   **Stock & returns**: Audited stock adjustments and partial sale returns update inventory with transactional writes. Return refunds honor invoice discounts, and profit reports use recorded purchase costs and actual sale prices.
     *   **Return history**: Fully returned invoices are omitted from regular customer and sales history. Their invoice and return audit records remain stored; staff can include them in the all-bills response with `GET /api/bills?includeReturned=true`. Partial returns show remaining quantities and net paid totals.
-    *   **Medicine export**: Use **Export Excel** on the Medicine Inventory page to download the complete current medicine list using the stable name, manufacturer, expiry, purchase cost, sale cost, quantity, and rack columns.
+    *   **Medicine export**: Use **Export CSV for Excel** to create a complete inventory export in the background. The file opens in Excel.
     *   **Alerts & Reminders page**: A simplified, friendly dashboard listing daily automated checks (expired medicine, low stock, patient reminders) with "Run now" capabilities.
 *   **Customer Portal**: A consumer-facing panel:
     *   **Medicine Shop**: A catalog to search, filter by category, and buy medicines.
@@ -165,12 +179,11 @@ npm run install:all
 
 ---
 
-### Step 4: Seed Mock Data (Disposable Test Database Only)
-WARNING: `npm run seed` deletes existing users, medicines, bills, reminders, and notifications before inserting demo data. Never run it on real pharmacy data. On a new empty database, the app automatically creates login accounts; use the seed script only with a disposable test database.
+### Step 4: Default Login Accounts (Non-destructive)
 
-```bash
-npm run seed
-```
+Startup creates missing Admin, Pharmacist and Customer accounts without inserting medicines or deleting existing data. A fresh database starts with no medicines. You may also run `npm run seed` to add missing default accounts safely; existing passwords and records are preserved.
+
+See [New PC and data-safety guide](docs/NEW-PC.md) for Docker setup, Excel imports, backups and moving to another computer.
 
 ---
 
@@ -193,7 +206,7 @@ Run `npm test` from the project root to execute the backend unit suite and the 5
 ---
 
 ## 🧪 Test Accounts
-After running the seeder script (`npm run seed`), you can log in using the following pre-configured credentials:
+After startup or the non-destructive account setup (`npm run seed`), you can log in using the following pre-configured credentials:
 
 * **Superadmin**: `aheerdawood014@gmail.com` / `Dawood@@5786`
 * **Pharmacist**: `mlksardar6@gmail.com` / `Dawood@@5786`

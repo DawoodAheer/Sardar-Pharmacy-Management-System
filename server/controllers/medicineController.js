@@ -1,3 +1,8 @@
+import { pagination } from '../utils/pagination.js';
+import { createHash } from 'node:crypto';
+import { enqueueJob } from '../utils/backgroundJobs.js';
+import MedicineImportRun from '../models/MedicineImportRun.js';
+import { ensureBatches, syncBatchTotals, allocateBatches, consumeStock, saleExpiryStatus } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
 import MedicineImportIssue from '../models/MedicineImportIssue.js';
@@ -39,6 +44,7 @@ export const getAllMedicines = async (req, res, next) => {
 
   try {
     const query = { isDeleted: { $ne: true } };
+    if (req.query.dated === 'true') query.expiryDate = { $ne: null };
 
     // 1. Search filter (name, manufacturer, batch and rack)
     if (search) {
@@ -84,9 +90,13 @@ export const getAllMedicines = async (req, res, next) => {
       query.quantity = { $lt: 5 };
     }
 
-    const medicines = await Medicine.find(query)
+    const paginated = req.query.page !== undefined;
+    const page = Math.max(1, Math.floor(Number(req.query.page) || 1)), limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit) || 50)));
+    const finder = Medicine.find(query);
+    finder.skip((page - 1) * limit).limit(limit);
+    const medicines = await finder
       .populate('createdBy', 'name email')
-      .sort({ name: 1 });
+      .sort(req.query.sort === 'expiry' ? { expiryDate: 1, _id: 1 } : { name: 1, _id: 1 });
 
     // Append calculated status to each item for frontend convenience
     const medicinesWithStatus = medicines.map((med) => {
@@ -96,6 +106,7 @@ export const getAllMedicines = async (req, res, next) => {
       return medObj;
     });
 
+    if (paginated) return res.json({ medicines: medicinesWithStatus, total: await Medicine.countDocuments(query), page, limit });
     res.json(medicinesWithStatus);
   } catch (error) {
     next(error);
@@ -213,6 +224,11 @@ export const updateMedicine = async (req, res, next) => {
         if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }
         
 
+        if (medicine.batches?.length && ((quantity !== undefined && Number(quantity) !== medicine.quantity) ||
+          (expiryDate !== undefined && new Date(expiryDate).getTime() !== new Date(medicine.expiryDate).getTime()) ||
+          nextPurchasePrice !== medicine.purchasePrice || nextUnitsPerPack !== medicine.unitsPerPack)) {
+          const error = new Error('Use Batch inventory to change batch stock, expiry or purchase costs.'); error.statusCode = 400; throw error;
+        }
         const previousValues = snapshotMedicine(medicine);
         medicine.name = nextName;
         
@@ -283,13 +299,14 @@ export const deleteMedicine = async (req, res, next) => {
   }
 };
 
-export const getDeletedMedicines = async (_req, res, next) => {
+export const getDeletedMedicines = async (req, res, next) => {
   try {
     const medicines = await Medicine.find({ isDeleted: true })
       .populate('createdBy', 'name email')
       .populate('deletedBy', 'name email')
-      .sort({ deletedAt: -1 });
-    res.json(medicines);
+      .sort({ deletedAt: -1, _id: -1 }).skip(pagination(req.query).skip).limit(pagination(req.query).limit);
+    const total = await Medicine.countDocuments({ isDeleted: true });
+    res.json(req.query.page !== undefined ? { medicines, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) } : medicines);
   } catch (error) { next(error); }
 };
 
@@ -312,101 +329,74 @@ export const restoreMedicine = async (req, res, next) => {
 // @access  Private/Pharmacist,Superadmin
 export const bulkImportMedicines = async (req, res, next) => {
   const medicineArray = Array.isArray(req.body) ? req.body : req.body?.medicines;
-
-  if (!Array.isArray(medicineArray)) {
-    res.status(400);
-    return next(new Error('Payload must be a JSON array of medicines'));
+  if (!Array.isArray(medicineArray) || !medicineArray.length || medicineArray.length > 10000) {
+    return res.status(400).json({ message: 'Provide 1–10,000 medicine rows.' });
   }
-  if (!medicineArray.length) {
-    res.status(400);
-    return next(new Error('At least one medicine row is required'));
+  if (req.body?.background === true && req.body?.dryRun !== true && !req.backgroundWorker) {
+    try { return res.status(202).json(await enqueueJob('import', req.user._id, req.body)); }
+    catch (error) { return next(error); }
   }
-
-  try {
-    const existingMedicines = await Medicine.find({ isDeleted: { $ne: true } })
-      .select('name manufacturer').lean();
-    
-    const existingNames = new Set(existingMedicines.map((item) => `${String(item.name).trim().toLowerCase()}|${String(item.manufacturer || '').trim().toLowerCase()}`));
-    
-    const seenNames = new Set();
-    const validRows = [];
-    const invalidRows = [];
-
+  const sourceFile = String(req.body?.sourceFile || req.headers['x-import-filename'] || '').slice(0, 180);
+  const runId = createHash('sha256').update(JSON.stringify({ user: String(req.user._id), sourceFile, rows: medicineArray })).digest('hex');
+  const classify = async session => {
+    const existing = await Medicine.find({ isDeleted: { $ne: true } }).select('name manufacturer').session(session || null).lean();
+    const names = new Set(existing.map(item => `${item.name.trim().toLowerCase()}|${(item.manufacturer || '').trim().toLowerCase()}`));
+    const seen = new Set(), validRows = [], invalidRows = [];
     medicineArray.forEach((row, index) => {
       const { medicine, errors } = normalizeMedicineImportRow(row);
-      
-      const nameKey = `${medicine.name.toLowerCase()}|${medicine.manufacturer.toLowerCase()}`;
-      if (medicine.name && existingNames.has(nameKey)) errors.push('This medicine and manufacturer already exist in active inventory.');
-      
-      if (medicine.name && seenNames.has(nameKey)) errors.push('This medicine is duplicated in the uploaded file.');
-      
-      if (medicine.name) seenNames.add(nameKey);
-      const rowNumber = index + (req.body?.sourceFile || req.headers['x-import-filename'] ? 2 : 1);
-      const originalRow = row && typeof row === 'object' ? row : { rawValue: row ?? null };
-      if (errors.length) invalidRows.push({ rowNumber, originalRow, medicine, errors });
-      else validRows.push({ rowNumber, medicine });
+      const key = `${medicine.name.toLowerCase()}|${medicine.manufacturer.toLowerCase()}`;
+      if (medicine.name && names.has(key)) errors.push('This medicine and manufacturer already exist in active inventory. Existing stock was kept unchanged.');
+      if (medicine.name && seen.has(key)) errors.push('This medicine is duplicated in the uploaded file.');
+      const details = { rowNumber: index + (sourceFile ? 2 : 1), medicine,
+        originalRow: row && typeof row === 'object' ? row : { rawValue: row ?? null } };
+      if (errors.length) invalidRows.push({ ...details, errors });
+      else { seen.add(key); validRows.push(details); }
     });
-
-    const sourceFile = String(req.body?.sourceFile || req.headers['x-import-filename'] || '').slice(0, 180);
+    return { validRows, invalidRows };
+  };
+  try {
     if (req.body?.dryRun === true) {
-      const previewRows = [
-        ...validRows.map((row) => ({ ...row, errors: [] })),
-        ...invalidRows.map((row) => ({ rowNumber: row.rowNumber, medicine: row.medicine, errors: row.errors })),
-      ].sort((a, b) => a.rowNumber - b.rowNumber);
-      return res.json({ preview: true, sourceFile, totalRows: previewRows.length, validCount: validRows.length, invalidCount: invalidRows.length, rows: previewRows });
+      const { validRows, invalidRows } = await classify();
+      const rows = [...validRows.map(({ originalRow, ...row }) => ({ ...row, errors: [] })),
+        ...invalidRows.map(({ originalRow, ...row }) => row)].sort((a, b) => a.rowNumber - b.rowNumber);
+      return res.json({ preview: true, sourceFile, totalRows: rows.length, validCount: validRows.length, invalidCount: invalidRows.length, rows });
     }
-
-    const imported = [];
-    for (const { rowNumber, medicine } of validRows) {
-      const session = await mongoose.startSession();
-      try {
-        let created;
-        await session.withTransaction(async () => {
-          [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
-          await recordMedicineAudit({ medicine: created, action: 'bulk_imported', newValues: snapshotMedicine(created), performedBy: req.user._id, session });
-        });
-        imported.push(created);
-      } catch (error) {
-        invalidRows.push({ rowNumber, originalRow: medicine, medicine, errors: [error.message || 'Medicine could not be saved.'] });
-      } finally {
-        await session.endSession();
-      }
-    }
-
-    const issues = invalidRows.length
-      ? await MedicineImportIssue.insertMany(invalidRows.map((issue) => ({
-        sourceFile,
-        rowNumber: issue.rowNumber,
-        originalRow: issue.originalRow,
-        normalizedRow: issue.medicine,
-        validationErrors: issue.errors,
-        createdBy: req.user._id,
-      })))
-      : [];
-
-    // Evaluate newly bulk imported medicines
-    checkAndSendExpiryAlerts().catch((err) => {
-      console.error('[Bulk Import Alert Error]:', err.message);
-    });
-
-    res.status(201).json({
-      message: 'Bulk import complete',
-      insertedCount: imported.length,
-      skippedCount: invalidRows.length,
-      skippedDetails: invalidRows.map(({ rowNumber, medicine, errors }) => ({ rowNumber, name: medicine.name || 'Unknown medicine', reason: errors.join(' '), issueId: issues.find((item) => item.rowNumber === rowNumber)?._id })),
-      invalidRows: issues,
-    });
-  } catch (error) {
-    next(error);
-  }
+    // A shared transaction lock makes concurrent file imports recheck the latest inventory.
+    await MedicineImportRun.updateOne({ _id: 'inventory-import-lock' }, { $setOnInsert: { revision: 0 } }, { upsert: true }).catch(error => { if (error.code !== 11000) throw error; });
+    const session = await mongoose.startSession();
+    let result;
+    try {
+      await session.withTransaction(async () => {
+        await MedicineImportRun.updateOne({ _id: 'inventory-import-lock' }, { $inc: { revision: 1 } }, { session });
+        const previous = await MedicineImportRun.findById(runId).session(session).lean();
+        if (previous) { result = { ...previous.result, replayed: true }; return; }
+        const { validRows, invalidRows } = await classify(session);
+        const imported = validRows.length ? await Medicine.insertMany(validRows.map(({ medicine }) => ({ ...medicine, createdBy: req.user._id })), { session, ordered: true }) : [];
+        if (imported.length) await MedicineAudit.insertMany(imported.map(medicine => ({ medicineId: medicine._id,
+          medicineName: medicine.name, action: 'bulk_imported', newValues: snapshotMedicine(medicine),
+          changedFields: AUDITED_MEDICINE_FIELDS, performedBy: req.user._id })), { session, ordered: true });
+        const issues = invalidRows.length ? await MedicineImportIssue.insertMany(invalidRows.map(issue => ({ sourceFile,
+          rowNumber: issue.rowNumber, originalRow: issue.originalRow, normalizedRow: issue.medicine,
+          validationErrors: issue.errors, createdBy: req.user._id })), { session, ordered: true }) : [];
+        result = { message: 'Import saved. Existing stock was not replaced.', importId: runId, insertedCount: imported.length,
+          skippedCount: invalidRows.length, skippedDetails: invalidRows.slice(0, 100).map((row, index) => ({ rowNumber: row.rowNumber,
+            name: row.medicine.name || 'Unknown medicine', reason: row.errors.join(' '), issueId: issues[index]._id })) };
+        await MedicineImportRun.create([{ _id: runId, sourceFile, createdBy: req.user._id, result }], { session });
+      }, { writeConcern: { w: 'majority' } });
+    } finally { await session.endSession(); }
+    if (!result.replayed && result.insertedCount) checkAndSendExpiryAlerts().catch(error => console.error('[Bulk Import Alert Error]', error.message));
+    res.status(201).json(result);
+  } catch (error) { next(error); }
 };
 
-export const getMedicineImportIssues = async (_req, res, next) => {
+export const getMedicineImportIssues = async (req, res, next) => {
   try {
+    const page = Math.max(1, Number(req.query.page) || 1), limit = 50;
     const issues = await MedicineImportIssue.find({ status: 'pending' })
       .populate('createdBy', 'name email role')
-      .sort({ createdAt: -1 }).lean();
-    res.json({ issues });
+      .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean();
+    const total = await MedicineImportIssue.countDocuments({ status: 'pending' });
+    res.json({ issues, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
@@ -502,7 +492,7 @@ export const processBill = async (req, res, next) => {
         return next(new Error(`Medicine with ID ${item.medicineId} not found`));
       }
 
-      const expiryStatus = checkExpiryStatus(medicine.expiryDate);
+      const expiryStatus = saleExpiryStatus(medicine);
       if (expiryStatus === 'EXPIRED') {
         return res.status(403).json({
           message: 'This medicine is expired and cannot be billed',
@@ -528,18 +518,7 @@ export const processBill = async (req, res, next) => {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
-        for (const [medicineId, quantity] of stockRequirements) {
-          const result = await Medicine.updateOne(
-            { _id: medicineId, quantity: { $gte: quantity } },
-            { $inc: { quantity: -quantity } },
-            { session }
-          );
-          if (!result.modifiedCount) {
-            const error = new Error('Stock changed during billing. Please refresh and try again.');
-            error.statusCode = 409;
-            throw error;
-          }
-        }
+        for (const [medicineId, quantity] of stockRequirements) await consumeStock(medicineId, quantity, session);
       });
     } finally {
       await session.endSession();
@@ -823,16 +802,16 @@ export const adjustStock = async (req, res, next) => {
     try {
       await session.withTransaction(async () => {
         const previousValues = snapshotMedicine(medicine);
-        const updatedMedicine = await Medicine.findOneAndUpdate(
-          { _id: medicine._id, quantity: previousQuantity },
-          { $set: { quantity: newQuantity } },
-          { new: true, session }
-        );
-        if (!updatedMedicine) {
-          const error = new Error('Stock changed during adjustment. Refresh and try again.');
-          error.statusCode = 409;
-          throw error;
+        const updatedMedicine = await Medicine.findById(medicine._id).session(session);
+        if (!updatedMedicine || updatedMedicine.quantity !== previousQuantity) {
+          const error = new Error('Stock changed during adjustment. Refresh and try again.'); error.statusCode = 409; throw error;
         }
+        ensureBatches(updatedMedicine);
+        if (quantityChanged < 0) allocateBatches(updatedMedicine, -quantityChanged, { allowExpired: true });
+        if (quantityChanged > 0) updatedMedicine.batches.push({ batchNumber: `ADJUST-${new mongoose.Types.ObjectId()}`,
+          quantity: quantityChanged, purchaseCost: updatedMedicine.purchasePrice / (updatedMedicine.unitsPerPack || 1), expiryDate: updatedMedicine.expiryDate });
+        syncBatchTotals(updatedMedicine);
+        await updatedMedicine.save({ session });
 
         [adjustmentLog] = await StockAdjustment.create(
           [{
@@ -875,9 +854,9 @@ export const getStockAdjustments = async (req, res, next) => {
       .populate('medicineId', 'name genericName rackLocation')
       .populate('adjustedBy', 'name email role')
       .sort({ createdAt: -1 })
-      .limit(100);
-
-    res.json(logs);
+      .skip(pagination(req.query).skip).limit(pagination(req.query).limit);
+    const total = await StockAdjustment.countDocuments();
+    res.json(req.query.page !== undefined ? { logs, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) } : logs);
   } catch (error) {
     next(error);
   }
@@ -889,7 +868,8 @@ export const getMedicineAuditHistory = async (req, res, next) => {
     if (req.query.medicineId && mongoose.isValidObjectId(req.query.medicineId)) query.medicineId = req.query.medicineId;
     const records = await MedicineAudit.find(query)
       .populate('performedBy', 'name email role')
-      .sort({ createdAt: -1 }).limit(300).lean();
-    res.json({ records });
+      .sort({ createdAt: -1, _id: -1 }).skip(pagination(req.query).skip).limit(pagination(req.query).limit).lean();
+    const total = await MedicineAudit.countDocuments(query);
+    res.json({ records, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) });
   } catch (error) { next(error); }
 };

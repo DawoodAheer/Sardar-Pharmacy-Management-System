@@ -1,3 +1,5 @@
+import PageControls from '../components/PageControls';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
@@ -114,6 +116,8 @@ const CustomerReminders = () => {
   // empty string means user intentionally cleared it
   // --------------------------------------------------
   const [medicineName, setMedicineName] = useState('');
+  const [reminderPage, setReminderPage] = useState(1), [logPage, setLogPage] = useState(1);
+  const medicineSearch = useDebouncedValue(medicineName);
   const [phoneNumber, setPhoneNumber] = useState(null);
   const [time, setTime] = useState('10:00 AM');
   const [formError, setFormError] = useState('');
@@ -123,22 +127,23 @@ const CustomerReminders = () => {
   // Reminders
   // --------------------------------------------------
   const {
-    data: reminders = [],
+    data: reminderData,
     isLoading: remindersLoading,
     isError: remindersError,
     refetch: refetchReminders,
   } = useQuery({
-    queryKey: ['reminders', user?._id],
+    queryKey: ['reminders', user?._id, reminderPage],
     queryFn: async () => {
       const { data } = await api.get(
-        `/notifications/reminders/customer/${user._id}`
+        `/notifications/reminders/customer/${user._id}`, { params: { page: reminderPage } }
       );
 
-      return Array.isArray(data) ? data : [];
+      return data;
     },
     enabled: !!user?._id,
   });
 
+  const reminders = reminderData?.reminders || [];
   // --------------------------------------------------
   // Medicines catalog
   // --------------------------------------------------
@@ -146,9 +151,9 @@ const CustomerReminders = () => {
     data: medicines = [],
     isLoading: medicinesLoading,
   } = useQuery({
-    queryKey: ['medicinesList'],
+    queryKey: ['medicinesList', medicineSearch],
     queryFn: async () => {
-      const { data } = await api.get('/medicines');
+      const { data } = await api.get('/medicines', { params: { search: medicineSearch, limit: 50 } });
 
       return Array.isArray(data) ? data : [];
     },
@@ -188,21 +193,22 @@ const CustomerReminders = () => {
   // Notification logs
   // --------------------------------------------------
   const {
-    data: logs = [],
+    data: logData,
     isLoading: logsLoading,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: ['notificationLogs', user?._id],
+    queryKey: ['notificationLogs', user?._id, logPage],
     queryFn: async () => {
       const { data } = await api.get(
-        `/notifications/${user._id}`
+        `/notifications/${user._id}`, { params: { page: logPage } }
       );
 
-      return Array.isArray(data) ? data : [];
+      return data;
     },
     enabled: !!user?._id,
   });
 
+  const logs = logData?.notifications || [];
   // --------------------------------------------------
   // Create reminder
   // --------------------------------------------------
@@ -1212,6 +1218,7 @@ const CustomerReminders = () => {
             )}
           </div>
 
+          <PageControls page={reminderPage} pages={reminderData?.pages || 1} total={reminderData?.total || 0} onChange={setReminderPage} />
           {/* =================================================
               DELIVERY LOGS
           ================================================= */}
@@ -1222,7 +1229,7 @@ const CustomerReminders = () => {
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                   <History className="w-4 h-4 text-[#1A56A0] dark:text-sky-400" />
                   Notification Delivery Log
-                </h3>
+                </h3><PageControls page={logPage} pages={logData?.pages || 1} total={logData?.total || 0} onChange={setLogPage} />
 
                 <p className="text-[9px] text-slate-400 mt-1">
                   Review previously generated notification attempts.

@@ -1,3 +1,4 @@
+import { pageResponse, pagedFind } from '../utils/pagination.js';
 import mongoose from 'mongoose';
 import DeletionRequest from '../models/DeletionRequest.js';
 import Medicine from '../models/Medicine.js';
@@ -41,13 +42,10 @@ export const createDeletionRequest = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-export const listDeletionRequests = async (_req, res, next) => {
+export const listDeletionRequests = async (req, res, next) => {
   try {
-    const requests = await DeletionRequest.find().sort({ status: 1, createdAt: -1 })
-      .populate('requestedBy', 'name email role')
-      .populate('reviewedBy', 'name email role')
-      .lean();
-    res.json({ requests });
+    const result = await pagedFind(DeletionRequest, {}, req, { sort: { status: 1, createdAt: -1, _id: -1 }, populate: [['requestedBy', 'name email role'], ['reviewedBy', 'name email role']] });
+    res.json(pageResponse(result, 'requests'));
   } catch (error) { next(error); }
 };
 

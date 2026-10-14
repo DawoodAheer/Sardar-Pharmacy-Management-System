@@ -1,5 +1,7 @@
 {
   "ignore": [
+    "job-data/**",
+    "integration/**",
     "backups/**",
     "backups/*",
     "logs/**",

@@ -1,234 +1,69 @@
-# =====================================================================
-# Sardar Medical Store - 1-Click Desktop Launcher Script (PowerShell)
-# Fast, Clean, Crash-proof startup
-# =====================================================================
-
-$ErrorActionPreference = "Continue"
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = (Resolve-Path "$ScriptDir\..").Path
-$AppUrl = "http://localhost:5174"
-
-Set-Location $ProjectRoot
-
-Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "       Sardar Medical Store - Starting...             " -ForegroundColor Green
-Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host ""
-
-# ---------------------------------------------------------------------
-# Step 1: Ensure Desktop Shortcut is created
-# ---------------------------------------------------------------------
+param([switch]$NoOpen, [switch]$NoShortcut)
+$ErrorActionPreference = 'Stop'
+$projectDirectory = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Set-Location -LiteralPath $projectDirectory
+function Invoke-Docker {
+    param([string[]]$Arguments)
+    & docker @Arguments
+    if ($LASTEXITCODE -ne 0) { throw "Docker command failed (exit $LASTEXITCODE). See the message above." }
+}
+function New-LocalSecret {
+    $bytes = New-Object byte[] 48
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
+    return [Convert]::ToBase64String($bytes)
+}
+function Test-DockerEngine {
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & docker info *> $null; return $LASTEXITCODE -eq 0 } finally { $ErrorActionPreference = $savedPreference }
+}
 try {
-    & "$ScriptDir\create-shortcut.ps1" -NoPause
-} catch {}
-
-# ---------------------------------------------------------------------
-# Step 2: Check Docker Installation & Status
-# ---------------------------------------------------------------------
-Write-Host ""
-Write-Host "[1/3] Checking Docker..." -ForegroundColor Yellow
-
-$dockerCli = Get-Command "docker" -ErrorAction SilentlyContinue
-if (-not $dockerCli) {
-    Write-Host "[ERROR] Docker is not installed!" -ForegroundColor Red
-    Write-Host "Install Docker Desktop from: https://www.docker.com/products/docker-desktop" -ForegroundColor Yellow
-    Read-Host "Press Enter to exit..."
+    Write-Host 'Sardar Medical Store - starting' -ForegroundColor Cyan
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'Install Docker Desktop and complete its initial setup, then run this launcher again.' }
+    if (-not (Test-DockerEngine)) {
+        $desktopExecutables = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe")
+        $dockerDesktop = $desktopExecutables | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        if (-not $dockerDesktop) { throw 'Docker Engine is unavailable. Start Docker Desktop and retry.' }
+        Start-Process -FilePath $dockerDesktop -WindowStyle Hidden
+        $deadline = (Get-Date).AddMinutes(3)
+        do {
+            Start-Sleep -Seconds 3
+            if (Test-DockerEngine) { break }
+        } while ((Get-Date) -lt $deadline)
+        if (-not (Test-DockerEngine)) { throw 'Docker Engine did not become ready. Check Docker Desktop / WSL setup.' }
+    }
+    Invoke-Docker -Arguments @('compose', 'version')
+    $settings = Join-Path $projectDirectory '.env'
+    if (-not (Test-Path -LiteralPath $settings)) {
+        $contents = "JWT_ACCESS_SECRET=$(New-LocalSecret)`nJWT_REFRESH_SECRET=$(New-LocalSecret)`nCLIENT_URL=http://localhost:5174`n"
+        [IO.File]::WriteAllText($settings, $contents, (New-Object Text.UTF8Encoding($false)))
+    }
+    if (-not $NoShortcut) { & (Join-Path $PSScriptRoot 'create-shortcut.ps1') -NoPause }
+    Invoke-Docker -Arguments @('compose', 'config', '--quiet')
+    Write-Host 'Preparing services. The first launch needs internet and can take several minutes.'
+    $sourceFiles = @('docker-compose.yml', 'server/Dockerfile', 'server/package.json', 'server/package-lock.json', 'server/server.js', 'server/env-loader.js', 'client/Dockerfile', 'client/nginx.conf', 'client/package.json', 'client/package-lock.json', 'client/index.html', 'client/vite.config.js')
+    $sourceDirectories = @('server/controllers','server/models','server/utils','server/routes','server/config','server/middleware','client/src','client/public')
+    $sourceFiles += Get-ChildItem -LiteralPath $sourceDirectories -Recurse -File | ForEach-Object { $_.FullName }
+    $fingerprint = ($sourceFiles | Sort-Object | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join ''
+    $buildMarker = Join-Path $projectDirectory '.pharmacy-build-id'
+    $previousBuild = if (Test-Path -LiteralPath $buildMarker) { [IO.File]::ReadAllText($buildMarker) } else { '' }
+    $composeArguments = @('compose', 'up', '-d', '--wait', '--wait-timeout', '180')
+    if ($previousBuild -ne $fingerprint) { $composeArguments += '--build' }
+    Invoke-Docker -Arguments $composeArguments
+    [IO.File]::WriteAllText($buildMarker, $fingerprint)
+    $health = Invoke-RestMethod -Uri 'http://localhost:5174/api/health' -TimeoutSec 10
+    if ($health.ready -ne $true -or $health.databaseConnected -ne $true) { throw 'The pharmacy API is not ready. No application window was opened.' }
+    if (-not $NoOpen) {
+        $browsers = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe")
+        $browserExecutable = $browsers | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        if ($browserExecutable) { Start-Process -FilePath $browserExecutable -ArgumentList @('--app=http://localhost:5174', '--new-window') }
+        else { Start-Process 'http://localhost:5174' }
+    }
+    Write-Host 'Ready. Use the Sardar Medical Store desktop shortcut for daily launch.' -ForegroundColor Green
+    Write-Host 'Stop-Sardar-Pharmacy.bat stops services while keeping the database.'
+} catch {
+    Write-Host "Startup failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host 'Keep this folder. Logs: docker compose logs --tail 100'
     exit 1
 }
-
-# Check if Docker daemon is running
-$isDockerRunning = $false
-try {
-    $null = docker info 2>$null
-    if ($LASTEXITCODE -eq 0) { $isDockerRunning = $true }
-} catch {}
-
-if (-not $isDockerRunning) {
-    Write-Host "[INFO] Docker not running - starting Docker Desktop..." -ForegroundColor Yellow
-
-    $dockerDesktopPaths = @(
-        "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
-        "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe"
-    )
-    $dockerExe = $dockerDesktopPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-    if (-not $dockerExe) {
-        Write-Host "[ERROR] Docker Desktop not found. Please start Docker Desktop manually then re-run." -ForegroundColor Red
-        Read-Host "Press Enter to exit..."
-        exit 1
-    }
-
-    Start-Process -FilePath $dockerExe
-    Write-Host "[INFO] Waiting for Docker Engine (up to 90 seconds)..." -ForegroundColor Yellow
-
-    $waited = 0
-    while ($waited -lt 90) {
-        Start-Sleep -Seconds 3
-        $waited += 3
-        try {
-            $null = docker info 2>$null
-            if ($LASTEXITCODE -eq 0) { $isDockerRunning = $true; break }
-        } catch {}
-        Write-Host "." -NoNewline -ForegroundColor Gray
-    }
-    Write-Host ""
-
-    if (-not $isDockerRunning) {
-        Write-Host "[ERROR] Docker failed to start after 90 seconds. Please start Docker Desktop and try again." -ForegroundColor Red
-        Read-Host "Press Enter to exit..."
-        exit 1
-    }
-}
-
-Write-Host "[OK] Docker Engine is running!" -ForegroundColor Green
-
-# ---------------------------------------------------------------------
-# Step 3: Fast Instant Startup (Runs docker compose up safely)
-# ---------------------------------------------------------------------
-Write-Host ""
-Write-Host "[2/3] Starting pharmacy services..." -ForegroundColor Yellow
-
-# Run docker compose and capture exit code
-$composeOutput = cmd /c "docker compose up -d 2>&1"
-$composeExitCode = $LASTEXITCODE
-
-if ($composeExitCode -ne 0) {
-    Write-Host "[ERROR] Docker Compose failed to start services!" -ForegroundColor Red
-    Write-Host $composeOutput -ForegroundColor Yellow
-    Read-Host "Press Enter to exit..."
-    exit 1
-}
-
-# Self-heal replica set member host so backend can always resolve internal mongodb:27017
-$fixJs = 'try { let c = rs.conf(); if (c.members[0].host !== "mongodb:27017") { c.members[0].host = "mongodb:27017"; rs.reconfig(c, { force: true }); } } catch (e) {}'
-docker exec pharmadesk-mongodb mongosh --quiet --eval $fixJs 2>$null
-
-Write-Host "[OK] Containers launched!" -ForegroundColor Green
-
-# ---------------------------------------------------------------------
-# Step 4: Verify Health of MongoDB, Backend, and Frontend
-# ---------------------------------------------------------------------
-Write-Host ""
-Write-Host "[3/3] Verifying services health (MongoDB, Backend, Frontend)..." -ForegroundColor Yellow
-
-$mongoHealthy = $false
-$backendHealthy = $false
-$frontendHealthy = $false
-$elapsed = 0
-$maxWait = 60
-
-while ($elapsed -lt $maxWait) {
-    # 1. Check MongoDB container health
-    if (-not $mongoHealthy) {
-        $mStatus = & docker inspect --format='{{json .State.Health.Status}}' pharmadesk-mongodb 2>$null
-        if ($mStatus -like '*healthy*') {
-            $mongoHealthy = $true
-            Write-Host " [MongoDB: HEALTHY]" -ForegroundColor Green -NoNewline
-        }
-    }
-
-    # 2. Check Backend container health
-    if (-not $backendHealthy) {
-        $bStatus = & docker inspect --format='{{json .State.Health.Status}}' pharmadesk-backend 2>$null
-        if ($bStatus -like '*healthy*') {
-            $backendHealthy = $true
-            Write-Host " [Backend: HEALTHY]" -ForegroundColor Green -NoNewline
-        }
-    }
-
-    # 3. Check Frontend HTTP response on 5174 then 5173
-    foreach ($url in @("http://localhost:5174", "http://localhost:5173")) {
-        try {
-            $req = [System.Net.WebRequest]::Create($url)
-            $req.Timeout = 1500
-            $res = $req.GetResponse()
-            $code = [int]$res.StatusCode
-            $res.Close()
-            if ($code -ge 200 -and $code -lt 400) {
-                $AppUrl = $url
-                $frontendHealthy = $true
-                break
-            }
-        } catch {}
-    }
-
-    if ($mongoHealthy -and $backendHealthy -and $frontendHealthy) {
-        break
-    }
-
-    Start-Sleep -Seconds 2
-    $elapsed += 2
-    Write-Host "." -NoNewline -ForegroundColor Gray
-}
-Write-Host ""
-
-if ($mongoHealthy -and $backendHealthy -and $frontendHealthy) {
-    Write-Host "[OK] All pharmacy services are HEALTHY & READY at $AppUrl! (took ${elapsed}s)" -ForegroundColor Green
-} else {
-    Write-Host "[ERROR] One or more services failed to report healthy within ${maxWait}s:" -ForegroundColor Red
-    Write-Host " - MongoDB  : $(if ($mongoHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
-    Write-Host " - Backend  : $(if ($backendHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
-    Write-Host " - Frontend : $(if ($frontendHealthy) { 'HEALTHY' } else { 'UNHEALTHY / TIMEOUT' })" -ForegroundColor Yellow
-    Write-Host "Check container logs via: docker compose logs" -ForegroundColor Gray
-    Read-Host "Press Enter to exit..."
-    exit 1
-}
-
-# ---------------------------------------------------------------------
-# Step 5: Open App in Browser (app mode - frameless desktop app look)
-# ---------------------------------------------------------------------
-$opened = $false
-
-# Try Chrome app mode first (no address bar - feels like native desktop app)
-$ChromePaths = @(
-    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
-    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
-    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-)
-foreach ($p in $ChromePaths) {
-    if (Test-Path $p) {
-        Start-Process -FilePath $p -ArgumentList "--app=$AppUrl", "--new-window"
-        Write-Host "[OK] Opened in Google Chrome (app mode - no address bar)" -ForegroundColor Green
-        $opened = $true
-        break
-    }
-}
-
-# Try Edge app mode if Chrome not found
-if (-not $opened) {
-    $EdgePaths = @(
-        "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
-        "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe"
-    )
-    foreach ($p in $EdgePaths) {
-        if (Test-Path $p) {
-            Start-Process -FilePath $p -ArgumentList "--app=$AppUrl", "--new-window"
-            Write-Host "[OK] Opened in Microsoft Edge (app mode - no address bar)" -ForegroundColor Green
-            $opened = $true
-            break
-        }
-    }
-}
-
-# Fallback: open in default browser
-if (-not $opened) {
-    Start-Process $AppUrl
-    Write-Host "[OK] Opened in default browser" -ForegroundColor Green
-}
-
-# ---------------------------------------------------------------------
-# Done!
-# ---------------------------------------------------------------------
-Write-Host ""
-Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host "   Sardar Medical Store IS RUNNING AND READY!         " -ForegroundColor Green
-Write-Host "======================================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "  URL        : $AppUrl" -ForegroundColor White
-Write-Host "  Superadmin : aheerdawood014@gmail.com / Dawood@@5786" -ForegroundColor Gray
-Write-Host "  Pharmacist : mlksardar6@gmail.com     / Dawood@@5786" -ForegroundColor Gray
-Write-Host ""
-Write-Host "  To stop safely: run Stop-Sardar-Pharmacy.bat" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "Press any key to close this window..." -ForegroundColor DarkGray
-try { $null = [Console]::ReadKey() } catch {}

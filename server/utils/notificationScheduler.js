@@ -6,7 +6,8 @@ import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import { checkExpiryStatus } from './expiryCheck.js';
 import { getStockStatus } from './stockStatus.js';
-import { createBackup, markBackupFailure } from './backupManager.js';
+import { markBackupFailure } from './backupManager.js';
+import { enqueueJob } from './backgroundJobs.js';
 
 // Setup Nodemailer email transporter
 const getEmailTransporter = () => {
@@ -79,7 +80,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
     today.setHours(0, 0, 0, 0);
     const msInDay = 24 * 60 * 60 * 1000;
 
-    const query = {};
+    const query = { isDeleted: { $ne: true }, quantity: { $gt: 0 } };
     if (medicineId) {
       query._id = medicineId;
     }
@@ -95,7 +96,13 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
     const sixMonthsWarningList = [];
     const expiredList = [];
 
-    medicines.forEach((med) => {
+    const lots = medicines.flatMap(medicine => medicine.batches?.length
+      ? medicine.batches.filter(batch => batch.quantity > 0).map(batch => ({ ...medicine.toObject(), ...batch.toObject(), _id: medicine._id,
+        _batchId: batch._id, name: `${medicine.name} — batch ${batch.batchNumber}` })) : [medicine]);
+    const markExpiryAlert = async (med, field) => med._batchId
+      ? Medicine.updateOne({ _id: med._id, 'batches._id': med._batchId }, { $set: { [`batches.$.${field}`]: true } })
+      : Medicine.findByIdAndUpdate(med._id, { [field]: true });
+    lots.forEach((med) => {
       if (!med.expiryDate) return;
       const exp = new Date(med.expiryDate);
       if (Number.isNaN(exp.getTime())) return;
@@ -258,7 +265,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
       });
 
       for (const { med } of sixMonthsWarningList) {
-        await Medicine.findByIdAndUpdate(med._id, { expiryAlert180Sent: true });
+        await markExpiryAlert(med, 'expiryAlert180Sent');
       }
     }
 
@@ -281,7 +288,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
       // Mark expiryAlert1Sent = true
       for (const { med } of oneDayUrgentList) {
-        await Medicine.findByIdAndUpdate(med._id, { expiryAlert1Sent: true });
+        await markExpiryAlert(med, 'expiryAlert1Sent');
       }
     }
 
@@ -304,7 +311,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
 
       // Mark expiryAlert10Sent = true
       for (const { med } of tenDaysWarningList) {
-        await Medicine.findByIdAndUpdate(med._id, { expiryAlert10Sent: true });
+        await markExpiryAlert(med, 'expiryAlert10Sent');
       }
     }
 
@@ -326,7 +333,7 @@ export const checkAndSendExpiryAlerts = async ({ force = false, medicineId = nul
       });
 
       for (const { med } of expiredList) {
-        await Medicine.findByIdAndUpdate(med._id, { expiryAlertExpiredSent: true });
+        await markExpiryAlert(med, 'expiryAlertExpiredSent');
       }
     }
 
@@ -634,11 +641,12 @@ export const initializeNotificationScheduler = () => {
   cron.schedule('0 0 * * *', async () => {
     console.log('Running daily database automated backup...');
     try {
-      await createBackup();
+      await enqueueJob('backup');
     } catch (err) {
       await markBackupFailure(err);
       console.error('Daily automated backup failed:', err.message);
     }
-  });
+  }, { timezone: 'Asia/Karachi' });
   console.log('Scheduled Daily Database Backup Cron Job (12:00 AM Midnight daily)');
+  cron.schedule('0 2 * * 0', () => enqueueJob('verify').catch(error => console.error('Weekly recovery verification could not be queued:', error.message)), { timezone: 'Asia/Karachi' });
 };

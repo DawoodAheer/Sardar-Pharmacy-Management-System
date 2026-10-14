@@ -1,3 +1,7 @@
+import mongoose from 'mongoose';
+import jobRoutes from './routes/jobRoutes.js';
+import { startJobQueue, stopJobQueue } from './utils/backgroundJobs.js';
+import { monitorRequests } from './utils/systemMonitor.js';
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -10,6 +14,7 @@ import {
   errorHandler,
 } from "./middleware/errorMiddleware.js";
 
+import operationsRoutes from './routes/operationsRoutes.js';
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import medicineRoutes from "./routes/medicineRoutes.js";
@@ -38,12 +43,12 @@ const __dirname = path.dirname(__filename);
 // before any ES module imports are evaluated. No need to call dotenv here.
 
 // Connect to Database
-connectDB();
-
-// Initialize Daily Notification Cron Scheduler
-initializeNotificationScheduler();
+let databaseInitialized = false;
+const databaseStartup = connectDB();
+databaseStartup.then(async () => { await startJobQueue(); databaseInitialized = true; initializeNotificationScheduler(); });
 
 const app = express();
+app.use(monitorRequests);
 
 // CORS configuration
 const allowedOrigins = [
@@ -120,8 +125,15 @@ app.get("/api/dev-identity", (_req, res) => {
   res.type("text/plain").send("sardar-pharmacy-dev-api-v2");
 });
 
+app.get('/api/health', (_req, res) => {
+  const ready = databaseInitialized && mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({ ready, databaseConnected: mongoose.connection.readyState === 1 });
+});
+
 // Register API Routes
 app.use("/api/auth", authRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use("/api/operations", operationsRoutes);
 
 app.use("/api/users", userRoutes);
 
@@ -178,3 +190,15 @@ server.on("error", (error) => {
 
 // Initialize WebSocket scanner on same HTTP server
 initMobileScannerWebSocket(server);
+
+let stopping = false;
+const stopServer = () => {
+  if (stopping) return;
+  stopping = true;
+  databaseInitialized = false;
+  stopJobQueue();
+  const timeout = setTimeout(() => process.exit(1), 25000); timeout.unref();
+  server.close(async () => { await mongoose.disconnect(); clearTimeout(timeout); process.exit(0); });
+};
+process.once('SIGTERM', stopServer);
+process.once('SIGINT', stopServer);

@@ -52,22 +52,17 @@ export const normalizeMedicineImportRow = (row = {}) => {
   const priceRaw = readAlias(row, aliases.price);
   const quantityRaw = readAlias(row, aliases.quantity);
 
-  const parsedUnits = unitsRaw !== undefined && unitsRaw !== '' && !Number.isNaN(Number(unitsRaw)) ? Number(unitsRaw) : 1;
-  const parsedUnitsPerPack = parsedUnits > 0 ? parsedUnits : 1;
-  const parsedPurchasePrice = purchaseRaw !== undefined && purchaseRaw !== '' ? Number(purchaseRaw) : NaN;
-  
-  let parsedSalePrice = priceRaw !== undefined && priceRaw !== '' ? Number(priceRaw) : NaN;
-  if (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0) {
-    // If not provided or empty, default to cost per unit or 0
-    parsedSalePrice = Number.isFinite(parsedPurchasePrice) && parsedPurchasePrice > 0 
-      ? Number((parsedPurchasePrice / parsedUnitsPerPack).toFixed(2)) 
-      : 0;
-  }
-
-  let parsedQuantity = quantityRaw !== undefined && quantityRaw !== '' ? Number(quantityRaw) : 0;
-  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-    parsedQuantity = 0;
-  }
+  const numeric = value => {
+    if (typeof value === 'number') return value;
+    const text = String(value ?? '').trim();
+    if (!/^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(text)) return NaN;
+    return Number(text.replaceAll(',', ''));
+  };
+  const parsedUnitsPerPack = unitsRaw === undefined ? 1 : numeric(unitsRaw);
+  const parsedPurchasePrice = purchaseRaw === undefined ? NaN : numeric(purchaseRaw);
+  const parsedSalePrice = priceRaw === undefined
+    ? Number((parsedPurchasePrice / parsedUnitsPerPack).toFixed(2)) : numeric(priceRaw);
+  const parsedQuantity = quantityRaw === undefined ? 0 : numeric(quantityRaw);
 
   const parsedExpiry = expiryRaw ? parseMedicineExpiryDate(expiryRaw) : null;
 
@@ -87,6 +82,9 @@ export const normalizeMedicineImportRow = (row = {}) => {
   if (!Number.isFinite(medicine.purchasePrice) || medicine.purchasePrice <= 0) {
     errors.push('Purchase price per pack is required and must be greater than zero.');
   }
+  if (!isValidUnitsPerPack(parsedUnitsPerPack)) errors.push('Units per pack must be a positive whole number.');
+  if (!Number.isFinite(parsedSalePrice) || parsedSalePrice < 0) errors.push('Sale price must be a non-negative number.');
+  if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) errors.push('Stock quantity must be a non-negative whole number.');
   if (expiryRaw && !parsedExpiry) {
     errors.push('Expiry date format is invalid (use DD/MM/YYYY or YYYY-MM-DD).');
   }

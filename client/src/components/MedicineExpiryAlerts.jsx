@@ -1,3 +1,5 @@
+import PageControls from './PageControls';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, RefreshCw, PackageX } from 'lucide-react';
 import api from '../utils/api';
@@ -68,29 +70,22 @@ function MedicineRow({ medicine }) {
 }
 
 export default function MedicineExpiryAlerts({ compact = false }) {
+  const [page, setPage] = useState(1);
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ['medicineExpiryAlerts'],
-    queryFn: async () => {
-      const [expired, expiring] = await Promise.all([
-        api.get('/medicines', { params: { status: 'EXPIRED' } }),
-        api.get('/medicines', { params: { status: 'EXPIRING' } }),
-      ]);
-      return {
-        expired: Array.isArray(expired.data) ? expired.data : [],
-        expiring: Array.isArray(expiring.data) ? expiring.data : [],
-      };
-    },
+    queryKey: ['medicineExpiryAlerts', page],
+    queryFn: async () => (await api.get('/operations/batch-alerts', { params: { page, limit: 50 } })).data,
     refetchInterval: 60000,
   });
 
   const expired = data?.expired || [];
   const expiring = data?.expiring || [];
-  const total = expired.length + expiring.length;
+  const total = data?.total || 0;
 
   if (!total && !isFetching) return null;
 
   return (
     <section className="rounded-2xl border border-amber-200 bg-white shadow-sm dark:border-amber-900/50 dark:bg-slate-900 overflow-hidden">
+      <PageControls page={page} pages={data?.pages || 1} total={total} onChange={setPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50/70 px-5 py-4 dark:border-amber-900/40 dark:bg-amber-950/20">
         <div className="flex items-center gap-3">

@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
 
 const billItemSchema = new mongoose.Schema({
+  batchAllocations: [{ batchId: mongoose.Schema.Types.ObjectId, batchNumber: String,
+    quantity: Number, purchaseCost: Number, expiryDate: Date }],
   medicineId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Medicine',
@@ -212,6 +214,10 @@ billSchema.pre('save', async function (next) {
   next();
 });
 
+billSchema.index({ createdAt: -1, orderStatus: 1 });
+billSchema.index({ billType: 1, reviewedAt: -1, orderStatus: 1 });
+billSchema.index({ customerId: 1, createdAt: -1 });
+billSchema.index({ billType: 1, orderStatus: 1, createdAt: -1 });
 const Bill = mongoose.model('Bill', billSchema);
 
 export default Bill;

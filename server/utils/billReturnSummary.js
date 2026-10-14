@@ -54,8 +54,18 @@ export const getBillReturnSummary = (bill) => {
         ? (returns.refund * returnedQuantity) / returns.quantity
         : 0;
 
+    let purchasePrice = item.purchasePrice;
+    if (item.batchAllocations?.length && netQuantity > 0) {
+      let skip = returnedQuantity, remainingCost = 0;
+      for (const batch of item.batchAllocations) {
+        const omitted = Math.min(skip, batch.quantity); skip -= omitted;
+        remainingCost += (batch.quantity - omitted) * batch.purchaseCost;
+      }
+      purchasePrice = remainingCost / netQuantity;
+    }
     return {
       ...item,
+      purchasePrice,
       returnedQuantity,
       netQuantity,
       netSales: roundCurrency(

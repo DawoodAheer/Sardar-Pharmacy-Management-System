@@ -1,3 +1,4 @@
+import { pageResponse, pagedFind, pagination } from '../utils/pagination.js';
 import User from '../models/User.js';
 
 export const createStaffUser = async (req, res, next) => {
@@ -84,11 +85,17 @@ export const editManagedUser = async (req, res, next) => {
 // @access  Private/Superadmin
 export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find({})
+    const { page, limit, skip } = pagination(req.query);
+    const filter = {};
+    if (['superadmin', 'pharmacist', 'customer'].includes(req.query.role)) filter.role = req.query.role;
+    if (req.query.status) filter.accountStatus = req.query.status;
+    if (req.query.search) { const text = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); filter.$or = ['name','email','phone'].map(field => ({ [field]: { $regex: text, $options: 'i' } })); }
+    const total = await User.countDocuments(filter);
+    const users = await User.find(filter).skip(skip).limit(limit)
       .select('-password')
       .sort({ createdAt: -1 });
 
-    res.json(users);
+    res.json(req.query.page !== undefined ? { users, total, page, pages: Math.ceil(total / limit) } : users);
   } catch (error) {
     next(error);
   }
@@ -213,17 +220,11 @@ export const deleteUser = async (req, res, next) => {
 // @access  Private/Pharmacist/Superadmin
 export const getCustomers = async (req, res, next) => {
   try {
-    const customers = await User.find({
-      role: 'customer',
-      accountStatus: 'approved',
-    })
-      .select('-password')
-      .sort({ createdAt: -1 });
-
-    res.json(customers);
-  } catch (error) {
-    next(error);
-  }
+    const filter = { role: 'customer', accountStatus: 'approved' };
+    if (req.query.search) filter.name = { $regex: String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    const result = await pagedFind(User, filter, req, { select: '-password' });
+    res.json(req.query.page !== undefined ? pageResponse(result, 'customers') : result.records);
+  } catch (error) { next(error); }
 };
 
 // @desc    Get customer accounts waiting for approval
@@ -231,19 +232,12 @@ export const getCustomers = async (req, res, next) => {
 // @access  Private/Pharmacist,Superadmin
 export const getPendingCustomers = async (req, res, next) => {
   try {
-    const customers = await User.find({
-      role: 'customer',
-      accountStatus: 'pending',
-    })
-      .select('-password')
-      .sort({ createdAt: -1 });
-
-    res.json(customers);
-  } catch (error) {
-    next(error);
-  }
+    const filter = { role: 'customer', accountStatus: 'pending' };
+    if (req.query.search) filter.name = { $regex: String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    const result = await pagedFind(User, filter, req, { select: '-password' });
+    res.json(req.query.page !== undefined ? pageResponse(result, 'customers') : result.records);
+  } catch (error) { next(error); }
 };
-
 
 // @desc    Update user profile name or phone
 // @route   PATCH /api/users/profile

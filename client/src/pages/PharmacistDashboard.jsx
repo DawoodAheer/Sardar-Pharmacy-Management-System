@@ -1,25 +1,28 @@
-import { useEffect, useState, useRef } from 'react';
+import useSalesPage from '../hooks/useSalesPage';
+import lazyPanel from '../components/lazyPanel';
+import useDebouncedValue from '../hooks/useDebouncedValue';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query';
+import PageControls from '../components/PageControls';
 import api from '../utils/api';
-import { createMedicineInventoryWorkbook, downloadMedicineInventory } from '../utils/medicineExport';
+import { waitForJob } from '../utils/backgroundJobs';
 import { getPurchaseCostPerUnit } from '../utils/medicinePricing';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import ProfitDetailsModal from '../components/ProfitDetailsModal';
+const ProfitDetailsModal = lazyPanel(() => import('../components/ProfitDetailsModal'));
 import MedicineImportIssues from '../components/MedicineImportIssues';
 import MedicineExpiryAlerts from '../components/MedicineExpiryAlerts';
 import MedicineAuditHistory from '../components/MedicineAuditHistory';
 import PurchaseOrdersPanel from '../components/PurchaseOrdersPanel';
 import DailyClosingReport from '../components/DailyClosingReport';
-import StockAdjustmentModal from '../components/StockAdjustmentModal';
-import SalesReturnModal from '../components/SalesReturnModal';
-import UdharManagement from './UdharManagement';
-import * as XLSX from 'xlsx';
+const StockAdjustmentModal = lazyPanel(() => import('../components/StockAdjustmentModal'));
+const SalesReturnModal = lazyPanel(() => import('../components/SalesReturnModal'));
+const UdharManagement = lazyPanel(() => import('./UdharManagement'));
 import { QRCodeSVG } from 'qrcode.react';
 
 import {
@@ -351,6 +354,14 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [customerPage, setCustomerPage] = useState(1), [pendingPage, setPendingPage] = useState(1);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const debouncedCustomerSearch = useDebouncedValue(customerSearch);
+  const [orderPage, setOrderPage] = useState(1);
+  const [orderStatus, setOrderStatus] = useState('PENDING');
+  const [returnPage, setReturnPage] = useState(1);
   const [categoryFilter, setCategoryFilter] =
     useState('');
   const [expiryStatusFilter, setExpiryStatusFilter] =
@@ -374,7 +385,9 @@ const PharmacistDashboard = () => {
     useState(null);
 
   // Sales Ranking Modal
+  const [rankingPage, setRankingPage] = useState(1);
   const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
+  useEffect(() => setRankingPage(1), [salesRankingModal]);
 
   // Modal states for dashboard cards
   const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
@@ -538,6 +551,11 @@ const PharmacistDashboard = () => {
   const [importMode, setImportMode] = useState('excel'); // 'excel' or 'json'
   const [bulkFile, setBulkFile] = useState(null);
   const [bulkData, setBulkData] = useState([]);
+  const [bulkParsing, setBulkParsing] = useState(false);
+  const [bulkIgnoredSheets, setBulkIgnoredSheets] = useState([]);
+  const bulkWorkerRef = useRef(null);
+  const bulkReadVersion = useRef(0);
+  useEffect(() => () => { bulkReadVersion.current++; bulkWorkerRef.current?.terminate(); }, []);
   const [bulkPreviewResult, setBulkPreviewResult] = useState(null);
   const [bulkJson, setBulkJson] = useState('');
 
@@ -644,24 +662,25 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const {
-    data: medicines = [],
+    data: medicinePageData,
     isLoading: isMedsLoading,
     isFetching: isMedsFetching,
     refetch: refetchMeds,
   } = useQuery({
     queryKey: [
       'medicines',
-      search,
+      debouncedSearch,
       categoryFilter,
       expiryStatusFilter,
-      reorderFilter,
+      reorderFilter, inventoryPage, medicineViewFilter,
     ],
 
     queryFn: async () => {
-      const params = {};
+      const params = { page: inventoryPage, limit: 50 };
+      if (medicineViewFilter === 'LOW_STOCK') params.reorder = 'true';
 
-      if (search) {
-        params.search = search;
+      if (debouncedSearch) {
+        params.search = debouncedSearch;
       }
 
       if (categoryFilter) {
@@ -683,59 +702,60 @@ const PharmacistDashboard = () => {
         }
       );
 
-      return Array.isArray(response.data)
-        ? response.data
-        : [];
+      return response.data;
     },
   });
 
+  const medicines = medicinePageData?.medicines || [];
+  const { data: dashboardData } = useQuery({ queryKey: ['operations', 'summary'], queryFn: async () => (await api.get('/operations/summary')).data, refetchInterval: 30000 });
+  const debouncedBillSearch = useDebouncedValue(billSearch);
+  const { data: billingPage } = useQuery({ queryKey: ['medicines', 'billing', debouncedBillSearch], queryFn: async () => (await api.get('/medicines', { params: { page: 1, limit: 50, search: debouncedBillSearch } })).data });
+  const { data: expiryPage } = useQuery({ queryKey: ['medicines', 'expiryPreview'], queryFn: async () => (await api.get('/medicines', { params: { page: 1, limit: 50, status: 'EXPIRING', sort: 'expiry' } })).data });
   // ==========================================================================
   // BILLS QUERY
   // ==========================================================================
 
   const {
-    data: bills = [],
+    data: billPageData,
     isLoading: isBillsLoading,
     isFetching: isBillsFetching,
     refetch: refetchBills,
   } = useQuery({
-    queryKey: ['bills'],
+    queryKey: ['bills', returnPage, refundSearchTerm],
 
     queryFn: async () => {
       const response =
-        await api.get('/bills');
+        await api.get('/bills', { params: { page: returnPage, limit: 50, search: refundSearchTerm, includeReturned: 'true' } });
 
-      return Array.isArray(response.data)
-        ? response.data
-        : [];
+      return response.data;
     },
   });
 
+  const bills = billPageData?.bills || [];
   // ==========================================================================
   // ONLINE ORDERS
   // ==========================================================================
 
   const {
-    data: onlineOrders = [],
+    data: orderPageData,
     isLoading: isOrdersLoading,
     isFetching: isOrdersFetching,
     refetch: refetchOnlineOrders,
   } = useQuery({
-    queryKey: ['onlineOrders'],
+    queryKey: ['onlineOrders', orderPage, orderStatus],
 
     queryFn: async () => {
       const response = await api.get(
-        '/bills/online-orders'
+        '/bills/online-orders', { params: { page: orderPage, limit: 50, status: orderStatus || undefined } }
       );
 
-      return Array.isArray(response.data)
-        ? response.data
-        : [];
+      return response.data;
     },
 
     refetchInterval: 15000,
   });
 
+  const onlineOrders = orderPageData?.orders || [];
   const pendingOnlineOrders = onlineOrders.filter(
     (order) => order?.orderStatus === 'PENDING'
   );
@@ -764,6 +784,7 @@ const PharmacistDashboard = () => {
   const refreshDashboardData = async () => {
     if (isDashboardRefreshing) return;
     setIsDashboardRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['operations', 'summary'] });
     setDashboardRefreshMessage('');
     try {
       const results = await Promise.allSettled([
@@ -807,9 +828,9 @@ const PharmacistDashboard = () => {
     data: medicineSalesRanking,
     isLoading: isMedicineSalesLoading,
   } = useQuery({
-    queryKey: ['medicineSalesRanking'],
+    queryKey: ['medicineSalesRanking', rankingPage],
     queryFn: async () => {
-      const response = await api.get('/bills/medicine-sales-ranking');
+      const response = await api.get('/bills/medicine-sales-ranking', { params: { page: rankingPage } });
       return response.data || {};
     },
     staleTime: 60000,
@@ -820,40 +841,38 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const {
-    data: customers = [],
+    data: customerData,
     isLoading: isCustomersLoading,
   } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', customerPage, debouncedCustomerSearch],
 
     queryFn: async () => {
       const response =
         await api.get(
-          '/users/customers'
+          '/users/customers', { params: { page: customerPage, search: debouncedCustomerSearch } }
         );
 
-      return Array.isArray(response.data)
-        ? response.data
-        : [];
+      return response.data;
     },
   });
 
   const {
-    data: pendingCustomers = [],
+    data: pendingData,
     isLoading: isPendingCustomersLoading,
   } = useQuery({
-    queryKey: ['pendingCustomers'],
+    queryKey: ['pendingCustomers', pendingPage],
     enabled: currentUser?.role === 'superadmin',
     queryFn: async () => {
       const response = await api.get(
-        '/users/pending-customers'
+        '/users/pending-customers', { params: { page: pendingPage } }
       );
 
-      return Array.isArray(response.data)
-        ? response.data
-        : [];
+      return response.data;
     },
   });
 
+  const customers = customerData?.customers || [];
+  const pendingCustomers = pendingData?.customers || [];
   const updateCustomerStatusMutation = useMutation({
     mutationFn: async ({ customerId, action }) => {
       const response = await api.put(
@@ -1015,10 +1034,11 @@ const PharmacistDashboard = () => {
         const response =
           await api.post(
             '/medicines/bulk',
-            { medicines: data, sourceFile: bulkFile?.name || 'JSON bulk import', dryRun }
+            { medicines: data, sourceFile: importMode === 'excel' ? bulkFile?.name : 'JSON bulk import', dryRun, background: !dryRun },
+            { timeout: 120000 }
           );
 
-        return response.data;
+        return waitForJob(response.data);
       },
 
       onSuccess: (data, variables) => {
@@ -1189,6 +1209,7 @@ const PharmacistDashboard = () => {
     setIsProfitModalOpen(true);
   };
 
+  const salesPage = useSalesPage(salesDetailsType);
   const closeSalesDetails = () => {
     setSalesDetailsType(null);
   };
@@ -1259,28 +1280,9 @@ const PharmacistDashboard = () => {
     );
   };
 
-  const selectedSalesBills =
-    salesDetailsType
-      ? getSalesBills(
-          salesDetailsType
-        )
-      : [];
-
-  const selectedSalesTotal =
-    selectedSalesBills.reduce(
-      (sum, bill) =>
-        sum +
-        (bill?.netTotal ??
-          Math.max(
-            0,
-            Number(bill?.total || 0) -
-              Number(bill?.totalRefunded || 0)
-          )),
-      0
-    );
-
-  const selectedSalesBillCount =
-    selectedSalesBills.length;
+  const selectedSalesBills = salesPage.bills;
+  const selectedSalesTotal = salesDetailsType === 'daily' ? todaySales : salesDetailsType === 'monthly' ? monthlySales : yearlySales;
+  const selectedSalesBillCount = salesPage.data?.total || 0;
 
   const selectedSalesAverage =
     selectedSalesBillCount >
@@ -1732,18 +1734,21 @@ const PharmacistDashboard = () => {
   // BULK
   // ==========================================================================
 
-  const downloadExcelTemplate = () => {
+  const downloadExcelTemplate = async () => {
+    try {
+    const XLSX = await import('xlsx');
+    const { createMedicineInventoryWorkbook } = await import('../utils/medicineExport');
     XLSX.writeFile(createMedicineInventoryWorkbook([]), 'Medicine_Bulk_Import_Template.xlsx');
+    } catch { setBulkError('Unable to load the Excel template. Please retry.'); }
   };
 
   const exportAllMedicines = async () => {
     setIsExportingMedicines(true);
     try {
-      const { data } = await api.get('/medicines');
-      if (!Array.isArray(data)) {
-        throw new Error('The server returned an invalid medicine list.');
-      }
-      downloadMedicineInventory(data);
+      const job = await waitForJob((await api.post('/jobs/inventory-export')).data);
+      const { data } = await api.get(`/jobs/${job.jobId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data), link = document.createElement('a');
+      link.href = url; link.download = 'medicine_inventory.csv'; link.click(); URL.revokeObjectURL(url);
     } catch (exportError) {
       setError(
         exportError.response?.data?.message ||
@@ -1755,33 +1760,29 @@ const PharmacistDashboard = () => {
     }
   };
 
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setBulkPreviewResult(null);
-    setBulkFile(file);
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-
-        // Read ALL sheets and merge rows — supports multi-sheet Excel files
-        let allData = [];
-        wb.SheetNames.forEach((sheetName) => {
-          const ws = wb.Sheets[sheetName];
-          const sheetRows = XLSX.utils.sheet_to_json(ws, { raw: false, dateNF: 'dd/mm/yy' });
-          allData = allData.concat(sheetRows);
-        });
-
-        setBulkData(allData);
-        setBulkError('');
-      } catch {
-        setBulkError('Error parsing Excel file. Ensure it matches the template.');
-      }
-    };
-    reader.readAsBinaryString(file);
+  const handleFileUpload = async event => {
+    const file = event.target.files[0];
+    const version = ++bulkReadVersion.current;
+    bulkWorkerRef.current?.terminate();
+    setBulkData([]); setBulkPreviewResult(null); setBulkIgnoredSheets([]); setBulkError(''); setBulkSuccess(''); setBulkFile(file || null);
+    if (!file) { setBulkParsing(false); return; }
+    if (file.size > 20 * 1024 * 1024) { setBulkParsing(false); setBulkError('Select a workbook smaller than 20 MB.'); return; }
+    setBulkParsing(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      if (version !== bulkReadVersion.current) return;
+      const worker = new Worker(new URL('../workers/excelImport.worker.js', import.meta.url), { type: 'module' });
+      bulkWorkerRef.current = worker;
+      const fail = message => { if (version === bulkReadVersion.current) { setBulkError(message); setBulkParsing(false); } worker.terminate(); };
+      worker.onerror = () => fail('Unable to read the workbook. Download the sample and retry.');
+      worker.onmessage = message => {
+        if (version !== bulkReadVersion.current) { worker.terminate(); return; }
+        if (message.data.error) { fail(message.data.error); return; }
+        setBulkData(message.data.result.rows); setBulkIgnoredSheets(message.data.result.ignoredSheets);
+        setBulkParsing(false); worker.terminate();
+      };
+      worker.postMessage(buffer, [buffer]);
+    } catch (error) { if (version === bulkReadVersion.current) { setBulkError(error.message || 'Unable to read file.'); setBulkParsing(false); } }
   };
 
   const handleBulkSubmit = (
@@ -1792,6 +1793,7 @@ const PharmacistDashboard = () => {
     setBulkError('');
     setBulkSuccess('');
 
+    if (bulkParsing) return;
     if (importMode === 'excel') {
       if (!bulkData || bulkData.length === 0) {
         setBulkError(
@@ -2239,41 +2241,12 @@ const PharmacistDashboard = () => {
   const todayString =
     now.toDateString();
 
-  const totalMedicines =
-    medicines.length;
+  const totalMedicines = dashboardData?.inventory?.total || 0;
 
-  const expiredCount =
-    medicines.filter(
-      (medicine) =>
-        medicine?.expiryStatus ===
-        'EXPIRED'
-    ).length;
-
-  const expiringWithinSixMonths = medicines.filter((medicine) => {
-    const days = getDaysLeft(medicine?.expiryDate);
-    return days !== null && days >= 0 && days <= 180;
-  }).length;
-
-  const billsToday =
-    bills.filter(
-      (bill) =>
-        bill?.createdAt &&
-        bill?.orderStatus !== 'PENDING' &&
-        bill?.orderStatus !== 'REJECTED' &&
-        new Date(
-          bill.createdAt
-        ).toDateString() ===
-          todayString
-    ).length;
-
-  const lowStockCount =
-    medicines.filter(
-      (medicine) =>
-        Number(
-          medicine?.quantity ||
-            0
-        ) < 5
-    ).length;
+  const expiredCount = dashboardData?.inventory?.expired || 0;
+  const expiringWithinSixMonths = dashboardData?.inventory?.expiring || 0;
+  const billsToday = salesSummary?.today?.totalBills || 0;
+  const lowStockCount = dashboardData?.inventory?.lowStock || 0;
 
   // ==========================================================================
   // DISPLAYED MEDICINES
@@ -2302,104 +2275,17 @@ const PharmacistDashboard = () => {
   // TOP 100 EXPIRY MEDICINES
   // ==========================================================================
 
-  const expiringMedicines =
-    [...medicines]
-      .filter(
-        (medicine) => {
-          const days = getDaysLeft(medicine?.expiryDate);
-          return (
-            medicine?.expiryDate &&
-            days !== null &&
-            days >= 0 &&
-            days <= 180
-          );
-        }
-      )
-      .sort(
-        (a, b) => {
-          const aDate =
-            new Date(
-              a.expiryDate
-            ).getTime();
-
-          const bDate =
-            new Date(
-              b.expiryDate
-            ).getTime();
-
-          return aDate - bDate;
-        }
-      );
+  const expiringMedicines = expiryPage?.medicines || [];
 
   // ==========================================================================
   // 7 DAY REVENUE
   // ==========================================================================
 
-  const chartData = [];
-
-  for (
-    let index = 6;
-    index >= 0;
-    index -= 1
-  ) {
-    const date =
-      new Date();
-
-    date.setHours(
-      0,
-      0,
-      0,
-      0
-    );
-
-    date.setDate(
-      date.getDate() -
-        index
-    );
-
-    const dayBills =
-      bills.filter(
-        (bill) =>
-          bill?.createdAt &&
-          bill?.orderStatus !== 'PENDING' &&
-          bill?.orderStatus !== 'REJECTED' &&
-          new Date(
-            bill.createdAt
-          ).toDateString() ===
-            date.toDateString()
-      );
-
-    const revenue =
-      dayBills.reduce(
-        (sum, bill) =>
-          sum +
-          Number(
-            bill?.total || 0
-          ),
-        0
-      );
-
-    chartData.push({
-      name:
-        date.toLocaleDateString(
-          undefined,
-          {
-            weekday:
-              'short',
-          }
-        ),
-
-      Revenue:
-        Number(
-          revenue.toFixed(
-            2
-          )
-        ),
-
-      Bills:
-        dayBills.length,
-    });
-  }
+  const chartData = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(); date.setDate(date.getDate() - 6 + index);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return { name: date.toLocaleDateString('en-US', { weekday: 'short' }), Revenue: dashboardData?.sales?.find(day => day._id === key)?.total || 0 };
+  });
 
   // ==========================================================================
   // RECENT BILLS
@@ -2430,7 +2316,7 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const filteredBillMedicines =
-    medicines.filter(
+    (billingPage?.medicines || []).filter(
       (medicine) => {
         const query =
           billSearch
@@ -2482,6 +2368,14 @@ const PharmacistDashboard = () => {
   // NAV ITEMS
   // ==========================================================================
 
+  const returnBills = useMemo(() => bills.filter(b => !['PENDING', 'REJECTED'].includes(b.orderStatus)).filter(b => {
+    const text = refundSearchTerm.toLowerCase();
+    return !text || [b.billNumber, b._id, b.customerName, b.customer?.name, b.customerPhone].some(value => String(value || '').toLowerCase().includes(text));
+  }), [bills, refundSearchTerm]);
+  useEffect(() => setInventoryPage(1), [debouncedSearch, categoryFilter, expiryStatusFilter, reorderFilter, medicineViewFilter]);
+  useEffect(() => setReturnPage(1), [refundSearchTerm]);
+  const safeInventoryPage = inventoryPage;
+  const safeReturnPage = returnPage;
   const navItems = [
 
 
@@ -2586,6 +2480,7 @@ const PharmacistDashboard = () => {
 
         <nav className="space-y-1 p-3">
 
+          <button type="button" onClick={() => navigate('/operations')} className="rounded-xl border border-teal-400 px-3 py-2 text-sm font-semibold">Stock & accounts</button>
           {navItems.map(
             (item) => {
               const Icon =
@@ -3221,7 +3116,7 @@ const PharmacistDashboard = () => {
                     className="px-3 py-3 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
                   >
                     <ClipboardList className="w-4 h-4" />
-                    Orders ({pendingOnlineOrders.length})
+                    Orders ({dashboardData?.pendingOrders || 0})
                   </button>
 
                 </div>
@@ -3544,7 +3439,8 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="mb-3"><select value={orderStatus} onChange={e => { setOrderStatus(e.target.value); setOrderPage(1); }}><option value="PENDING">Pending orders</option><option value="ACCEPTED">Accepted orders</option><option value="REJECTED">Rejected orders</option><option value="">All orders</option></select><PageControls page={orderPage} pages={orderPageData?.pages || 1} total={orderPageData?.total || 0} onChange={setOrderPage} /></div>
+                  <div className="overflow-x-auto">
 
                   <table className="w-full">
 
@@ -3892,7 +3788,7 @@ const PharmacistDashboard = () => {
                     title="Download all medicines as an Excel backup"
                   >
                     <Download className="h-4 w-4 !text-emerald-700" />
-                    {isExportingMedicines ? 'Exporting…' : 'Export Excel'}
+                    {isExportingMedicines ? 'Exporting…' : 'Export CSV for Excel'}
                   </button>
 
                   <button
@@ -4036,6 +3932,7 @@ const PharmacistDashboard = () => {
                 </div>
               )}
 
+              <PageControls page={safeInventoryPage} pages={Math.ceil((medicinePageData?.total || 0) / 50)} total={medicinePageData?.total || 0} onChange={setInventoryPage} />
               <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
 
                 <div className="relative md:col-span-2">
@@ -4506,7 +4403,8 @@ const PharmacistDashboard = () => {
 
                 <div className="p-3 space-y-2 overflow-y-auto">
 
-                  {filteredBillMedicines.map(
+                  {filteredBillMedicines.length > 50 && <p className="text-xs text-slate-500">Showing the first 50 matches. Search to narrow the medicine list.</p>}
+                  {filteredBillMedicines.slice(0, 50).map(
                     (medicine) => {
 
                       const disabled =
@@ -4858,7 +4756,9 @@ const PharmacistDashboard = () => {
 
           {activeTab ===
             'customers' && (
-            <div className="space-y-4">
+            <div className="space-y-4"><input aria-label="Search customers" value={customerSearch} onChange={e => { setCustomerSearch(e.target.value); setCustomerPage(1); }} placeholder="Search customers" className="rounded-lg border p-2" /><PageControls page={customerPage} pages={customerData?.pages || 1} total={customerData?.total || 0} onChange={setCustomerPage} />
+              {currentUser?.role === 'superadmin' && <PageControls page={pendingPage} pages={pendingData?.pages || 1} total={pendingData?.total || 0} onChange={setPendingPage} />}
+
 
               {currentUser?.role === 'superadmin' && pendingCustomers.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
@@ -5200,6 +5100,7 @@ const PharmacistDashboard = () => {
                 </div>
               </div>
 
+              <PageControls page={safeReturnPage} pages={billPageData?.pages || 1} total={billPageData?.total || 0} onChange={setReturnPage} />
               {/* BILLS LIST FOR RETURNS */}
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm overflow-hidden">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -5225,16 +5126,7 @@ const PharmacistDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {bills
-                        .filter((b) => b?.orderStatus !== 'PENDING' && b?.orderStatus !== 'REJECTED')
-                        .filter((b) => {
-                          if (!refundSearchTerm) return true;
-                          const term = refundSearchTerm.toLowerCase();
-                          const billNum = String(b.billNumber || b._id || '').toLowerCase();
-                          const cust = String(b.customerName || b.customer?.name || '').toLowerCase();
-                          const phone = String(b.customerPhone || b.customer?.phone || '').toLowerCase();
-                          return billNum.includes(term) || cust.includes(term) || phone.includes(term);
-                        })
+                      {returnBills.slice((safeReturnPage - 1) * 50, safeReturnPage * 50)
                         .map((bill) => {
                           const totalItems = Array.isArray(bill.items)
                             ? bill.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
@@ -6041,7 +5933,8 @@ const PharmacistDashboard = () => {
                     {bulkFile && (
                       <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg w-full text-center">
                         <p className="text-xs text-slate-600 font-semibold">{bulkFile.name}</p>
-                        <p className="text-xs text-blue-700 font-bold mt-1">{bulkData.length} items found</p>
+                        <p className="text-xs text-blue-700 font-bold mt-1">{bulkParsing ? 'Reading workbook…' : `${bulkData.length} medicine rows found`}</p>
+                        {bulkIgnoredSheets.length > 0 && <p className="text-xs text-slate-600">Ignored non-medicine sheets: {bulkIgnoredSheets.join(', ')}</p>}
                       </div>
                     )}
                   </div>
@@ -6058,7 +5951,7 @@ const PharmacistDashboard = () => {
 
               {bulkPreviewResult && (
                 <div className="max-h-72 overflow-auto rounded-xl border border-blue-200 bg-blue-50 p-3">
-                  <p className="text-xs font-bold text-blue-900">Preview: {bulkPreviewResult.validCount} valid · {bulkPreviewResult.invalidCount} need correction · {bulkPreviewResult.totalRows} total</p>
+                  <p className="text-xs font-bold text-blue-900">Preview: {bulkPreviewResult.validCount} valid · {bulkPreviewResult.invalidCount} skipped / need correction · {bulkPreviewResult.totalRows} total</p>
                   <p className="mt-1 text-[10px] text-blue-800">Valid rows will be imported after confirmation. Invalid rows are saved for Admin and Pharmacist review.</p>
                   <div className="mt-2 space-y-1">
                     {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
@@ -6070,7 +5963,7 @@ const PharmacistDashboard = () => {
               <button
                 type="submit"
                 disabled={
-                    bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
+                    bulkParsing || bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
                 }
                 className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold shadow hover:brightness-110 disabled:opacity-50 transition"
               >
@@ -6592,6 +6485,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
+              <PageControls page={salesPage.page} pages={salesPage.data?.pages || 1} total={salesPage.data?.total || 0} onChange={salesPage.setPage} />
               {selectedSalesBills.length ===
               0 ? (
 
@@ -7315,6 +7209,7 @@ const PharmacistDashboard = () => {
 
             {/* List */}
             <div className="max-h-[60vh] overflow-y-auto p-4 space-y-2">
+              <PageControls page={rankingPage} pages={medicineSalesRanking?.pages || 1} total={medicineSalesRanking?.total || 0} onChange={setRankingPage} />
               {isMedicineSalesLoading ? (
                 <div className="text-center py-8 text-slate-400 text-sm">Loading...</div>
               ) : (() => {
@@ -7339,7 +7234,7 @@ const PharmacistDashboard = () => {
                         ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-300 text-slate-800' : index === 2 ? 'bg-amber-600 text-white' : 'bg-emerald-100 text-emerald-700'
                         : 'bg-rose-100 text-rose-700'
                     }`}>
-                      {salesRankingModal === 'top' && index === 0 ? '🥇' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
+                      {salesRankingModal === 'top' && index === 0 ? '🥇' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${(rankingPage - 1) * 50 + index + 1}`}
                     </div>
 
                     {/* Info */}

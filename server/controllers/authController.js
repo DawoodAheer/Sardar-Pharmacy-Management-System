@@ -301,8 +301,7 @@ export const logoutUser = async (req, res, next) => {
       httpOnly: true,
       expires: new Date(0),
       sameSite: "lax",
-      secure:
-        process.env.NODE_ENV === "production",
+      secure: process.env.COOKIE_SECURE === "true",
       path: "/",
     });
 
@@ -409,8 +408,7 @@ export const refreshAccessToken = async (
       httpOnly: true,
       expires: new Date(0),
       sameSite: "lax",
-      secure:
-        process.env.NODE_ENV === "production",
+      secure: process.env.COOKIE_SECURE === "true",
       path: "/",
     });
 

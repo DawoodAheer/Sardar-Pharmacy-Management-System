@@ -6,7 +6,7 @@ const medicineImportIssueSchema = new mongoose.Schema({
   originalRow: { type: mongoose.Schema.Types.Mixed, required: true },
   normalizedRow: { type: mongoose.Schema.Types.Mixed, default: {} },
   validationErrors: [{ type: String, trim: true }],
-  status: { type: String, enum: ['pending', 'resolved'], default: 'pending', index: true },
+  status: { type: String, enum: ['pending', 'resolved', 'ignored'], default: 'pending', index: true },
   resolvedMedicine: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine', default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

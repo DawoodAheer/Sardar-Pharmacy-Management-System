@@ -1,22 +1,27 @@
+import { pagination } from '../utils/pagination.js';
+import { addBatch } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
 import PurchaseOrder from '../models/PurchaseOrder.js';
 import StockAdjustment from '../models/StockAdjustment.js';
 import { recordMedicineAudit, snapshotMedicine } from '../utils/medicineAudit.js';
 
-export const getLowStockMedicines = async (_req, res, next) => {
+export const getLowStockMedicines = async (req, res, next) => {
   try {
-    const medicines = await Medicine.find({ isDeleted: { $ne: true }, quantity: { $lte: 10 } })
-      .sort({ quantity: 1, name: 1 }).limit(500).lean();
-    res.json({ medicines });
+    const { page, limit, skip } = pagination(req.query);
+    const filter = { isDeleted: { $ne: true }, quantity: { $lt: 5 } };
+    const total = await Medicine.countDocuments(filter);
+    const medicines = await Medicine.find(filter).sort({ quantity: 1, name: 1, _id: 1 }).skip(skip).limit(limit).lean();
+    res.json({ medicines, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
-export const getPurchaseOrders = async (_req, res, next) => {
+export const getPurchaseOrders = async (req, res, next) => {
   try {
-    const orders = await PurchaseOrder.find().populate('createdBy', 'name email role')
-      .sort({ createdAt: -1 }).limit(200).lean();
-    res.json({ orders });
+    const { page, limit, skip } = pagination(req.query);
+    const total = await PurchaseOrder.countDocuments();
+    const orders = await PurchaseOrder.find().populate('createdBy', 'name email role').sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean();
+    res.json({ orders, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
@@ -35,7 +40,17 @@ export const createPurchaseOrder = async (req, res, next) => {
       if (!medicine) return res.status(404).json({ message: 'A selected medicine is no longer active in inventory.' });
       normalized.push({ medicineId: medicine._id, medicineName: medicine.name, quantityOrdered: qty });
     }
-    const order = await PurchaseOrder.create({ supplierName, supplierPhone, items: normalized, createdBy: req.user._id });
+    let order;
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const item of normalized) {
+          const lock = await Medicine.updateOne({ _id: item.medicineId, isDeleted: { $ne: true } }, { $set: { updatedAt: new Date() } }, { session });
+          if (!lock.matchedCount) throw Object.assign(new Error('A selected medicine was archived or removed. Refresh inventory.'), { statusCode: 409 });
+        }
+        [order] = await PurchaseOrder.create([{ supplierName, supplierPhone, items: normalized, createdBy: req.user._id }], { session });
+      });
+    } finally { await session.endSession(); }
     res.status(201).json({ message: 'Purchase order draft created.', order });
   } catch (error) { next(error); }
 };
@@ -58,7 +73,10 @@ export const updatePurchaseOrderStatus = async (req, res, next) => {
           if (!medicine || medicine.isDeleted) { const error = new Error(`${item.medicineName} is no longer active. Restore it before receiving this order.`); error.statusCode = 409; throw error; }
           const previousValues = snapshotMedicine(medicine);
           const previousQuantity = medicine.quantity;
-          medicine.quantity += item.quantityOrdered;
+          const receipt = req.body.receipts?.find(line => String(line.medicineId) === String(item.medicineId)) || {};
+          addBatch(medicine, { batchNumber: receipt.batchNumber || order.orderNumber,
+            quantity: item.quantityOrdered, expiryDate: receipt.expiryDate || medicine.expiryDate,
+            purchaseCost: receipt.purchaseCost ?? medicine.purchasePrice / (medicine.unitsPerPack || 1) });
           const updatedMedicine = await medicine.save({ session });
           await StockAdjustment.create([{
             medicineId: medicine._id, medicineName: medicine.name, previousQuantity,

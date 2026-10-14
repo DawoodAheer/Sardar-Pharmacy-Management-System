@@ -33,6 +33,11 @@ server/uploads/
 # Backups & Data Dumps (Security & Data Protection)
 backups/
 server/backups/
+backup-exports/
+server/job-data/
+server/logs/
+.pharmacy-build-id
+launcher-test-*/
 *.archive.gz
 *.tar.gz
 

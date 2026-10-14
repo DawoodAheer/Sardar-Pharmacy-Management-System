@@ -1,3 +1,4 @@
+import PageControls from './PageControls';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -17,19 +18,20 @@ const fmtDate = (v) =>
 
 export default function PurchaseOrdersPanel({ compact = false }) {
   const queryClient = useQueryClient();
+  const [stockPage, setStockPage] = useState(1), [orderPage, setOrderPage] = useState(1);
   const [supplierOverrides, setSupplierOverrides] = useState({});
   const [quantities, setQuantities] = useState({});
   const [msg, setMsg] = useState('');
 
   const { data: lowData, isFetching, refetch } = useQuery({
-    queryKey: ['lowStockMedicines'],
-    queryFn: async () => (await api.get('/purchase-orders/low-stock')).data?.medicines || [],
+    queryKey: ['lowStockMedicines', stockPage],
+    queryFn: async () => (await api.get('/purchase-orders/low-stock', { params: { page: stockPage } })).data,
     refetchInterval: 60000,
   });
 
   const { data: ordersData } = useQuery({
-    queryKey: ['purchaseOrders'],
-    queryFn: async () => (await api.get('/purchase-orders')).data?.orders || [],
+    queryKey: ['purchaseOrders', orderPage],
+    queryFn: async () => (await api.get('/purchase-orders', { params: { page: orderPage } })).data,
     refetchInterval: 30000,
   });
 
@@ -69,11 +71,12 @@ export default function PurchaseOrdersPanel({ compact = false }) {
     onError: (e) => setMsg(e?.response?.data?.message || 'Unable to update purchase order.'),
   });
 
-  const lowStock = Array.isArray(lowData) ? lowData : [];
-  const orders = Array.isArray(ordersData) ? ordersData : [];
+  const lowStock = lowData?.medicines || [];
+  const orders = ordersData?.orders || [];
 
   return (
     <section className="rounded-2xl border border-orange-200 bg-white shadow-sm dark:border-orange-900/50 dark:bg-slate-900 overflow-hidden">
+      <PageControls page={stockPage} pages={lowData?.pages || 1} total={lowData?.total || 0} onChange={setStockPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-orange-100 bg-orange-50/70 px-5 py-4 dark:border-orange-900/40 dark:bg-orange-950/20">
         <div className="flex items-center gap-3">
@@ -139,7 +142,7 @@ export default function PurchaseOrdersPanel({ compact = false }) {
                         </p>
                         <p className="text-[10px] text-slate-500">
                           Stock:{' '}
-                          <strong className="text-rose-600">{medicine.quantity}</strong> · Low stock alert (≤ 10)
+                          <strong className="text-rose-600">{medicine.quantity}</strong> · Low stock alert (below 5)
                           {medicine.expiryDate && ' · Exp: ' + fmtDate(medicine.expiryDate)}
                         </p>
                       </div>
@@ -210,6 +213,7 @@ export default function PurchaseOrdersPanel({ compact = false }) {
           </div>
         )}
 
+        <PageControls page={orderPage} pages={ordersData?.pages || 1} total={ordersData?.total || 0} onChange={setOrderPage} />
         {/* Recent Orders */}
         <div>
           <h3 className="mb-2 border-t border-slate-100 pt-4 text-xs font-bold text-slate-700 dark:border-slate-800 dark:text-slate-300">
@@ -217,7 +221,7 @@ export default function PurchaseOrdersPanel({ compact = false }) {
           </h3>
           {orders.length > 0 ? (
             <div className="max-h-64 space-y-2 overflow-auto">
-              {orders.slice(0, 30).map((order) => {
+              {orders.map((order) => {
                 const cfg = STATUS_CONFIG[order.status] || STATUS_CONFIG.DRAFT;
                 return (
                   <div

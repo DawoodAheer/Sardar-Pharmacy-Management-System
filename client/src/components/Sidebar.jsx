@@ -14,10 +14,12 @@ const Sidebar = () => {
         return [
           { name: 'Admin Settings', path: '/superadmin', icon: Users },
           { name: 'Inventory Manager', path: '/pharmacist', icon: Pill },
+          { name: 'Stock & accounts', path: '/operations', icon: FileText },
         ];
       case 'pharmacist':
         return [
           { name: 'Inventory Manager', path: '/pharmacist', icon: Pill },
+          { name: 'Stock & accounts', path: '/operations', icon: FileText },
         ];
       case 'customer':
         return [

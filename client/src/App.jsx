@@ -5,6 +5,7 @@ import useBrowserNotifications from './hooks/useBrowserNotifications';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 
+const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
@@ -113,6 +114,7 @@ function App() {
 
       {/* Shared Dashboard Layout */}
       <Route element={<DashboardLayout />}>
+        <Route path="/operations" element={<ProtectedRoute allowedRoles={['superadmin', 'pharmacist']}><OperationsPage /></ProtectedRoute>} />
         {/* Unauthorized */}
         <Route path="/unauthorized" element={<Unauthorized />} />
 

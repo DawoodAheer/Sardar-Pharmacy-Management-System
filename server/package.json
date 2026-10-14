@@ -1,7 +1,7 @@
 {
   "name": "pharmadesk-server",
   "version": "1.0.0",
-  "description": "Pharmadesk API server — Express + MongoDB backend",
+  "description": "Pharmadesk API server \u2014 Express + MongoDB backend",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,9 @@
     "test": "node --test",
     "seed": "node --import ./env-loader.js seed.js",
     "db:backup": "node --import ./env-loader.js utils/backupManager.js backup",
-    "db:restore": "node --import ./env-loader.js utils/backupManager.js restore"
+    "db:restore": "node --import ./env-loader.js utils/backupManager.js restore",
+    "test:integration": "node --test integration/upgrades.test.js integration/import.test.js",
+    "test:capacity": "node --test integration/capacity.test.js"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

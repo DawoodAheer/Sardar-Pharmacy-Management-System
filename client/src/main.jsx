@@ -11,7 +11,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: (count, error) => count < 1 && !error.response && error.code !== 'ECONNABORTED',
+      staleTime: 30000,
     },
   },
 });

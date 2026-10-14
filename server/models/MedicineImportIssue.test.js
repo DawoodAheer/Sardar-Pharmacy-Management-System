@@ -15,9 +15,16 @@ test('invalid medicine import rows remain pending with their source row and corr
   assert.equal(issue.validateSync(), undefined);
 });
 
-test('import review model only accepts pending or resolved states', () => {
+test('import review model rejects unknown review states', () => {
   const issue = new MedicineImportIssue({
     rowNumber: 2, originalRow: {}, status: 'approved', createdBy: new mongoose.Types.ObjectId(),
   });
   assert.ok(issue.validateSync().errors.status);
+});
+
+test('ignored import issues remain valid for backup recovery', () => {
+  const issue = new MedicineImportIssue({ rowNumber: 2, originalRow: { name: 'Duplicate row' },
+    status: 'ignored', createdBy: new mongoose.Types.ObjectId() });
+  assert.equal(issue.validateSync(), undefined);
+  assert.equal(issue.originalRow.name, 'Duplicate row');
 });

@@ -1,3 +1,5 @@
+import { waitForJob } from '../utils/backgroundJobs';
+import PageControls from './PageControls';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -76,6 +78,7 @@ function PreviewRow({ row }) {
 
 export default function MedicineImportIssues({ compact = false }) {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [msg, setMsg] = useState('');
@@ -86,8 +89,8 @@ export default function MedicineImportIssues({ compact = false }) {
   const [bulkPayload, setBulkPayload] = useState(null);
 
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ['medicineImportIssues'],
-    queryFn: async () => (await api.get('/medicines/import-issues')).data?.issues || [],
+    queryKey: ['medicineImportIssues', page],
+    queryFn: async () => (await api.get('/medicines/import-issues', { params: { page } })).data,
     refetchInterval: 15000,
   });
 
@@ -107,13 +110,9 @@ export default function MedicineImportIssues({ compact = false }) {
   });
 
   const confirmImportMutation = useMutation({
-    mutationFn: async () =>
-      (
-        await api.post('/medicines/bulk', {
-          medicines: bulkPayload,
-          sourceFile: previewFile,
-        })
-      ).data,
+    mutationFn: async () => waitForJob((await api.post('/medicines/bulk', {
+      medicines: bulkPayload, sourceFile: previewFile, background: true,
+    })).data),
     onSuccess: async (r) => {
       setMsg(
         'Imported ' +
@@ -149,7 +148,7 @@ export default function MedicineImportIssues({ compact = false }) {
     },
   });
 
-  const issues = Array.isArray(data) ? data : [];
+  const issues = data?.issues || [];
 
   const beginFix = (issue) => {
     const orig = issue.originalRow || {};
@@ -251,11 +250,12 @@ export default function MedicineImportIssues({ compact = false }) {
   // ── Pending Issues Panel ────────────────────────────────
   return (
     <section className="rounded-xl border border-amber-200 bg-amber-50 dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
+      <PageControls page={page} pages={data?.pages || 1} total={data?.total || 0} onChange={setPage} />
       <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
           <AlertTriangle size={16} /> Medicine Rows Needing Review
           <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs dark:bg-amber-700 dark:text-amber-200">
-            {issues.length}
+            {data?.total || issues.length}
           </span>
         </div>
         <div className="flex gap-2">

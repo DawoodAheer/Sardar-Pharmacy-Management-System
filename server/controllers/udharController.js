@@ -1,3 +1,6 @@
+import { pagination } from '../utils/pagination.js';
+import mongoose from 'mongoose';
+import { roundMoney } from '../utils/batchInventory.js';
 import Udhar from '../models/Udhar.js';
 
 // @desc    Create a new Udhar (credit) entry
@@ -31,8 +34,8 @@ export const createUdhar = async (req, res, next) => {
       }
       const qty = Number(item.quantity);
       const price = Number(item.unitPrice);
-      if (!qty || qty < 1) throw new Error(`Invalid quantity for item ${idx + 1}`);
-      if (price < 0) throw new Error(`Invalid price for item ${idx + 1}`);
+      if (!Number.isInteger(qty) || qty < 1) throw new Error(`Invalid quantity for item ${idx + 1}`);
+      if (!Number.isFinite(price) || price < 0) throw new Error(`Invalid price for item ${idx + 1}`);
       return {
         medicineName: item.medicineName.trim(),
         quantity: qty,
@@ -52,6 +55,7 @@ export const createUdhar = async (req, res, next) => {
       payments: [],
       recordedBy: req.user._id,
       billRef: billRef || '',
+      dueDate: req.body.dueDate || null,
     });
 
     res.status(201).json({ success: true, udhar });
@@ -65,16 +69,19 @@ export const createUdhar = async (req, res, next) => {
 // @access  Private/Pharmacist,Superadmin
 export const getAllUdhar = async (req, res, next) => {
   try {
-    const { status, search, page = 1, limit = 50 } = req.query;
+    const { status, search } = req.query;
+    const page = Math.max(1, Math.floor(Number(req.query.page) || 1)), limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit) || 50)));
 
     const filter = {};
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (req.query.overdue === 'true') { filter.dueDate = { $lt: today }; filter.remainingAmount = { $gt: 0 }; }
 
     if (status && status !== 'ALL') {
       filter.status = status;
     }
 
     if (search && search.trim()) {
-      const s = search.trim();
+      const s = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
         { customerName: { $regex: s, $options: 'i' } },
         { customerPhone: { $regex: s, $options: 'i' } },
@@ -171,9 +178,11 @@ export const removeItemFromUdhar = async (req, res, next) => {
       return next(new Error('Udhar record not found'));
     }
 
-    udhar.items = udhar.items.filter(
-      (item) => item._id.toString() !== req.params.itemId
-    );
+    const remainingItems = udhar.items.filter(item => item._id.toString() !== req.params.itemId);
+    if (!remainingItems.length || remainingItems.reduce((sum, item) => sum + item.totalPrice, 0) < udhar.totalPaid) {
+      return res.status(400).json({ message: 'Cannot remove all charges or reduce charges below recorded payments.' });
+    }
+    udhar.items = remainingItems;
 
     await udhar.save();
     res.json({ success: true, udhar });
@@ -186,59 +195,37 @@ export const removeItemFromUdhar = async (req, res, next) => {
 // @route   POST /api/udhar/:id/pay
 // @access  Private/Pharmacist,Superadmin
 export const recordPayment = async (req, res, next) => {
+  const session = await mongoose.startSession();
   try {
-    const udhar = await Udhar.findById(req.params.id);
-    if (!udhar) {
-      res.status(404);
-      return next(new Error('Udhar record not found'));
-    }
-
-    if (udhar.status === 'PAID') {
-      res.status(400);
-      return next(new Error('This Udhar is already fully paid'));
-    }
-
-    const amount = Number(req.body.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      res.status(400);
-      return next(new Error('Payment amount must be a positive number'));
-    }
-
+    const amount = roundMoney(req.body.amount);
     const paidAt = req.body.paidAt ? new Date(req.body.paidAt) : new Date();
-    if (Number.isNaN(paidAt.getTime())) {
-      res.status(400);
-      return next(new Error('Payment date is invalid'));
+    if (!Number.isFinite(amount) || amount <= 0 || Number.isNaN(paidAt.getTime())) {
+      return res.status(400).json({ message: 'Enter a positive payment and valid payment date.' });
     }
-
-    if (amount > udhar.remainingAmount) {
-      res.status(400);
-      return next(
-        new Error(`Payment amount (Rs ${amount}) exceeds remaining balance (Rs ${udhar.remainingAmount})`)
-      );
-    }
-
-    udhar.payments.push({
-      amount,
-      paidAt,
-      note: req.body.note || '',
-      paidBy: req.user._id,
+    let udhar;
+    await session.withTransaction(async () => {
+      udhar = await Udhar.findById(req.params.id).session(session);
+      if (!udhar) throw Object.assign(new Error('Udhar record not found'), { statusCode: 404 });
+      if (amount > udhar.remainingAmount || udhar.status === 'PAID') {
+        throw Object.assign(new Error('Payment exceeds the current remaining balance.'), { statusCode: 400 });
+      }
+      udhar.payments.push({ amount, paidAt, note: req.body.note || '', paidBy: req.user._id });
+      await udhar.save({ session });
     });
-
-    await udhar.save();
-    res.json({ success: true, udhar });
-  } catch (error) {
-    next(error);
-  }
+    res.json({ success: true, udhar, receipt: { id: udhar.payments.at(-1)._id, amount, paidAt, remaining: udhar.remainingAmount } });
+  } catch (error) { next(error); }
+  finally { await session.endSession(); }
 };
 
 // @desc    Admin audit feed for each recorded Udhar payment
 // @route   GET /api/udhar/payment-activity
-export const getUdharPaymentActivity = async (_req, res, next) => {
+export const getUdharPaymentActivity = async (req, res, next) => {
   try {
     const activity = await Udhar.aggregate([
       { $unwind: '$payments' },
       { $sort: { 'payments.paidAt': -1 } },
-      { $limit: 200 },
+      { $skip: pagination(req.query).skip },
+      { $limit: pagination(req.query).limit },
       { $project: {
         _id: '$payments._id',
         customerName: 1,
@@ -261,7 +248,9 @@ export const getUdharPaymentActivity = async (_req, res, next) => {
         recordedBy: { $let: { vars: { user: { $arrayElemAt: ['$recorder', 0] } }, in: { _id: '$$user._id', name: '$$user.name', email: '$$user.email' } } },
       } },
     ]);
-    res.json({ success: true, payments: activity });
+    const [counts] = await Udhar.aggregate([{ $unwind: '$payments' }, { $count: 'total' }]);
+    const total = counts?.total || 0;
+    res.json({ success: true, payments: activity, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) });
   } catch (error) { next(error); }
 };
 

@@ -19,11 +19,16 @@ import {
 } from '../controllers/medicineController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
+import Medicine from '../models/Medicine.js';
+import { permanentlyDeleteArchived } from '../controllers/archiveDeletionController.js';
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
+router.get('/categories', async (_req, res, next) => {
+  try { res.json((await Medicine.distinct('category', { isDeleted: { $ne: true } })).filter(Boolean)); } catch (error) { next(error); }
+});
 
 // Billing check - accessible by any authenticated role
 router.post('/bill', authorize('pharmacist', 'superadmin'), processBill);
@@ -47,6 +52,7 @@ router.get('/audit-history', authorize('pharmacist', 'superadmin'), getMedicineA
 // Stock adjustments
 router.get('/stock-adjustments', authorize('pharmacist', 'superadmin'), getStockAdjustments);
 router.get('/deleted', authorize('superadmin'), getDeletedMedicines);
+router.delete('/:id/permanent', authorize('superadmin'), permanentlyDeleteArchived);
 router.patch('/:id/restore', authorize('superadmin'), restoreMedicine);
 router.post('/:id/adjust-stock', authorize('pharmacist', 'superadmin'), adjustStock);
 

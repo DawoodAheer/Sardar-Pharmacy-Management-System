@@ -1,4 +1,8 @@
+import { pagination } from '../utils/pagination.js';
+import { medicineProfitStages, profitStages } from '../utils/profitAggregation.js';
+import { allocateBillStock, restoreReturnedBatches, saleExpiryStatus } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
+import { saleDateFilter } from '../utils/saleDate.js';
 import Bill from '../models/Bill.js';
 import Medicine from '../models/Medicine.js';
 import User from '../models/User.js';
@@ -180,9 +184,7 @@ export const createBill = async (req, res, next) => {
         return next(new Error(`${medicine.name} is archived and cannot be added to a new bill`));
       }
 
-      const expiryStatus = checkExpiryStatus(
-        medicine.expiryDate
-      );
+      const expiryStatus = saleExpiryStatus(medicine);
 
       if (expiryStatus === 'EXPIRED') {
         expiredItems.push(
@@ -251,6 +253,9 @@ export const createBill = async (req, res, next) => {
       );
     }
 
+    if (isCustomerOrder && Number(discount || 0) !== 0) {
+      return res.status(403).json({ message: 'Only pharmacy staff may apply discounts.' });
+    }
     const finalDiscount =
       discount === undefined || discount === '' ? 0 : Number(discount);
     if (
@@ -270,6 +275,12 @@ export const createBill = async (req, res, next) => {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
+        if (isCustomerOrder) {
+          for (const item of validatedItems) {
+            const lock = await Medicine.updateOne({ _id: item.medicineId, isDeleted: { $ne: true } }, { $set: { updatedAt: new Date() } }, { session });
+            if (!lock.matchedCount) throw Object.assign(new Error('A medicine was archived or removed. Refresh your cart.'), { statusCode: 409 });
+          }
+        }
         [bill] = await Bill.create(
           [{
             pharmacistId: finalPharmacistId,
@@ -299,22 +310,7 @@ export const createBill = async (req, res, next) => {
           { session }
         );
 
-        if (!isCustomerOrder) {
-          for (const [medicineId, quantity] of stockRequirements) {
-            const result = await Medicine.updateOne(
-              { _id: medicineId, quantity: { $gte: quantity } },
-              { $inc: { quantity: -quantity } },
-              { session }
-            );
-            if (!result.modifiedCount) {
-              const error = new Error(
-                'Stock changed during billing. Please refresh and try again.'
-              );
-              error.statusCode = 409;
-              throw error;
-            }
-          }
-        }
+        if (!isCustomerOrder) await allocateBillStock(bill, session);
       });
     } finally {
       await session.endSession();
@@ -360,9 +356,13 @@ export const getCustomerBills = async (
       );
     }
 
-    const bills = await Bill.find({
-      customerId,
-    })
+    const { page, limit, skip } = pagination(req.query);
+    const filter = { customerId, $expr: { $gt: [{ $sum: '$items.quantity' }, { $sum: '$returns.quantityReturned' }] } };
+    const [summary] = await Bill.aggregate([
+      { $match: { ...filter, customerId: new mongoose.Types.ObjectId(customerId) } },
+      { $group: { _id: null, total: { $sum: 1 }, totalItems: { $sum: { $max: [0, { $subtract: [{ $sum: '$items.quantity' }, { $sum: '$returns.quantityReturned' }] }] } }, totalSpent: { $sum: { $max: [0, { $subtract: ['$total', { $ifNull: ['$totalRefunded', 0] }] }] } }, monthlySpent: { $sum: { $cond: [{ $gte: ['$createdAt', new Date(new Date().getFullYear(), new Date().getMonth(), 1)] }, { $max: [0, { $subtract: ['$total', { $ifNull: ['$totalRefunded', 0] }] }] }, 0] } } } },
+    ]);
+    const bills = await Bill.find(filter).skip(skip).limit(limit)
       .populate(
         'customerId',
         'name email phone'
@@ -379,11 +379,10 @@ export const getCustomerBills = async (
         createdAt: -1,
       });
 
-    res.json(
-      bills
-        .map((bill) => getBillReturnSummary(bill))
-        .filter((bill) => !bill.isFullyReturned)
-    );
+    const rows = bills.map(bill => getBillReturnSummary(bill));
+    const total = summary?.total || 0;
+    res.json(req.query.page !== undefined ? { bills: rows, total, page, pages: Math.ceil(total / limit), summary } : rows);
+
   } catch (error) {
     next(error);
   }
@@ -849,7 +848,18 @@ export const getAllBills = async (
       );
     }
 
-    const bills = await Bill.find({})
+    const { page, limit, skip } = pagination(req.query);
+    const filter = {};
+    if (req.query.accepted === 'true') filter.orderStatus = { $nin: ['PENDING', 'REJECTED'] };
+    if (req.query.includeReturned !== 'true') filter.$expr = { $gt: [{ $sum: '$items.quantity' }, { $sum: '$returns.quantityReturned' }] };
+    if (req.query.search) { const text = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); filter.$or = ['billNumber', 'customerName', 'customerPhone'].map(field => ({ [field]: { $regex: text, $options: 'i' } })); }
+    if (req.query.startDate && req.query.endDate) {
+      const range = getLocalDateRange(req.query.startDate, req.query.endDate);
+      if (!range.start || !range.end) return res.status(400).json({ message: 'Invalid date range.' });
+      filter.$and = [saleDateFilter({ $gte: range.start, $lte: range.end })];
+    }
+    const total = await Bill.countDocuments(filter);
+    const bills = await Bill.find(filter).skip(skip).limit(limit)
       .populate(
         'customerId',
         'name email phone'
@@ -867,11 +877,7 @@ export const getAllBills = async (
       });
 
     const summarizedBills = bills.map((bill) => getBillReturnSummary(bill));
-    res.json(
-      req.query.includeReturned === 'true'
-        ? summarizedBills
-        : summarizedBills.filter((bill) => !bill.isFullyReturned)
-    );
+    res.json(req.query.page !== undefined ? { bills: summarizedBills, total, page, pages: Math.ceil(total / limit) } : summarizedBills);
   } catch (error) {
     next(error);
   }
@@ -886,12 +892,11 @@ export const getOnlineOrders = async (
   next
 ) => {
   try {
-    const orders = await Bill.find({
-      billType: 'ONLINE',
-      customerId: {
-        $ne: null,
-      },
-    })
+    const { page, limit, skip } = pagination(req.query);
+    const filter = { billType: 'ONLINE', customerId: { $ne: null } };
+    if (req.query.status) filter.orderStatus = req.query.status;
+    const total = await Bill.countDocuments(filter);
+    const orders = await Bill.find(filter).skip(skip).limit(limit)
       .populate(
         'customerId',
         'name email phone'
@@ -908,7 +913,7 @@ export const getOnlineOrders = async (
         createdAt: -1,
       });
 
-    res.json(orders);
+    res.json(req.query.page !== undefined ? { orders, total, page, pages: Math.ceil(total / limit) } : orders);
   } catch (error) {
     next(error);
   }
@@ -958,7 +963,7 @@ export const acceptOnlineOrder = async (
             error.statusCode = 404;
             throw error;
           }
-          if (checkExpiryStatus(medicine.expiryDate) === 'EXPIRED') {
+          if (saleExpiryStatus(medicine) === 'EXPIRED') {
             const error = new Error(`${medicine.name} is expired and cannot be accepted`);
             error.statusCode = 403;
             throw error;
@@ -971,20 +976,7 @@ export const acceptOnlineOrder = async (
           );
         }
 
-        for (const [medicineId, quantity] of requirements) {
-          const result = await Medicine.updateOne(
-            { _id: medicineId, quantity: { $gte: quantity } },
-            { $inc: { quantity: -quantity } },
-            { session }
-          );
-          if (!result.modifiedCount) {
-            const error = new Error(
-              'Stock changed during order acceptance. Refresh and try again.'
-            );
-            error.statusCode = 409;
-            throw error;
-          }
-        }
+        await allocateBillStock(bill, session);
 
         bill.orderStatus = 'ACCEPTED';
         bill.pharmacistId = req.user._id;
@@ -1316,9 +1308,7 @@ export const createInstoreBill = async (
       }
 
       const expiryStatus =
-        checkExpiryStatus(
-          medicine.expiryDate
-        );
+        saleExpiryStatus(medicine);
 
       if (expiryStatus === 'EXPIRED') {
         expiredItems.push(
@@ -1444,20 +1434,7 @@ export const createInstoreBill = async (
           { session }
         );
 
-        for (const [medicineId, quantity] of stockRequirements) {
-          const result = await Medicine.updateOne(
-            { _id: medicineId, quantity: { $gte: quantity } },
-            { $inc: { quantity: -quantity } },
-            { session }
-          );
-          if (!result.modifiedCount) {
-            const error = new Error(
-              'Stock changed during billing. Please refresh and try again.'
-            );
-            error.statusCode = 409;
-            throw error;
-          }
-        }
+        await allocateBillStock(bill, session);
       });
     } finally {
       await session.endSession();
@@ -1540,34 +1517,18 @@ export const getSalesSummary = async (
       },
     };
 
-    const [todayBills, monthBills, yearBills] = await Promise.all([
-      Bill.find({
-        ...acceptedMatch,
-        createdAt: { $gte: startOfDay, $lt: startOfTomorrow },
-      }).lean(),
-      Bill.find({
-        ...acceptedMatch,
-        createdAt: { $gte: startOfMonth, $lt: startOfNextMonth },
-      }).lean(),
-      Bill.find({
-        ...acceptedMatch,
-        createdAt: { $gte: startOfYear, $lt: startOfNextYear },
-      }).lean(),
+    const aggregateSales = async (start, end) => {
+      const [result] = await Bill.aggregate([
+        { $match: { ...acceptedMatch, ...saleDateFilter({ $gte: start, $lt: end }) } },
+        { $set: { net: { $max: [0, { $subtract: ['$total', { $ifNull: ['$totalRefunded', 0] }] }] } } },
+        { $match: { $expr: { $gt: [{ $sum: '$items.quantity' }, { $sum: '$returns.quantityReturned' }] } } },
+        { $group: { _id: null, totalSales: { $sum: '$net' }, totalBills: { $sum: 1 } } },
+      ]);
+      return result || { totalSales: 0, totalBills: 0 };
+    };
+    const [todaySummary, monthlySummary, yearlySummary] = await Promise.all([
+      aggregateSales(startOfDay, startOfTomorrow), aggregateSales(startOfMonth, startOfNextMonth), aggregateSales(startOfYear, startOfNextYear),
     ]);
-    const summarizeSales = (records) =>
-      records
-        .map((bill) => getBillReturnSummary(bill))
-        .filter((bill) => !bill.isFullyReturned)
-        .reduce(
-          (summary, bill) => ({
-            totalSales: summary.totalSales + bill.netTotal,
-            totalBills: summary.totalBills + 1,
-          }),
-          { totalSales: 0, totalBills: 0 }
-        );
-    const todaySummary = summarizeSales(todayBills);
-    const monthlySummary = summarizeSales(monthBills);
-    const yearlySummary = summarizeSales(yearBills);
 
     res.json({
       success: true,
@@ -1601,16 +1562,20 @@ export const getDailyClosingReport = async (req, res, next) => {
     const day = req.query.date || localToday;
     const range = getLocalDateRange(day, day);
     if (!range.start || !range.end) return res.status(400).json({ message: 'Provide a valid report date in YYYY-MM-DD format.' });
-    const billFilter = { createdAt: { $gte: range.start, $lte: range.end }, orderStatus: { $nin: ['PENDING', 'REJECTED'] } };
+    const billFilter = { ...saleDateFilter({ $gte: range.start, $lte: range.end }), orderStatus: { $nin: ['PENDING', 'REJECTED'] } };
     const [bills, returns, udharIssued, udharPayments] = await Promise.all([
-      Bill.find(billFilter).select('total paymentMethod').lean(),
-      SaleReturn.find({ date: { $gte: range.start, $lte: range.end } }).populate('sale_id', 'paymentMethod').lean(),
+      Bill.aggregate([{ $match: billFilter }, { $group: { _id: '$paymentMethod', total: { $sum: '$total' }, count: { $sum: 1 } } }]),
+      SaleReturn.aggregate([{ $match: { date: { $gte: range.start, $lte: range.end } } },
+        { $lookup: { from: 'bills', localField: 'sale_id', foreignField: '_id', as: 'bill' } },
+        { $group: { _id: { $ifNull: [{ $arrayElemAt: ['$bill.paymentMethod', 0] }, 'Cash'] }, total: { $sum: '$refund_amount' } } }]),
       Udhar.aggregate([{ $match: { createdAt: { $gte: range.start, $lte: range.end } } }, { $group: { _id: null, total: { $sum: '$totalAmount' }, count: { $sum: 1 } } }]),
       Udhar.aggregate([{ $unwind: '$payments' }, { $match: { 'payments.paidAt': { $gte: range.start, $lte: range.end } } }, { $group: { _id: null, total: { $sum: '$payments.amount' }, count: { $sum: 1 } } }]),
     ]);
     const creditIssued = Number(udharIssued[0]?.total || 0);
     const creditRecovered = Number(udharPayments[0]?.total || 0);
-    res.json({ date: day, billCount: bills.length, ...summarizeDailyClosing({ bills, returns, creditIssued, creditRecovered }),
+    res.json({ date: day, billCount: bills.reduce((sum, group) => sum + group.count, 0), ...summarizeDailyClosing({
+      bills: bills.map(group => ({ paymentMethod: group._id, total: group.total })),
+      returns: returns.map(group => ({ sale_id: { paymentMethod: group._id }, refund_amount: group.total })), creditIssued, creditRecovered }),
       udharEntries: Number(udharIssued[0]?.count || 0), udharPayments: Number(udharPayments[0]?.count || 0) });
   } catch (error) { next(error); }
 };
@@ -1639,56 +1604,24 @@ export const getProfitSummary = async (req, res, next) => {
       };
     }
 
-    const [bills, medicines] = await Promise.all([
-      Bill.find(matchStage).lean(),
-      Medicine.find().select('_id purchasePrice unitsPerPack').lean(),
-    ]);
-    const purchasePriceByMedicine = new Map(
-      medicines.map((medicine) => [
-        String(medicine._id),
-        getPurchaseCostPerUnit(medicine.purchasePrice, medicine.unitsPerPack),
-      ])
-    );
-
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
-
-    let dailyProfit = 0;
-    let monthlyProfit = 0;
-    let yearlyProfit = 0;
-    let customProfit = 0;
-    let customSales = 0;
-
-    bills.forEach((bill) => {
-      let totalCost = 0;
-      getBillReturnSummary(bill).netItems.forEach((item) => {
-        const netQty = item.netQuantity;
-        if (netQty === 0) return;
-        const savedPurchasePrice = Number(item.purchasePrice);
-        const purchasePrice =
-          item.purchasePrice !== undefined &&
-          item.purchasePrice !== null &&
-          Number.isFinite(savedPurchasePrice)
-            ? savedPurchasePrice
-            : purchasePriceByMedicine.get(String(item.medicineId)) || 0;
-        totalCost += purchasePrice * netQty;
-      });
-
-      const netTotal = Math.max(0, (bill.total || 0) - (bill.totalRefunded || 0));
-      const profit = netTotal - totalCost;
-      const billDate = new Date(bill.createdAt);
-
-      if (billDate >= startOfDay) dailyProfit += profit;
-      if (billDate >= startOfMonth) monthlyProfit += profit;
-      if (billDate >= startOfYear) yearlyProfit += profit;
-
-      if (startDate && endDate) {
-        customProfit += profit;
-        customSales += netTotal;
-      }
-    });
+    const range = startDate && endDate ? getLocalDateRange(startDate, endDate) : null;
+    const earliest = range ? new Date(Math.min(range.start.getTime(), startOfYear.getTime())) : startOfYear;
+    const [summary] = await Bill.aggregate([
+      { $match: { orderStatus: { $nin: ['PENDING', 'REJECTED'] }, ...saleDateFilter({ $gte: earliest }) } },
+      ...profitStages(),
+      { $group: { _id: null,
+        dailyProfit: { $sum: { $cond: [{ $gte: ['$saleDate', startOfDay] }, '$profit', 0] } },
+        monthlyProfit: { $sum: { $cond: [{ $gte: ['$saleDate', startOfMonth] }, '$profit', 0] } },
+        yearlyProfit: { $sum: { $cond: [{ $gte: ['$saleDate', startOfYear] }, '$profit', 0] } },
+        customProfit: { $sum: { $cond: [range ? { $and: [{ $gte: ['$saleDate', range.start] }, { $lte: ['$saleDate', range.end] }] } : false, '$profit', 0] } },
+        customSales: { $sum: { $cond: [range ? { $and: [{ $gte: ['$saleDate', range.start] }, { $lte: ['$saleDate', range.end] }] } : false, '$netTotal', 0] } },
+      } },
+    ]).allowDiskUse(true);
+    const { dailyProfit = 0, monthlyProfit = 0, yearlyProfit = 0, customProfit = 0, customSales = 0 } = summary || {};
 
     res.json({
       success: true,
@@ -1707,110 +1640,22 @@ export const getProfitSummary = async (req, res, next) => {
 // @access  Private/Pharmacist/Superadmin
 export const getProfitDetails = async (req, res, next) => {
   try {
-    if (req.user.role !== 'pharmacist' && req.user.role !== 'superadmin') {
-      res.status(403);
-      return next(new Error('Only pharmacists and superadmins can view profit details'));
+    const { page, limit, skip } = pagination(req.query);
+    const match = { orderStatus: { $nin: ['PENDING', 'REJECTED'] } };
+    if (req.query.startDate || req.query.endDate) {
+      const range = getLocalDateRange(req.query.startDate, req.query.endDate);
+      if (!range.start || !range.end || range.start > range.end) return res.status(400).json({ message: 'A valid start and end date are required.' });
+      Object.assign(match, saleDateFilter({ $gte: range.start, $lte: range.end }));
     }
-
-    const { startDate, endDate } = req.query;
-    const matchStage = {
-      orderStatus: { $nin: ['PENDING', 'REJECTED'] },
-    };
-
-    if (startDate && endDate) {
-      const range = getLocalDateRange(startDate, endDate);
-      if (!range.start || !range.end || range.start > range.end) {
-        res.status(400);
-        return next(new Error('A valid start and end date are required'));
-      }
-      matchStage.createdAt = {
-        $gte: range.start,
-        $lte: range.end,
-      };
-    }
-
-    const bills = await Bill.find(matchStage).lean();
-    const medicines = await Medicine.find().lean();
-    const medMap = {};
-    medicines.forEach((m) => {
-      medMap[String(m._id)] = m;
-    });
-
-    // Aggregate by medicine
-    const medicineProfitMap = {};
-
-    bills.forEach((bill) => {
-      // Calculate total discount ratio for the bill to apply proportionally
-      const subtotal = bill.subtotal || bill.total;
-      const discountRatio = (bill.discount > 0 && subtotal > 0) ? (bill.discount / subtotal) : 0;
-
-      getBillReturnSummary(bill).netItems.forEach((item) => {
-        const netQty = item.netQuantity;
-
-        if (netQty === 0) return;
-
-        const medObj = medMap[String(item.medicineId)];
-        const itemPurchasePrice = item.purchasePrice ?? (
-          medObj ? getPurchaseCostPerUnit(medObj.purchasePrice, medObj.unitsPerPack) : 0
-        );
-        const itemSalePrice =
-          item.salePrice ?? item.unitPrice ?? (medObj ? medObj.price : 0);
-
-        if (!medicineProfitMap[item.medicineId]) {
-          medicineProfitMap[item.medicineId] = {
-            medicineId: item.medicineId,
-            name: item.name,
-            purchasePrice: 0,
-            salePrice: 0,
-            remainingStock: medObj ? medObj.quantity : 0,
-            quantitySold: 0,
-            totalCost: 0,
-            totalDiscount: 0,
-            grossSales: 0,
-            totalSales: 0,
-            totalProfit: 0,
-          };
-        }
-
-        const {
-          cost,
-          grossSales,
-          discountAmount,
-          netSales,
-          profit,
-        } = getNetItemAmounts({
-          purchasePrice: itemPurchasePrice,
-          salePrice: itemSalePrice,
-          quantity: netQty,
-          discountRatio,
-        });
-
-        medicineProfitMap[item.medicineId].quantitySold += netQty;
-        medicineProfitMap[item.medicineId].totalCost += cost;
-        medicineProfitMap[item.medicineId].totalDiscount += discountAmount;
-        medicineProfitMap[item.medicineId].grossSales += grossSales;
-        medicineProfitMap[item.medicineId].totalSales += netSales;
-        medicineProfitMap[item.medicineId].totalProfit += profit;
-      });
-    });
-
-    Object.values(medicineProfitMap).forEach((item) => {
-      if (item.quantitySold > 0) {
-        item.purchasePrice = item.totalCost / item.quantitySold;
-        item.salePrice = item.grossSales / item.quantitySold;
-      }
-      delete item.grossSales;
-    });
-
-    const profitDetails = Object.values(medicineProfitMap).sort((a, b) => b.totalProfit - a.totalProfit);
-
-    res.json({
-      success: true,
-      profitDetails,
-    });
-  } catch (error) {
-    next(error);
-  }
+    const [result] = await Bill.aggregate([
+      { $match: match }, ...medicineProfitStages(),
+      { $facet: { profitDetails: [{ $sort: { totalProfit: -1, _id: 1 } }, { $skip: skip }, { $limit: limit }],
+        totals: [{ $group: { _id: null, total: { $sum: 1 }, quantitySold: { $sum: '$quantitySold' }, remainingStock: { $sum: '$remainingStock' }, totalCost: { $sum: '$totalCost' }, totalDiscount: { $sum: '$totalDiscount' }, totalSales: { $sum: '$totalSales' }, totalProfit: { $sum: '$totalProfit' } } }],
+      } },
+    ]).allowDiskUse(true);
+    const totals = result?.totals[0] || {};
+    res.json({ success: true, profitDetails: result?.profitDetails || [], totals, total: totals.total || 0, page, pages: Math.ceil((totals.total || 0) / limit) });
+  } catch (error) { next(error); }
 };
 
 // @desc    Process Sales Return (Return medicines & issue refund)
@@ -1842,8 +1687,8 @@ export const processSalesReturn = async (req, res, next) => {
           error.statusCode = 404;
           throw error;
         }
-        if (bill.orderStatus === 'REJECTED') {
-          const error = new Error('Cannot process return on a rejected order');
+        if (['PENDING', 'REJECTED'].includes(bill.orderStatus)) {
+          const error = new Error('Only accepted sales can be returned');
           error.statusCode = 400;
           throw error;
         }
@@ -1918,11 +1763,8 @@ export const processSalesReturn = async (req, res, next) => {
           }
 
           const previousQuantity = medicine.quantity;
-          const updatedMedicine = await Medicine.findOneAndUpdate(
-            { _id: medicineId },
-            { $inc: { quantity: qtyToReturn } },
-            { new: true, session }
-          );
+          restoreReturnedBatches(medicine, matchingItems, qtyToReturn, previouslyReturned);
+          const updatedMedicine = await medicine.save({ session });
           await StockAdjustment.create(
             [{
               medicineId: medicine._id,
@@ -1992,12 +1834,13 @@ export const getReturnActivity = async (req, res, next) => {
   try {
     const returns = await SaleReturn.find()
       .sort({ date: -1, createdAt: -1 })
-      .limit(200)
+      .skip(pagination(req.query).skip).limit(pagination(req.query).limit)
       .populate('processed_by', 'name email role')
       .populate('item_id', 'name')
       .populate('sale_id', 'billNumber customerName customerPhone')
       .lean();
-    res.json({ success: true, returns });
+    const total = await SaleReturn.countDocuments();
+    res.json({ success: true, returns, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) });
   } catch (error) { next(error); }
 };
 
@@ -2006,42 +1849,13 @@ export const getReturnActivity = async (req, res, next) => {
 // @access  Private/Pharmacist/Superadmin
 export const getMedicineSalesRanking = async (req, res, next) => {
   try {
-    const acceptedBills = await Bill.find({
-      orderStatus: { $nin: ['PENDING', 'REJECTED'] },
-    }).select('items').lean();
-
-    // Aggregate units sold per medicine across all accepted bills
-    const salesMap = new Map();
-    for (const bill of acceptedBills) {
-      if (!Array.isArray(bill.items)) continue;
-      for (const item of bill.items) {
-        const id = String(item.medicine || item.medicineId || '');
-        if (!id) continue;
-        const qty = Number(item.quantity) || 0;
-        const revenue = Number(item.salePrice || item.unitPrice || 0) * qty;
-        if (salesMap.has(id)) {
-          const entry = salesMap.get(id);
-          entry.totalUnits += qty;
-          entry.totalRevenue += revenue;
-        } else {
-          salesMap.set(id, {
-            medicineId: id,
-            name: String(item.name || item.medicineName || ''),
-            manufacturer: String(item.manufacturer || ''),
-            totalUnits: qty,
-            totalRevenue: revenue,
-          });
-        }
-      }
-    }
-
-    const allMedicines = Array.from(salesMap.values()).filter((m) => m.totalUnits > 0);
-    const topSelling = [...allMedicines].sort((a, b) => b.totalUnits - a.totalUnits).slice(0, 100);
-    const leastSelling = [...allMedicines].sort((a, b) => a.totalUnits - b.totalUnits).slice(0, 100);
-
-    res.json({ success: true, topSelling, leastSelling, totalMedicinesWithSales: allMedicines.length });
-  } catch (error) {
-    next(error);
-  }
+    const { page, limit, skip } = pagination(req.query);
+    const [result] = await Bill.aggregate([
+      { $match: { orderStatus: { $nin: ['PENDING', 'REJECTED'] } } }, ...medicineProfitStages(),
+      { $project: { medicineId: 1, name: 1, totalUnits: '$quantitySold', totalRevenue: '$totalSales' } },
+      { $facet: { topSelling: [{ $sort: { totalUnits: -1, _id: 1 } }, { $skip: skip }, { $limit: limit }], leastSelling: [{ $sort: { totalUnits: 1, _id: 1 } }, { $skip: skip }, { $limit: limit }], count: [{ $count: 'total' }] } },
+    ]).allowDiskUse(true);
+    const total = result?.count[0]?.total || 0;
+    res.json({ success: true, topSelling: result?.topSelling || [], leastSelling: result?.leastSelling || [], totalMedicinesWithSales: total, total, page, pages: Math.ceil(total / limit) });
+  } catch (error) { next(error); }
 };
-

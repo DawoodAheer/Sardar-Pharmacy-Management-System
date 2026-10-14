@@ -1,3 +1,4 @@
+import PageControls from './PageControls';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { History, RefreshCw, ChevronDown, ChevronUp, User, Clock } from 'lucide-react';
@@ -105,17 +106,19 @@ function AuditRecord({ record }) {
 }
 
 export default function MedicineAuditHistory({ compact = false }) {
+  const [page, setPage] = useState(1);
   const { data, isFetching, refetch } = useQuery({
-    queryKey: ['medicineAuditHistory'],
-    queryFn: async () => (await api.get('/medicines/audit-history')).data?.records || [],
+    queryKey: ['medicineAuditHistory', page],
+    queryFn: async () => (await api.get('/medicines/audit-history', { params: { page } })).data,
     refetchInterval: 30000,
   });
 
-  const records = Array.isArray(data) ? data : [];
+  const records = data?.records || [];
   if (!records.length && !isFetching) return null;
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
+      <PageControls page={page} pages={data?.pages || 1} total={data?.total || 0} onChange={setPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/40">
         <div className="flex items-center gap-3">

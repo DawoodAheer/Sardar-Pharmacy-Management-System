@@ -1,3 +1,4 @@
+import PageControls from '../components/PageControls';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -90,6 +91,7 @@ const BillTypeBadge = ({ type }) => {
 
 const CustomerBills = () => {
   const { user } = useAuth();
+  const [page, setPage] = useState(1);
   const { id: routeBillId } = useParams();
   const navigate = useNavigate();
 
@@ -101,12 +103,12 @@ const CustomerBills = () => {
   // ==========================================================================
 
   const {
-    data: bills = [],
+    data: billPageData,
     isLoading,
     isError,
     error,
   } = useQuery({
-    queryKey: ['bills', user?._id],
+    queryKey: ['bills', user?._id, page],
 
     queryFn: async () => {
       if (!user?._id) {
@@ -114,12 +116,10 @@ const CustomerBills = () => {
       }
 
       const { data } = await api.get(
-        `/bills/customer/${user._id}`
+        `/bills/customer/${user._id}`, { params: { page, limit: 50 } }
       );
 
-      return Array.isArray(data)
-        ? data
-        : [];
+      return data;
     },
 
     enabled: Boolean(user?._id),
@@ -129,12 +129,9 @@ const CustomerBills = () => {
   // SELECTED BILL
   // ==========================================================================
 
-  const selectedBill = routeBillId
-    ? bills.find(
-        (bill) =>
-          bill._id === routeBillId
-      )
-    : null;
+  const bills = billPageData?.bills || [];
+  const { data: detailBill } = useQuery({ queryKey: ['billDetail', routeBillId], enabled: Boolean(routeBillId), queryFn: async () => (await api.get(`/bills/${routeBillId}`)).data });
+  const selectedBill = routeBillId ? detailBill || bills.find(bill => bill._id === routeBillId) : null;
 
   const modalOpen =
     Boolean(routeBillId) &&
@@ -144,28 +141,9 @@ const CustomerBills = () => {
   // SUMMARY
   // ==========================================================================
 
-  const totalInvoices = bills.length;
-
-  const totalItems = bills.reduce(
-    (sum, bill) =>
-      sum +
-      (Array.isArray(bill.items)
-        ? bill.items.reduce(
-            (itemSum, item) =>
-              itemSum +
-              Number(item.netQuantity ?? item.quantity ?? 0),
-            0
-          )
-        : 0),
-    0
-  );
-
-  const totalSpent = bills.reduce(
-    (sum, bill) =>
-      sum +
-      Math.max(0, Number(bill.total || 0) - Number(bill.totalRefunded || 0)),
-    0
-  );
+  const totalInvoices = billPageData?.total || 0;
+  const totalItems = billPageData?.summary?.totalItems || 0;
+  const totalSpent = billPageData?.summary?.totalSpent || 0;
 
   // ==========================================================================
   // ACTIONS
@@ -461,6 +439,7 @@ const CustomerBills = () => {
 
           {/* ERROR */}
 
+          <PageControls page={page} pages={billPageData?.pages || 1} total={billPageData?.total || 0} onChange={setPage} />
           {!isLoading &&
             isError && (
               <div className="py-20 text-center">

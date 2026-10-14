@@ -3,7 +3,7 @@
 # Includes local OCR model for 100% offline usage
 # ===================================================
 
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install production dependencies
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 # Copy all server code (including eng.traineddata OCR model)
 COPY . .
@@ -26,4 +26,4 @@ ENV PORT=5000
 ENV NODE_ENV=production
 
 # Start backend server
-CMD ["node", "server.js"]
+CMD ["node", "--import", "./env-loader.js", "server.js"]

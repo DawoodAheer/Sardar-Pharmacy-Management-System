@@ -1,3 +1,6 @@
+import PageControls from '../components/PageControls';
+import { useEffect } from 'react';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
@@ -71,7 +74,10 @@ export default function UdharManagement() {
 
   // list state
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  useEffect(() => setPage(1), [debouncedSearch, statusFilter]);
   const [selectedRecord, setSelectedRecord] = useState(null); // detail view
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
@@ -94,12 +100,13 @@ export default function UdharManagement() {
   });
 
   const { data: listData, isLoading, refetch: refetchUdharList } = useQuery({
-    queryKey: ['udharList', search, statusFilter],
+    queryKey: ['udharList', debouncedSearch, statusFilter, page],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.append('search', search);
+      if (debouncedSearch) params.append('search', debouncedSearch);
       if (statusFilter !== 'ALL') params.append('status', statusFilter);
-      params.append('limit', '100');
+      params.append('limit', '50');
+      params.append('page', String(page));
       return (await api.get(`/udhar?${params}`)).data;
     },
     keepPreviousData: true,
@@ -301,6 +308,7 @@ export default function UdharManagement() {
             </select>
           </div>
 
+          <PageControls page={page} pages={Math.ceil((listData?.total || 0) / 50)} total={listData?.total || 0} onChange={setPage} />
           {/* Records List */}
           <div className="space-y-2 max-h-[calc(100vh-320px)] overflow-y-auto pr-1">
             {isLoading ? (

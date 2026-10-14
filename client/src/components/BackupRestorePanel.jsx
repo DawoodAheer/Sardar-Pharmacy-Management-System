@@ -5,6 +5,7 @@ import {
   ShieldAlert, ShieldCheck, Loader2, AlertTriangle, HardDrive, Upload,
 } from 'lucide-react';
 import api from '../utils/api';
+import { waitForJob } from '../utils/backgroundJobs';
 
 const fmtDT = (v) =>
   v ? new Date(v).toLocaleString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never';
@@ -39,7 +40,7 @@ export default function BackupRestorePanel() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async () => (await api.post('/backups/create')).data,
+    mutationFn: async () => waitForJob((await api.post('/backups/create')).data),
     onSuccess: async (r) => {
       setMsg({ text: r.message, type: 'success' });
       await queryClient.invalidateQueries({ queryKey: ['backupStatus'] });
@@ -50,6 +51,11 @@ export default function BackupRestorePanel() {
     },
   });
 
+  const verifyMutation = useMutation({
+    mutationFn: async () => waitForJob((await api.post('/backups/verify', backupData ? { backupData } : {})).data),
+    onSuccess: async result => { setMsg({ text: result.message, type: 'success' }); await queryClient.invalidateQueries({ queryKey: ['backupStatus'] }); },
+    onError: error => setMsg({ text: error.response?.data?.message || error.message || 'Recovery verification failed.', type: 'error' }),
+  });
   const restoreMutation = useMutation({
     mutationFn: async () => (await api.post('/backups/restore', { confirmation, backupData, fileName })).data,
     onSuccess: async (r) => {
@@ -96,6 +102,11 @@ export default function BackupRestorePanel() {
 
   return (
     <section className="rounded-2xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-900/50 dark:bg-slate-900 overflow-hidden">
+      <div className="border-b p-4">
+        <button type="button" disabled={verifyMutation.isPending || (!hasBackup && !backupData)} onClick={() => verifyMutation.mutate()} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{verifyMutation.isPending ? 'Verifying recovery…' : 'Verify backup recovery'}</button>
+        <p className="mt-2 text-xs">Last recovery check: {fmtDT(status?.lastVerifiedAt)}. {backupData ? 'Checks the selected backup.' : 'Checks the latest backup.'}</p>
+        {status?.verificationError && <p className="text-xs text-red-600">{status.verificationError}</p>}
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-indigo-100 bg-indigo-50/70 px-5 py-4 dark:border-indigo-900/40 dark:bg-indigo-950/20">
         <div className="flex items-center gap-3">
@@ -116,6 +127,11 @@ export default function BackupRestorePanel() {
       </div>
 
       <div className="space-y-4 p-5">
+        <div className="rounded-xl border p-3 text-xs">
+          <p>Copy for sharing: {status?.sharePath || status?.shareDirectory || 'Available after creating a backup'}</p>
+          <p className="mt-1">Send the completed JSON file yourself and keep the transferred copy. A folder on this PC does not protect against disk failure.</p>
+          {status?.shareError && <p className="mt-1 text-red-600">Copy failed: {status.shareError}</p>}
+        </div>
         {/* Failure Warning */}
         {hasError && (
           <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3.5 dark:border-rose-800/50 dark:bg-rose-950/30">

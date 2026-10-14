@@ -1,3 +1,6 @@
+import PageControls from '../components/PageControls';
+import { useEffect } from 'react';
+import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { NavLink } from 'react-router-dom';
@@ -134,6 +137,8 @@ const CustomerShop = () => {
   |--------------------------------------------------------------------------
   */
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search);
   const [categoryFilter, setCategoryFilter] = useState('');
 
   /*
@@ -169,7 +174,7 @@ const CustomerShop = () => {
   |--------------------------------------------------------------------------
   */
   const {
-    data: medicines = [],
+    data: medicinePageData,
     isLoading,
     isError,
     error,
@@ -177,14 +182,14 @@ const CustomerShop = () => {
   } = useQuery({
     queryKey: [
       'medicines',
-      search,
-      categoryFilter,
+      debouncedSearch,
+      categoryFilter, page,
     ],
 
     queryFn: async () => {
-      const params = {};
+      const params = { page, limit: 50 };
 
-      const cleanSearch = search.trim();
+      const cleanSearch = debouncedSearch.trim();
 
       if (cleanSearch) {
         params.search = cleanSearch;
@@ -198,12 +203,14 @@ const CustomerShop = () => {
         params,
       });
 
-      return Array.isArray(data) ? data : [];
+      return data;
     },
 
     enabled: Boolean(currentUser?._id),
   });
 
+  const medicines = medicinePageData?.medicines || [];
+  useEffect(() => setPage(1), [debouncedSearch, categoryFilter]);
   /*
   |--------------------------------------------------------------------------
   | All medicines for categories
@@ -216,9 +223,9 @@ const CustomerShop = () => {
     queryKey: ['allMedicines'],
 
     queryFn: async () => {
-      const { data } = await api.get('/medicines');
+      const { data } = await api.get('/medicines/categories');
 
-      return Array.isArray(data) ? data : [];
+      return data.map(category => ({ category }));
     },
 
     enabled: Boolean(currentUser?._id),
@@ -973,6 +980,7 @@ const CustomerShop = () => {
             )}
           </div>
 
+          <PageControls page={page} pages={Math.ceil((medicinePageData?.total || 0) / 50)} total={medicinePageData?.total || 0} onChange={setPage} />
           {/* Catalog */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-24">

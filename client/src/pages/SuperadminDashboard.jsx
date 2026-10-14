@@ -1,3 +1,7 @@
+import { waitForJob } from '../utils/backgroundJobs';
+import useSalesPage from '../hooks/useSalesPage';
+import useDebouncedValue from '../hooks/useDebouncedValue';
+import lazyPanel from '../components/lazyPanel';
 import { useMemo, useState } from 'react';
 import {
   useMutation,
@@ -5,18 +9,20 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
+import { useEffect } from 'react';
+import PageControls from '../components/PageControls';
 import api from '../utils/api';
-import { downloadMedicineInventory } from '../utils/medicineExport';
+import { getInventoryPurchaseValue } from '../utils/medicinePricing';
 import { useAuth } from '../context/AuthContext';
-import ProfitDetailsModal from '../components/ProfitDetailsModal';
+const ProfitDetailsModal = lazyPanel(() => import('../components/ProfitDetailsModal'));
 import MedicineImportIssues from '../components/MedicineImportIssues';
 import BackupRestorePanel from '../components/BackupRestorePanel';
 import MedicineExpiryAlerts from '../components/MedicineExpiryAlerts';
 import MedicineAuditHistory from '../components/MedicineAuditHistory';
 import PurchaseOrdersPanel from '../components/PurchaseOrdersPanel';
 import DailyClosingReport from '../components/DailyClosingReport';
-import StockAdjustmentModal from '../components/StockAdjustmentModal';
-import SalesReturnModal from '../components/SalesReturnModal';
+const StockAdjustmentModal = lazyPanel(() => import('../components/StockAdjustmentModal'));
+const SalesReturnModal = lazyPanel(() => import('../components/SalesReturnModal'));
 
 import {
   AlertCircle,
@@ -448,11 +454,20 @@ export default function SuperadminDashboard() {
   const [selectedView, setSelectedView] =
     useState(null);
 
+  const [detailsPage, setDetailsPage] = useState(1);
+  useEffect(() => setDetailsPage(1), [selectedView]);
+  const [rankingPage, setRankingPage] = useState(1);
   const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
+  useEffect(() => setRankingPage(1), [salesRankingModal]);
 
   const [searchTerm, setSearchTerm] =
     useState('');
 
+  const [userPage, setUserPage] = useState(1);
+  const userSearch = useDebouncedValue(searchTerm);
+  useEffect(() => setUserPage(1), [userSearch]);
+  const administrativeView = ['deletionRequests','deletedMedicines','refundActivity','udharPaymentActivity'].includes(selectedView);
+  const userView = ['users','superadmins','pharmacists','customers','pharmacistRequests'].includes(selectedView);
   const [message, setMessage] =
     useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -472,29 +487,29 @@ export default function SuperadminDashboard() {
   const [isAuditHistoryModalOpen, setIsAuditHistoryModalOpen] = useState(false);
 
   const { data: deletionRequestsResponse, refetch: refetchDeletionRequests } = useQuery({
-    queryKey: ['adminDeletionRequests'],
-    queryFn: async () => (await api.get('/deletion-requests')).data,
-    refetchInterval: 10000,
+    queryKey: ['adminDeletionRequests', detailsPage],
+    queryFn: async () => (await api.get('/deletion-requests', { params: { page: selectedView === 'deletionRequests' ? detailsPage : 1 } })).data,
+    refetchInterval: selectedView === 'deletionRequests' ? 30000 : false,
   });
   const deletionRequests = deletionRequestsResponse?.requests || [];
   const { data: returnActivityResponse, refetch: refetchReturnActivity } = useQuery({
-    queryKey: ['adminReturnActivity'],
-    queryFn: async () => (await api.get('/bills/return-activity')).data,
-    refetchInterval: 15000,
+    queryKey: ['adminReturnActivity', detailsPage],
+    queryFn: async () => (await api.get('/bills/return-activity', { params: { page: selectedView === 'refundActivity' ? detailsPage : 1 } })).data,
+    refetchInterval: false,
   });
   const returnActivity = returnActivityResponse?.returns || [];
   const { data: udharPaymentActivityResponse, refetch: refetchUdharPaymentActivity } = useQuery({
-    queryKey: ['adminUdharPaymentActivity'],
-    queryFn: async () => (await api.get('/udhar/payment-activity')).data,
-    refetchInterval: 15000,
+    queryKey: ['adminUdharPaymentActivity', detailsPage],
+    queryFn: async () => (await api.get('/udhar/payment-activity', { params: { page: selectedView === 'udharPaymentActivity' ? detailsPage : 1 } })).data,
+    refetchInterval: false,
   });
   const udharPaymentActivity = udharPaymentActivityResponse?.payments || [];
   const { data: archivedMedicinesResponse, refetch: refetchArchivedMedicines } = useQuery({
-    queryKey: ['superadminDeletedMedicines'],
-    queryFn: async () => (await api.get('/medicines/deleted')).data,
-    refetchInterval: 15000,
+    queryKey: ['superadminDeletedMedicines', detailsPage],
+    queryFn: async () => (await api.get('/medicines/deleted', { params: { page: selectedView === 'deletedMedicines' ? detailsPage : 1 } })).data,
+    refetchInterval: false,
   });
-  const archivedMedicines = Array.isArray(archivedMedicinesResponse) ? archivedMedicinesResponse : [];
+  const archivedMedicines = archivedMedicinesResponse?.medicines || [];
   const reviewDeletionMutation = useMutation({
     mutationFn: async ({ requestId, decision }) => (await api.patch(`/deletion-requests/${requestId}/review`, { decision })).data,
     onSuccess: async (result) => {
@@ -505,7 +520,7 @@ export default function SuperadminDashboard() {
         queryClient.invalidateQueries({ queryKey: ['superadminDeletedMedicines'] }),
         queryClient.invalidateQueries({ queryKey: ['superadminBills'] }),
         queryClient.invalidateQueries({ queryKey: ['superadminSalesSummary'] }),
-        queryClient.invalidateQueries({ queryKey: ['superadminProfitSummary'] }),
+        queryClient.invalidateQueries({ queryKey: ['profitSummary'] }),
         queryClient.invalidateQueries({ queryKey: ['medicines'] }),
         queryClient.invalidateQueries({ queryKey: ['bills'] }),
       ]);
@@ -537,6 +552,14 @@ export default function SuperadminDashboard() {
     onError: (error) => setMessage(error?.response?.data?.message || 'Unable to restore medicine.'),
   });
 
+  const permanentlyDeleteMutation = useMutation({
+    mutationFn: async id => waitForJob((await api.delete(`/medicines/${id}/permanent`, { data: { confirmation: 'DELETE' } })).data),
+    onSuccess: async result => { setMessage(result.message); await queryClient.invalidateQueries(); },
+    onError: error => setMessage(error.response?.data?.message || error.message || 'Archive deletion failed.'),
+  });
+  const { data: dashboardData } = useQuery({ queryKey: ['operations', 'summary'], queryFn: async () => (await api.get('/operations/summary')).data, refetchInterval: 30000 });
+  const { data: nearestExpiry } = useQuery({ queryKey: ['medicines', 'nearestExpiry'], queryFn: async () => (await api.get('/medicines', { params: { page: 1, limit: 100, sort: 'expiry', dated: 'true' } })).data });
+  const inventoryView = ['medicines','lowStock','expired','expiring'].includes(selectedView);
   /* =======================================================
      USERS
   ======================================================= */
@@ -547,10 +570,10 @@ export default function SuperadminDashboard() {
     isError: isUsersError,
     refetch: refetchUsers,
   } = useQuery({
-    queryKey: ['superadminUsers'],
+    queryKey: ['superadminUsers', selectedView, detailsPage, userPage, userSearch],
     queryFn: async () => {
       const response =
-        await api.get('/users');
+        await api.get('/users', { params: { page: userView ? detailsPage : userPage, limit: 50, search: userSearch, role: { superadmins: 'superadmin', pharmacists: 'pharmacist', customers: 'customer', pharmacistRequests: 'pharmacist' }[selectedView], status: selectedView === 'pharmacistRequests' ? 'pending' : undefined } });
 
       return response.data;
     },
@@ -566,10 +589,10 @@ export default function SuperadminDashboard() {
     isError: isMedicinesError,
     refetch: refetchMedicines,
   } = useQuery({
-    queryKey: ['superadminMedicines'],
+    queryKey: ['superadminMedicines', selectedView, detailsPage],
     queryFn: async () => {
       const response =
-        await api.get('/medicines');
+        await api.get('/medicines', { params: { page: ['medicines','lowStock','expired','expiring'].includes(selectedView) ? detailsPage : 1, limit: 50, reorder: selectedView === 'lowStock' ? 'true' : undefined, status: selectedView === 'expired' ? 'EXPIRED' : selectedView === 'expiring' ? 'EXPIRING' : undefined } });
 
       return response.data;
     },
@@ -631,9 +654,9 @@ export default function SuperadminDashboard() {
     data: medicineSalesRanking,
     isLoading: isMedicineSalesLoading,
   } = useQuery({
-    queryKey: ['medicineSalesRankingAdmin'],
+    queryKey: ['medicineSalesRankingAdmin', rankingPage],
     queryFn: async () => {
-      const response = await api.get('/bills/medicine-sales-ranking');
+      const response = await api.get('/bills/medicine-sales-ranking', { params: { page: rankingPage } });
       return response.data || {};
     },
     staleTime: 60000,
@@ -671,26 +694,10 @@ export default function SuperadminDashboard() {
      USER COUNTS
   ======================================================= */
 
-  const totalUsers =
-    users.length;
-
-  const totalSuperadmins =
-    users.filter(
-      (item) =>
-        item?.role === 'superadmin'
-    ).length;
-
-  const totalPharmacists =
-    users.filter(
-      (item) =>
-        item?.role === 'pharmacist'
-    ).length;
-
-  const totalCustomers =
-    users.filter(
-      (item) =>
-        item?.role === 'customer'
-    ).length;
+  const totalUsers = Object.values(dashboardData?.users || {}).reduce((sum, count) => sum + count, 0);
+  const totalSuperadmins = dashboardData?.users?.superadmin || 0;
+  const totalPharmacists = dashboardData?.users?.pharmacist || 0;
+  const totalCustomers = dashboardData?.users?.customer || 0;
 
   /* =======================================================
      PHARMACIST REQUESTS
@@ -721,8 +728,7 @@ export default function SuperadminDashboard() {
      MEDICINE COUNTS
   ======================================================= */
 
-  const totalMedicines =
-    medicines.length;
+  const totalMedicines = dashboardData?.inventory?.total || 0;
 
   const lowStockMedicines =
     useMemo(() => {
@@ -847,64 +853,10 @@ export default function SuperadminDashboard() {
      TODAY BILLS
   ======================================================= */
 
-  const todayBillsList = useMemo(
-    () => {
-      return bills
-        .filter((bill) =>
-          isDateBetween(
-            getBillDate(bill),
-            startOfToday(),
-            endOfToday()
-          )
-        )
-        .sort(
-          (a, b) =>
-            new Date(
-              getBillDate(b) || 0
-            ).getTime() -
-            new Date(
-              getBillDate(a) || 0
-            ).getTime()
-        );
-    },
-    [bills]
-  );
-
-  /* =======================================================
-     MONTHLY BILLS
-  ======================================================= */
-
-  const monthlyBillsList =
-    useMemo(() => {
-      return bills
-        .filter((bill) =>
-          isDateBetween(
-            getBillDate(bill),
-            startOfCurrentMonth(),
-            endOfCurrentMonth()
-          )
-        )
-        .sort(
-          (a, b) =>
-            new Date(
-              getBillDate(b) || 0
-            ).getTime() -
-            new Date(
-              getBillDate(a) || 0
-            ).getTime()
-        );
-    }, [bills]);
-
-  const yearlyBillsList = useMemo(() => {
-    const year = new Date().getFullYear();
-    const start = new Date(year, 0, 1);
-    const end = new Date(year + 1, 0, 1);
-    return bills.filter((bill) => {
-      const date = new Date(getBillDate(bill) || '');
-      return Number.isFinite(date.getTime()) && date >= start && date < end &&
-        !['PENDING', 'REJECTED'].includes(bill?.orderStatus) && getBillTotal(bill) > 0;
-    }).sort((a, b) => new Date(getBillDate(b) || 0) - new Date(getBillDate(a) || 0));
-  }, [bills]);
+  const salesPage = useSalesPage({ todaySales: 'daily', monthlySales: 'monthly', yearlySales: 'yearly' }[selectedView]);
+  const todayBillsList = selectedView === 'todaySales' ? salesPage.bills : [];
+  const monthlyBillsList = selectedView === 'monthlySales' ? salesPage.bills : [];
+  const yearlyBillsList = selectedView === 'yearlySales' ? salesPage.bills : [];
 
   /* =======================================================
      SOLD MEDICINES
@@ -1151,6 +1103,7 @@ export default function SuperadminDashboard() {
   const handleRefresh = async () => {
     setMessage('');
     setIsRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey: ['operations', 'summary'] });
     try {
       const results = await Promise.allSettled([
         refetchUsers({ throwOnError: true }), refetchMedicines({ throwOnError: true }),
@@ -1167,12 +1120,15 @@ export default function SuperadminDashboard() {
     }
   };
 
-  const exportMedicinesToExcel = () => {
+  const [exporting, setExporting] = useState(false);
+  const exportMedicinesToExcel = async () => {
+    setExporting(true);
     try {
-      downloadMedicineInventory(medicines);
-    } catch (exportError) {
-      setMessage(`Unable to export medicines: ${exportError.message}`);
-    }
+      const job = await waitForJob((await api.post('/jobs/inventory-export')).data);
+      const { data } = await api.get(`/jobs/${job.jobId}/download`, { responseType: 'blob' });
+      const url = URL.createObjectURL(data), link = document.createElement('a');
+      link.href = url; link.download = 'medicine_inventory.csv'; link.click(); URL.revokeObjectURL(url);
+    } catch (error) { setMessage(error.message); } finally { setExporting(false); }
   };
 
   /* =======================================================
@@ -1370,11 +1326,11 @@ export default function SuperadminDashboard() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={exportMedicinesToExcel}
+              onClick={exportMedicinesToExcel} disabled={exporting}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <Download size={18} />
-              Export Medicines
+              {exporting ? 'Exporting…' : 'Export CSV for Excel'}
             </button>
             <button
               type="button"
@@ -1858,10 +1814,10 @@ export default function SuperadminDashboard() {
             <StatCard
               title="Pharmacist Requests"
               value={
-                pendingPharmacistRequests.length
+                (dashboardData?.pendingPharmacists || 0)
               }
               description={
-                pendingPharmacistRequests.length ===
+                (dashboardData?.pendingPharmacists || 0) ===
                 0
                   ? 'No pending requests'
                   : 'Waiting for approval'
@@ -1870,7 +1826,7 @@ export default function SuperadminDashboard() {
               iconWrapperClass="bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
               valueClass="text-orange-600 dark:text-orange-400"
               hasNotification={
-                pendingPharmacistRequests.length >
+                (dashboardData?.pendingPharmacists || 0) >
                 0
               }
               onClick={() =>
@@ -1915,9 +1871,7 @@ export default function SuperadminDashboard() {
 
             <StatCard
               title="Low Stock"
-              value={
-                lowStockMedicines.length
-              }
+              value={dashboardData?.inventory?.lowStock || 0}
               description="Need stock attention"
               icon={PackageSearch}
               iconWrapperClass="bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400"
@@ -1931,9 +1885,7 @@ export default function SuperadminDashboard() {
 
             <StatCard
               title="Expired Medicines"
-              value={
-                expiredMedicines.length
-              }
+              value={dashboardData?.inventory?.expired || 0}
               description="Already expired"
               icon={AlertTriangle}
               iconWrapperClass="bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400"
@@ -1947,9 +1899,7 @@ export default function SuperadminDashboard() {
 
             <StatCard
               title="Expiring Within 6 Months"
-              value={
-                expiringWithinSixMonths.length
-              }
+              value={dashboardData?.inventory?.expiring || 0}
               description="Expiry within 180 days"
               icon={Clock3}
               iconWrapperClass="bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
@@ -1969,23 +1919,12 @@ export default function SuperadminDashboard() {
 
               <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">
                 {getCurrency(
-                  medicines.reduce(
-                    (
-                      total,
-                      medicine
-                    ) =>
-                      total +
-                      getMedicinePurchasePrice(medicine) *
-                        getMedicineStock(
-                          medicine
-                        ),
-                    0
-                  )
+                  dashboardData?.inventory?.stockValue || 0
                 )}
               </p>
 
               <p className="mt-2 text-xs text-slate-500">
-                Current tablet/unit stock × purchase cost per tablet/unit
+                Current stock valued at each batch’s recorded purchase cost
               </p>
 
               <div className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800">
@@ -2042,6 +1981,7 @@ export default function SuperadminDashboard() {
 
           </div>
 
+          <PageControls page={userPage} pages={usersResponse?.pages || 1} total={usersResponse?.total || 0} onChange={setUserPage} />
           <div className="overflow-x-auto">
 
             <table className="min-w-full">
@@ -2356,7 +2296,7 @@ export default function SuperadminDashboard() {
 
               <tbody>
 
-                {medicines
+                {(nearestExpiry?.medicines || [])
                   .filter((medicine) =>
                     getExpiryDate(
                       medicine
@@ -2587,6 +2527,7 @@ export default function SuperadminDashboard() {
 
                   {selectedView === 'yearlySales' && `Net sales and bills from ${new Date().getFullYear()}.`}
 
+                  {['todaySales', 'monthlySales', 'yearlySales'].includes(selectedView) && <PageControls page={salesPage.page} pages={salesPage.data?.pages || 1} total={salesPage.data?.total || 0} onChange={salesPage.setPage} />}
                   {!['todaySales', 'monthlySales', 'yearlySales'].includes(
                     selectedView
                   ) &&
@@ -2830,11 +2771,16 @@ export default function SuperadminDashboard() {
 
               {selectedView === 'medicines' && (
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-200">
-                  <span>Admin can remove a medicine from active inventory immediately. Its bill and return history stays archived.</span>
+                  <span>Admin can archive active medicines. Unlinked archived medicines can be permanently deleted after confirmation; linked accounting records are protected.</span>
                   <button type="button" onClick={() => setSelectedView('deletedMedicines')} className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-bold hover:bg-violet-100 dark:border-violet-700 dark:hover:bg-violet-900/50">View archived ({archivedMedicines.length})</button>
                 </div>
               )}
 
+              {selectedView === 'deletedMedicines' && <div className="mb-3 rounded-lg border p-3 text-sm">
+                <p>Permanent deletion saves a safety backup first. Medicines linked to bills, returns or purchases cannot be deleted.</p>
+                {permanentlyDeleteMutation.error && <p role="alert" className="mt-2 text-rose-700">{permanentlyDeleteMutation.error.response?.data?.message || permanentlyDeleteMutation.error.message}</p>}
+                {permanentlyDeleteMutation.isSuccess && <p role="status" className="mt-2 text-emerald-700">{permanentlyDeleteMutation.data.message}</p>}
+              </div>}
               {selectedView === 'refundActivity' && (
                 <div className="space-y-4">
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/20 flex flex-wrap items-center justify-between gap-3">
@@ -3517,6 +3463,7 @@ export default function SuperadminDashboard() {
                 </div>
               )}
 
+              <PageControls page={detailsPage} pages={Math.ceil((inventoryView ? medicinesResponse?.total || 0 : userView ? usersResponse?.total || 0 : selectedView === 'deletionRequests' ? deletionRequestsResponse?.total || 0 : selectedView === 'deletedMedicines' ? archivedMedicinesResponse?.total || 0 : selectedView === 'refundActivity' ? returnActivityResponse?.total || 0 : selectedView === 'udharPaymentActivity' ? udharPaymentActivityResponse?.total || 0 : selectedViewData.length) / 50)} total={inventoryView ? medicinesResponse?.total || 0 : userView ? usersResponse?.total || 0 : selectedView === 'deletionRequests' ? deletionRequestsResponse?.total || 0 : selectedView === 'deletedMedicines' ? archivedMedicinesResponse?.total || 0 : selectedView === 'refundActivity' ? returnActivityResponse?.total || 0 : selectedView === 'udharPaymentActivity' ? udharPaymentActivityResponse?.total || 0 : selectedViewData.length} onChange={setDetailsPage} />
               {/* =============================================
                   USER DETAILS
               ============================================= */}
@@ -3529,7 +3476,7 @@ export default function SuperadminDashboard() {
               ].includes(
                 selectedView
               ) && (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
 
                   <table className="min-w-full">
 
@@ -3576,7 +3523,7 @@ export default function SuperadminDashboard() {
                           </td>
                         </tr>
                       ) : (
-                        selectedViewData.map(
+                        (inventoryView || userView || administrativeView ? selectedViewData : selectedViewData.slice((detailsPage - 1) * 50, detailsPage * 50)).map(
                           (item) => (
                             <tr
                               key={
@@ -3704,7 +3651,7 @@ export default function SuperadminDashboard() {
                           </td>
                         </tr>
                       ) : (
-                        selectedViewData.map(
+                        (inventoryView || userView || administrativeView ? selectedViewData : selectedViewData.slice((detailsPage - 1) * 50, detailsPage * 50)).map(
                           (medicine) => {
                             const daysLeft =
                               getDaysUntilExpiry(
@@ -3820,6 +3767,12 @@ export default function SuperadminDashboard() {
                                   >
                                     {selectedView === 'deletedMedicines' ? <><RefreshCw size={14} /> Restore</> : <><Trash2 size={14} /> Delete</>}
                                   </button>
+                                  {selectedView === 'deletedMedicines' && <button type="button" disabled={permanentlyDeleteMutation.isPending || restoreMedicineMutation.isPending}
+                                    onClick={() => { if (window.prompt(`Permanently delete ${medicine.name}? This removes its archived stock record. A safety backup is saved first. Medicines linked to accounting records cannot be deleted. Type DELETE to confirm.`) === 'DELETE') permanentlyDeleteMutation.mutate(medicine._id || medicine.id); }}
+                                    className="ml-2 rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                                    {permanentlyDeleteMutation.isPending ? 'Deleting…' : 'Delete permanently'}
+                                  </button>}
+
                                 </td>
 
                               </tr>
@@ -3905,6 +3858,7 @@ export default function SuperadminDashboard() {
             </div>
             {/* List (Grid Cards) */}
             <div className="max-h-[70vh] overflow-y-auto p-5 bg-slate-50/50 dark:bg-slate-900/50">
+              <PageControls page={rankingPage} pages={medicineSalesRanking?.pages || 1} total={medicineSalesRanking?.total || 0} onChange={setRankingPage} />
               {isMedicineSalesLoading ? (
                 <div className="text-center py-8 text-slate-400 text-sm flex items-center justify-center gap-2">
                   <RefreshCw className="w-5 h-5 animate-spin" />
@@ -3934,7 +3888,7 @@ export default function SuperadminDashboard() {
                             ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-200 text-slate-800' : index === 2 ? 'bg-amber-700 text-amber-50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
                             : 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
                         }`}>
-                          {salesRankingModal === 'top' && index === 0 ? '🏆' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${index + 1}`}
+                          {salesRankingModal === 'top' && index === 0 ? '🏆' : salesRankingModal === 'top' && index === 1 ? '🥈' : salesRankingModal === 'top' && index === 2 ? '🥉' : `#${(rankingPage - 1) * 50 + index + 1}`}
                         </div>
 
                         <div className="flex-1 mt-2">

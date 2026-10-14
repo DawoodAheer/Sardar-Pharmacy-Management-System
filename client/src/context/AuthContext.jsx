@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 
+import { useQueryClient } from '@tanstack/react-query';
 import api from "../utils/api";
 
 const AuthContext = createContext(null);
@@ -37,6 +38,7 @@ const AuthContext = createContext(null);
 */
 
 export const AuthProvider = ({ children }) => {
+  const queryClient = useQueryClient();
   /*
   |--------------------------------------------------------------------------
   | State
@@ -134,6 +136,7 @@ export const AuthProvider = ({ children }) => {
      * Clear token reference immediately.
      */
     tokenRef.current = null;
+    queryClient.clear();
 
     /*
      * Clear React authentication state.
@@ -148,7 +151,7 @@ export const AuthProvider = ({ children }) => {
      * have been manually stored in Axios defaults.
      */
     delete api.defaults.headers.common.Authorization;
-  }, []);
+  }, [queryClient]);
 
   /*
   |--------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { pageResponse, pagedFind } from '../utils/pagination.js';
 import Notification from '../models/Notification.js';
 import Reminder from '../models/Reminder.js';
 import User from '../models/User.js';
@@ -21,11 +22,8 @@ export const getNotificationHistory = async (req, res, next) => {
       throw new Error('Not authorized to access these notification logs');
     }
 
-    const logs = await Notification.find({ recipientId: userId })
-      .populate('recipientId', 'name email')
-      .sort({ sentAt: -1 });
-
-    res.json(logs);
+    const result = await pagedFind(Notification, { recipientId: userId }, req, { sort: { sentAt: -1, _id: -1 }, populate: [['recipientId', 'name email']] });
+    res.json(req.query.page !== undefined ? pageResponse(result, 'notifications') : result.records);
   } catch (error) {
     next(error);
   }
@@ -69,8 +67,9 @@ export const getCustomerReminders = async (req, res, next) => {
       throw new Error('Not authorized to view these reminders');
     }
 
-    const reminders = await Reminder.find({ customerId }).sort({ createdAt: -1 });
-    res.json(reminders);
+    const result = await pagedFind(Reminder, { customerId }, req);
+    const activeCount = await Reminder.countDocuments({ customerId, isActive: true });
+    res.json(req.query.page !== undefined ? { ...pageResponse(result, 'reminders'), activeCount } : result.records);
   } catch (error) {
     next(error);
   }

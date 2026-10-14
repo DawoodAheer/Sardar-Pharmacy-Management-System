@@ -1,3 +1,4 @@
+import PageControls from './PageControls';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
@@ -5,6 +6,7 @@ import { X, Sliders, History, AlertTriangle, CheckCircle, PlusCircle, MinusCircl
 
 export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
   const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('adjust'); // 'adjust' | 'history'
 
   const [adjustmentType, setAdjustmentType] = useState('ADD'); // ADD, SUBTRACT, SET
@@ -14,15 +16,16 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
   const [success, setSuccess] = useState('');
 
   // Fetch Stock Adjustment Logs
-  const { data: logs = [], isLoading: isLogsLoading, refetch: refetchLogs } = useQuery({
-    queryKey: ['stockAdjustments'],
+  const { data: logData, isLoading: isLogsLoading, refetch: refetchLogs } = useQuery({
+    queryKey: ['stockAdjustments', page],
     queryFn: async () => {
-      const res = await api.get('/medicines/stock-adjustments');
-      return Array.isArray(res.data) ? res.data : [];
+      const res = await api.get('/medicines/stock-adjustments', { params: { page } });
+      return res.data;
     },
     enabled: isOpen && activeTab === 'history',
   });
 
+  const logs = logData?.logs || [];
   const adjustMutation = useMutation({
     mutationFn: async (payload) => {
       const res = await api.post(`/medicines/${medicine._id}/adjust-stock`, payload);
@@ -30,6 +33,11 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['medicines'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminBills'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminSalesSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['dailyClosingReport'] });
+      queryClient.invalidateQueries({ queryKey: ['operations'] });
       queryClient.invalidateQueries({ queryKey: ['stockAdjustments'] });
       setSuccess(data.message || 'Stock successfully adjusted!');
       setError('');
@@ -292,6 +300,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
               </div>
 
               <div className="max-h-[350px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <PageControls page={page} pages={logData?.pages || 1} total={logData?.total || 0} onChange={setPage} />
                 {isLogsLoading ? (
                   <div className="p-8 text-center text-xs text-slate-500">Loading adjustment history...</div>
                 ) : logs.length === 0 ? (

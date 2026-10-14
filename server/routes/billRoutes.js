@@ -31,7 +31,7 @@ const router = express.Router();
 router.use(protect);
 
 // Lookup customer by phone
-router.get('/lookup-customer', lookupCustomerByPhone);
+router.get('/lookup-customer', authorize('superadmin', 'pharmacist'), lookupCustomerByPhone);
 
 // Sales summary
 router.get(

@@ -2,3 +2,10 @@ node_modules
 npm-debug.log
 .env
 .git
+backups
+job-data
+logs
+uploads
+integration
+**/*.test.js
+*.log

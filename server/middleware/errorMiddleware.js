@@ -6,7 +6,7 @@ export const notFound = (req, res, next) => {
 
 export const errorHandler = (err, req, res, next) => {
   const statusCode =
-    err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
+    (err.name === 'VersionError' ? 409 : err.name === 'ValidationError' || err.name === 'CastError' ? 400 : err.code === 11000 ? 409 : null) || err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
   res.status(statusCode);
   res.json({
     message: err.message,

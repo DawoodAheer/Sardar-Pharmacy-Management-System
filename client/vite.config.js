@@ -68,6 +68,7 @@ export default defineConfig({
             return undefined;
           }
 
+          if (id.includes('/xlsx/') || id.includes('\\xlsx\\')) return 'spreadsheets';
           if (id.includes('recharts') || id.includes('d3-')) {
             return 'charts';
           }

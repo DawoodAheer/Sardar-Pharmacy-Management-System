@@ -53,60 +53,41 @@ const CustomerDashboard = () => {
   const [expandedCard, setExpandedCard] = useState(null);
 
   const {
-    data: bills = [],
+    data: billData,
     isLoading: billsLoading,
     isError: billsError,
   } = useQuery({
-    queryKey: ['bills', user?._id],
+    queryKey: ['bills', user?._id, 'preview'],
     queryFn: async () => {
-      const { data } = await api.get(`/bills/customer/${user._id}`);
-      return Array.isArray(data) ? data : [];
+      const { data } = await api.get(`/bills/customer/${user._id}`, { params: { page: 1, limit: 50 } });
+      return data;
     },
     enabled: Boolean(user?._id),
   });
 
   const {
-    data: reminders = [],
+    data: reminderData,
     isLoading: remindersLoading,
     isError: remindersError,
   } = useQuery({
-    queryKey: ['reminders', user?._id],
+    queryKey: ['reminders', user?._id, 'preview'],
     queryFn: async () => {
       const { data } = await api.get(
-        `/notifications/reminders/customer/${user._id}`,
+        `/notifications/reminders/customer/${user._id}`, { params: { page: 1 } },
       );
 
-      return Array.isArray(data) ? data : [];
+      return data;
     },
     enabled: Boolean(user?._id),
   });
 
+  const bills = billData?.bills || [], reminders = reminderData?.reminders || [];
   const activeReminders = useMemo(
     () => reminders.filter((reminder) => reminder.isActive),
     [reminders],
   );
 
-  const totalPurchasesThisMonth = useMemo(() => {
-    const currentDate = new Date();
-
-    return bills.reduce((sum, bill) => {
-      const billDate = new Date(bill.createdAt);
-
-      if (Number.isNaN(billDate.getTime())) {
-        return sum;
-      }
-
-      const sameMonth =
-        billDate.getMonth() === currentDate.getMonth() &&
-        billDate.getFullYear() === currentDate.getFullYear();
-
-      if (!sameMonth) {
-        return sum;
-      }
-
-      return sum + Math.max(0, (Number(bill.total) || 0) - (Number(bill.totalRefunded) || 0));
-    }, 0);
-  }, [bills]);
+  const totalPurchasesThisMonth = billData?.summary?.monthlySpent || 0;
 
   const expiringMeds = useMemo(() => {
     const uniqueMeds = {};
@@ -322,7 +303,7 @@ const CustomerDashboard = () => {
                 </p>
 
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
-                  {bills.length} total order(s)
+                  {billData?.total || 0} total order(s)
                 </p>
               </div>
 
@@ -407,7 +388,7 @@ const CustomerDashboard = () => {
                 </p>
 
                 <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">
-                  {remindersLoading ? '...' : activeReminders.length}
+                  {remindersLoading ? '...' : reminderData?.activeCount || 0}
                 </p>
 
                 <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-2 font-semibold">

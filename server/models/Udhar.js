@@ -38,7 +38,7 @@ const paymentRecordSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: [true, 'Payment amount is required'],
-    min: [1, 'Payment amount must be positive'],
+    min: [0.01, 'Payment amount must be positive'],
   },
   paidAt: {
     type: Date,
@@ -58,6 +58,7 @@ const paymentRecordSchema = new mongoose.Schema({
 
 const udharSchema = new mongoose.Schema(
   {
+    dueDate: { type: Date, default: null, index: true },
     // Customer info
     customerName: {
       type: String,
@@ -129,6 +130,7 @@ const udharSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   }
 );
 
@@ -136,7 +138,9 @@ const udharSchema = new mongoose.Schema(
 udharSchema.pre('save', function (next) {
   this.totalAmount = this.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
   this.totalPaid = this.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-  this.remainingAmount = Math.max(0, this.totalAmount - this.totalPaid);
+  this.totalAmount = Math.round(this.totalAmount * 100) / 100;
+  this.totalPaid = Math.round(this.totalPaid * 100) / 100;
+  this.remainingAmount = Math.max(0, Math.round((this.totalAmount - this.totalPaid) * 100) / 100);
 
   if (this.remainingAmount === 0 && this.totalAmount > 0) {
     this.status = 'PAID';

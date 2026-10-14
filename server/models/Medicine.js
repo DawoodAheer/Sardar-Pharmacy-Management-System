@@ -1,7 +1,20 @@
 import mongoose from 'mongoose';
 
+const batchSchema = new mongoose.Schema({
+  batchNumber: { type: String, required: true, trim: true },
+  expiryAlert180Sent: { type: Boolean, default: false },
+  expiryAlert10Sent: { type: Boolean, default: false },
+  expiryAlert1Sent: { type: Boolean, default: false },
+  expiryAlertExpiredSent: { type: Boolean, default: false },
+  expiryDate: Date,
+  quantity: { type: Number, min: 0, required: true, validate: Number.isInteger },
+  purchaseCost: { type: Number, min: 0, required: true },
+  supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', default: null },
+}, { timestamps: true });
+
 const medicineSchema = new mongoose.Schema(
   {
+    batches: { type: [batchSchema], default: [] },
     // Medicine brand name
     name: {
       type: String,
@@ -111,6 +124,9 @@ const medicineSchema = new mongoose.Schema(
   }
 );
 
+medicineSchema.index({ isDeleted: 1, name: 1 });
+medicineSchema.index({ isDeleted: 1, expiryDate: 1 });
+medicineSchema.index({ isDeleted: 1, quantity: 1 });
 const Medicine = mongoose.model('Medicine', medicineSchema);
 
 export default Medicine;

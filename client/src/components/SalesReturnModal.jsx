@@ -77,6 +77,11 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
       queryClient.invalidateQueries({ queryKey: ['medicines'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminBills'] });
+      queryClient.invalidateQueries({ queryKey: ['superadminSalesSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['dailyClosingReport'] });
+      queryClient.invalidateQueries({ queryKey: ['operations'] });
       queryClient.invalidateQueries({ queryKey: ['salesSummary'] });
       queryClient.invalidateQueries({ queryKey: ['profitSummary'] });
       queryClient.invalidateQueries({ queryKey: ['profitDetails'] });

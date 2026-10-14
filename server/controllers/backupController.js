@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { createBackup, getBackupStatus, getLatestBackupPath, markBackupFailure, restoreBackupData } from '../utils/backupManager.js';
+import { enqueueJob } from '../utils/backgroundJobs.js';
+import { getBackupStatus, getLatestBackupPath, markBackupFailure, restoreBackupData } from '../utils/backupManager.js';
 
 export const getBackupStatusController = async (_req, res, next) => {
   try { res.json(await getBackupStatus()); }
@@ -14,10 +15,9 @@ export const downloadLatestBackup = async (_req, res, next) => {
   } catch (error) { next(error); }
 };
 
-export const createBackupController = async (_req, res, next) => {
+export const createBackupController = async (req, res, next) => {
   try {
-    const filePath = await createBackup();
-    res.status(201).json({ message: 'Database backup completed.', fileName: path.basename(filePath), status: await getBackupStatus() });
+    res.status(202).json(await enqueueJob('backup', req.user._id));
   } catch (error) {
     await markBackupFailure(error);
     next(error);
@@ -35,4 +35,10 @@ export const restoreBackupController = async (req, res, next) => {
     await markBackupFailure(error);
     next(error);
   }
+};
+
+export const verifyBackupController = async (req, res, next) => {
+  try {
+    res.status(202).json(await enqueueJob('verify', req.user._id, req.body?.backupData ? { backupData: req.body.backupData } : undefined));
+  } catch (error) { next(error); }
 };

@@ -1,3 +1,4 @@
+import PageControls from './PageControls';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
@@ -13,6 +14,7 @@ const getCurrency = (value) => {
 };
 
 export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate = '', initialEndDate = '' }) {
+  const [page, setPage] = useState(1);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
 
@@ -23,33 +25,26 @@ export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate =
     }
   }, [isOpen, initialStartDate, initialEndDate]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['profitDetails', startDate, endDate],
+  useEffect(() => setPage(1), [startDate, endDate]);
+  const { data: report, isLoading } = useQuery({
+    queryKey: ['profitDetails', startDate, endDate, page],
     queryFn: async () => {
       let url = '/bills/profit-details';
       if (startDate && endDate) {
         url += `?startDate=${startDate}&endDate=${endDate}`;
       }
-      const response = await api.get(url);
-      return response.data?.profitDetails || [];
+      const response = await api.get(url, { params: { page, limit: 50 } });
+      return response.data;
     },
     enabled: isOpen,
   });
 
-  const totals = (data || []).reduce(
-    (acc, item) => {
-      acc.quantitySold += item.quantitySold || 0;
-      acc.remainingStock += item.remainingStock || 0;
-      acc.totalCost += item.totalCost || 0;
-      acc.totalDiscount += item.totalDiscount || 0;
-      acc.totalSales += item.totalSales || 0;
-      acc.totalProfit += item.totalProfit || 0;
-      return acc;
-    },
-    { quantitySold: 0, remainingStock: 0, totalCost: 0, totalDiscount: 0, totalSales: 0, totalProfit: 0 }
-  );
+  const data = report?.profitDetails || [];
+  const totals = report?.totals || { quantitySold: 0, remainingStock: 0, totalCost: 0, totalDiscount: 0, totalSales: 0, totalProfit: 0 };
 
   const handleDownloadExcel = () => {
+    // This small export contains only the displayed page.
+
     if (!data || data.length === 0) return;
 
     const rows = [
@@ -76,7 +71,7 @@ export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate =
       row.totalProfit || 0,
       ]),
       [
-      'TOTAL SUMMARY',
+      'ALL-PAGES TOTAL SUMMARY',
       '',
       '',
       totals.quantitySold,
@@ -148,11 +143,12 @@ export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate =
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               <Download size={16} />
-              Download Excel (.xlsx)
+              Export this page (.xlsx)
             </button>
           </div>
 
-          <div className="h-[420px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <PageControls page={page} pages={report?.pages || 1} total={report?.total || 0} onChange={setPage} />
+        <div className="h-[420px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400">
               <thead className="sticky top-0 bg-slate-100 uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300 z-10 shadow-sm">
                 <tr>
