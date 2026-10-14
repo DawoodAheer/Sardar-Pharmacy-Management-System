@@ -1,4 +1,5 @@
 import { pagination } from '../utils/pagination.js';
+import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering.js';
 import { createHash } from 'node:crypto';
 import { enqueueJob } from '../utils/backgroundJobs.js';
 import MedicineImportRun from '../models/MedicineImportRun.js';
@@ -93,10 +94,11 @@ export const getAllMedicines = async (req, res, next) => {
     const paginated = req.query.page !== undefined;
     const page = Math.max(1, Math.floor(Number(req.query.page) || 1)), limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit) || 50)));
     const finder = Medicine.find(query);
+    if (req.query.sort !== 'expiry') finder.collation(MEDICINE_COLLATION);
     finder.skip((page - 1) * limit).limit(limit);
     const medicines = await finder
       .populate('createdBy', 'name email')
-      .sort(req.query.sort === 'expiry' ? { expiryDate: 1, _id: 1 } : { name: 1, _id: 1 });
+      .sort(req.query.sort === 'expiry' ? { expiryDate: 1, _id: 1 } : MANUFACTURER_SORT);
 
     // Append calculated status to each item for frontend convenience
     const medicinesWithStatus = medicines.map((med) => {
@@ -304,7 +306,7 @@ export const getDeletedMedicines = async (req, res, next) => {
     const medicines = await Medicine.find({ isDeleted: true })
       .populate('createdBy', 'name email')
       .populate('deletedBy', 'name email')
-      .sort({ deletedAt: -1, _id: -1 }).skip(pagination(req.query).skip).limit(pagination(req.query).limit);
+      .collation(MEDICINE_COLLATION).sort(MANUFACTURER_SORT).skip(pagination(req.query).skip).limit(pagination(req.query).limit);
     const total = await Medicine.countDocuments({ isDeleted: true });
     res.json(req.query.page !== undefined ? { medicines, total, page: pagination(req.query).page, pages: Math.ceil(total / pagination(req.query).limit) } : medicines);
   } catch (error) { next(error); }

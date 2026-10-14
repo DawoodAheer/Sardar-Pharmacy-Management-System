@@ -17,7 +17,7 @@ export function extractMedicineWorkbookRows(workbook) {
       for (const key of Object.keys(row)) {
         if (headerKey(key) !== 'expirydate') continue;
         if (typeof row[key] === 'number') {
-          const formatter = XLSX.SSF || (XLSX.default && XLSX.default.SSF);
+          const formatter = XLSX.SSF || Reflect.get(XLSX, 'default')?.SSF;
           if (!formatter) throw new Error('Unable to load the Excel date formatter.');
           const date = formatter.parse_date_code(row[key], { date1904: Boolean(workbook.Workbook?.WBProps?.date1904) });
           if (date) row[key] = `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;

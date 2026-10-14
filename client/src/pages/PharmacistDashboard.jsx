@@ -3933,6 +3933,7 @@ const PharmacistDashboard = () => {
               )}
 
               <PageControls page={safeInventoryPage} pages={Math.ceil((medicinePageData?.total || 0) / 50)} total={medicinePageData?.total || 0} onChange={setInventoryPage} />
+              <p className="mb-3 text-xs text-slate-500">Manufacturer A–Z · medicine name A–Z within each company</p>
               <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
 
                 <div className="relative md:col-span-2">
@@ -4180,8 +4181,8 @@ const PharmacistDashboard = () => {
 
                                 <div className="text-[10px] text-slate-600 dark:text-slate-400">
                                   {
-                                    medicine.genericName ||
-                                    'N/A'
+                                    medicine.manufacturer ||
+                                    'Manufacturer unspecified'
                                   }
                                 </div>
 

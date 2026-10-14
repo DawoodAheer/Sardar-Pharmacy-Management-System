@@ -7,6 +7,7 @@ import '../env-loader.js';
 import BackgroundJob from '../models/BackgroundJob.js';
 import Medicine from '../models/Medicine.js';
 import User from '../models/User.js';
+import { MANUFACTURER_SORT, MEDICINE_COLLATION } from './medicineOrdering.js';
 import { JOB_DIR } from './backgroundJobs.js';
 import { createBackup, verifyBackupRecovery } from './backupManager.js';
 
@@ -18,7 +19,7 @@ async function exportInventory(id) {
   let streamError; stream.on('error', error => { streamError = error; });
   try {
     stream.write('\uFEFFname,manufacturer,purchasePrice,unitsPerPack,price,quantity,expiryDate,rackLocation\r\n');
-    for await (const med of Medicine.find({ isDeleted: { $ne: true } }).sort({ name: 1, _id: 1 }).lean().cursor()) {
+    for await (const med of Medicine.find({ isDeleted: { $ne: true } }).collation(MEDICINE_COLLATION).sort(MANUFACTURER_SORT).lean().cursor()) {
       if (streamError) throw streamError;
       const row = [med.name, med.manufacturer, med.purchasePrice, med.unitsPerPack, med.price, med.quantity, med.expiryDate ? new Date(med.expiryDate).toISOString().slice(0, 10) : '', med.rackLocation];
       // Prevent spreadsheet formula execution in exported text.

@@ -39,12 +39,12 @@ function BatchInventory() {
   const { mutation, message } = useAction();
   const [form, setForm] = useState({ batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' });
   return <div className="space-y-5"><Panel title="Batch inventory">
-    <Field label="Find a medicine" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} />
-    <p className="my-3 text-sm text-slate-500">Sales use the earliest unexpired batch. Purchase cost is per tablet or sellable unit.</p>
+    <Field label="Find a medicine or manufacturer" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} />
+    <p className="my-3 text-sm text-slate-500">Sorted by manufacturer A–Z, then medicine name. Sales use the earliest unexpired batch. Purchase cost is per tablet or sellable unit.</p>
     <Feedback message={message} error={error} />
     {isFetching && <p role="status">Loading inventory…</p>}
     <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr><th className="p-2">Medicine / batch</th><th>Expiry</th><th>Units</th><th>Purchase / unit</th><th /></tr></thead><tbody>
-      {(data?.medicines || []).map(medicine => <tr className="border-t align-top" key={medicine._id}><td className="p-2"><strong>{medicine.name}</strong>{medicine.batches.map(batch => <p key={batch._id}>{batch.batchNumber}</p>)}</td>
+      {(data?.medicines || []).map(medicine => <tr className="border-t align-top" key={medicine._id}><td className="p-2"><p className="text-xs text-slate-500">{medicine.manufacturer || 'Manufacturer unspecified'}</p><strong>{medicine.name}</strong>{medicine.batches.map(batch => <p key={batch._id}>{batch.batchNumber}</p>)}</td>
         <td className="pt-7">{medicine.batches.map(batch => <p key={batch._id} className={batch.expiryDate && new Date(batch.expiryDate) < new Date(new Date().setHours(0, 0, 0, 0)) ? 'text-red-600' : ''}>{dateText(batch.expiryDate)}</p>)}</td>
         <td className="pt-7">{medicine.batches.map(batch => <p key={batch._id}>{batch.quantity}</p>)}</td><td className="pt-7">{medicine.batches.map(batch => <p key={batch._id}>{money(batch.purchaseCost)}</p>)}</td>
         <td className="p-2"><button className={buttonStyle} onClick={() => { setSelected(medicine); setForm({ batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' }); }}>Receive batch</button></td></tr>)}

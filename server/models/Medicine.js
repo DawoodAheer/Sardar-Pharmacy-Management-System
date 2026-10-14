@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering.js';
 
 const batchSchema = new mongoose.Schema({
   batchNumber: { type: String, required: true, trim: true },
@@ -127,6 +128,7 @@ const medicineSchema = new mongoose.Schema(
 medicineSchema.index({ isDeleted: 1, name: 1 });
 medicineSchema.index({ isDeleted: 1, expiryDate: 1 });
 medicineSchema.index({ isDeleted: 1, quantity: 1 });
+medicineSchema.index(MANUFACTURER_SORT, { collation: MEDICINE_COLLATION });
 const Medicine = mongoose.model('Medicine', medicineSchema);
 
 export default Medicine;

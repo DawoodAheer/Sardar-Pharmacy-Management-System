@@ -34,6 +34,8 @@ Backups include batches, suppliers, purchase invoices, cash sessions and credit 
 
 ## Performance and validation
 
+Medicine catalogues, archived stock, batch inventory, low-stock lists and full inventory CSV exports are ordered by manufacturer A–Z, then medicine name. Company/name comparisons ignore letter case, and record IDs keep pagination stable. Unspecified manufacturers form an empty-name group. Expiry-priority reports retain their date ordering. Sorting changes no stored quantities or accounting records.
+
 Inventory, shop, users/customers, invoices, orders, credit, corrections, batch alerts, purchase orders, medicine audit history and financial detail lists use server pagination. The usual page is 50 records, with a maximum of 100. Dashboard inventory counts and batch valuation, sales, profit totals and the seven-day chart use database aggregation. Excel libraries and large panels load on demand. No latency guarantee is implied.
 
 Bulk import confirmation, complete inventory export, backup creation and recovery checks run in a separate Node worker with a 512 MB heap limit. The queue and status are stored in MongoDB; import payloads and CSV artifacts live under `server/job-data`. Run only one API instance/dispatcher per database. A server restart marks interrupted jobs as failed and retains queued work. Imports can be retried safely because their existing transaction and content ID prevent duplication. The interface reports success only after worker completion. The normal import remains limited to 10,000 rows per file. Inventory CSV is compatible with Excel; the small profit-detail Excel export explicitly contains the displayed page.

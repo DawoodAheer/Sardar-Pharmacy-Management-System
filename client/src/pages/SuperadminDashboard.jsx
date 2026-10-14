@@ -3611,7 +3611,7 @@ export default function SuperadminDashboard() {
                         </th>
 
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
-                          Brand
+                          Manufacturer
                         </th>
 
                         <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">
@@ -3704,8 +3704,8 @@ export default function SuperadminDashboard() {
                                 </td>
 
                                 <td className="px-4 py-3 text-sm">
-                                  {medicine?.brand ||
-                                    'N/A'}
+                                  {medicine?.manufacturer ||
+                                    'Manufacturer unspecified'}
                                 </td>
 
                                 <td className="px-4 py-3 text-sm font-semibold">

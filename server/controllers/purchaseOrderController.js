@@ -1,4 +1,5 @@
 import { pagination } from '../utils/pagination.js';
+import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering.js';
 import { addBatch } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
@@ -11,7 +12,7 @@ export const getLowStockMedicines = async (req, res, next) => {
     const { page, limit, skip } = pagination(req.query);
     const filter = { isDeleted: { $ne: true }, quantity: { $lt: 5 } };
     const total = await Medicine.countDocuments(filter);
-    const medicines = await Medicine.find(filter).sort({ quantity: 1, name: 1, _id: 1 }).skip(skip).limit(limit).lean();
+    const medicines = await Medicine.find(filter).collation(MEDICINE_COLLATION).sort(MANUFACTURER_SORT).skip(skip).limit(limit).lean();
     res.json({ medicines, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };

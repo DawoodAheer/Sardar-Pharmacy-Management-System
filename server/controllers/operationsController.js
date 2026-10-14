@@ -1,4 +1,5 @@
 import { pagination } from '../utils/pagination.js';
+import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering.js';
 import mongoose from 'mongoose';
 import { saleDateFilter } from '../utils/saleDate.js';
 import Medicine from '../models/Medicine.js';
@@ -56,9 +57,12 @@ export const listBatches = async (req, res, next) => {
     const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
     const limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit) || 25)));
     const filter = { isDeleted: { $ne: true } };
-    if (req.query.search) filter.name = { $regex: String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-    const [total, medicines] = await Promise.all([Medicine.countDocuments(filter), Medicine.find(filter).select('name quantity expiryDate purchasePrice unitsPerPack batches')
-      .sort({ name: 1 }).skip((page - 1) * limit).limit(limit)]);
+    if (req.query.search) {
+      const text = String(req.query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [{ name: { $regex: text, $options: 'i' } }, { manufacturer: { $regex: text, $options: 'i' } }];
+    }
+    const [total, medicines] = await Promise.all([Medicine.countDocuments(filter), Medicine.find(filter).select('name manufacturer quantity expiryDate purchasePrice unitsPerPack batches')
+      .collation(MEDICINE_COLLATION).sort(MANUFACTURER_SORT).skip((page - 1) * limit).limit(limit)]);
     medicines.forEach(ensureBatches);
     res.json({ medicines, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
