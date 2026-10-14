@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import DeletionRequest from '../models/DeletionRequest.js';
 import Medicine from '../models/Medicine.js';
 import Bill from '../models/Bill.js';
-import SaleReturn from '../models/SaleReturn.js';
+import { deleteBillWithStockRestore } from '../utils/deleteBill.js';
 
 const targets = { medicine: Medicine, bill: Bill };
 
@@ -87,7 +87,7 @@ export const reviewDeletionRequest = async (req, res, next) => {
             await target.save({ session });
           }
         } else {
-          await Bill.deleteOne({ _id: target._id }, { session });
+          request.deletedBillSnapshot = await deleteBillWithStockRestore(target, req.user._id, session);
         }
       }
       request.status = decision === 'approve' ? 'approved' : 'rejected';
@@ -98,8 +98,28 @@ export const reviewDeletionRequest = async (req, res, next) => {
       ? 'Deletion request rejected; record was kept.'
       : response.targetType === 'medicine'
         ? 'Medicine deleted from active inventory; its sales and return history remain preserved.'
-        : 'Bill deleted successfully.';
+        : 'Bill deleted, sale removed from reports and stock restored. Deletion audit retained.';
     res.json({ message, request: response });
+  } catch (error) { next(error); }
+  finally { await session.endSession(); }
+};
+
+export const deleteBillAsAdmin = async (req, res, next) => {
+  if (req.body?.confirmation !== 'DELETE') return res.status(400).json({ message: 'Type DELETE to confirm bill deletion.' });
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid bill ID.' });
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const bill = await Bill.findById(req.params.id).session(session);
+      if (!bill) { const error = new Error('Bill not found.'); error.statusCode = 404; throw error; }
+      const snapshot = await deleteBillWithStockRestore(bill, req.user._id, session);
+      await DeletionRequest.updateMany({ targetType: 'bill', targetId: bill._id, status: 'pending' },
+        { $set: { status: 'approved', reviewedBy: req.user._id, reviewedAt: new Date(), deletedBillSnapshot: snapshot } }, { session });
+      await DeletionRequest.create([{ targetType: 'bill', targetId: bill._id, targetLabel: getTargetLabel('bill', bill),
+        requestedBy: req.user._id, reviewedBy: req.user._id, reviewedAt: new Date(), status: 'approved',
+        requestReason: 'Admin-confirmed bill deletion', deletedBillSnapshot: snapshot }], { session });
+    });
+    res.json({ message: 'Bill deleted and stock restored. Deletion audit retained.' });
   } catch (error) { next(error); }
   finally { await session.endSession(); }
 };

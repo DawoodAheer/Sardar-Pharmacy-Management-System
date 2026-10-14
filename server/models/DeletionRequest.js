@@ -10,6 +10,7 @@ const deletionRequestSchema = new mongoose.Schema({
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   reviewedAt: { type: Date, default: null },
   reviewNote: { type: String, trim: true, maxlength: 500, default: '' },
+  deletedBillSnapshot: { type: mongoose.Schema.Types.Mixed, default: null },
 }, { timestamps: true });
 
 deletionRequestSchema.index(

@@ -9,6 +9,18 @@ Docker Desktop must have a working WSL 2 engine. Installing Docker alone is insu
 
 A fresh installation uses an empty medicine/bill database and the configured initial accounts. Existing installations retain their named Docker database volume. Never run `docker compose down -v`, delete Docker volumes, or use a factory reset to update. Keep one installation folder and one running installation per PC.
 
+Sending the source ZIP through WhatsApp does not send your database. A laptop that has NEVER run this Docker project starts empty. If your brother already ran an older version on that laptop, the existing Docker database is deliberately retained, including old medicines and bills. Downloading a new ZIP is an update, not a fresh-data reset. Use a verified backup and a separately managed fresh installation if you need a different business database; do not erase the existing volume to demonstrate the application.
+
+Initial accounts on a fresh database: Admin `aheerdawood014@gmail.com`, Pharmacist `mlksardar6@gmail.com`, Customer `aheerraza0@gmail.com`. Their initial password is `Dawood@@5786`; change passwords after setup. Startup never resets an existing account password.
+
+## Demonstrating bills without keeping test sales
+
+In New Bill, check **Training mode**, add medicine items and choose **Preview training bill**. The preview is not saved, consumes no stock and affects no sales/cash reports. **Discard training bill** clears it. It cannot be printed as a real receipt. Real inventory entries made during training still persist; this switch applies to bills only.
+
+For an already saved bill, Admin can use **Delete bill** in daily/monthly/yearly bill details and type `DELETE`. The bill is removed from sales and customer history, stock is restored to its original batches, and an approval/audit snapshot remains. Bills with return/refund history are protected. This is intended for mistakenly recorded or test sales; use Return / Refund for an actual customer refund.
+
+Pharmacist uses the bill's deletion-request button. Nothing is removed until Admin approves in **Deletion Requests**; rejection keeps the bill. Successful approval performs the same stock restoration. All deletion changes are atomic, so a failure does not partially delete a bill or restore only some stock.
+
 ## Updating your brother's laptop
 
 For a Git-cloned installation, `Update-Sardar-Pharmacy.bat` pulls published changes with fast-forward protection, refuses to overwrite local source edits, and starts the updated build. Git must be installed for this method. Changes must first be published to GitHub to be available there.

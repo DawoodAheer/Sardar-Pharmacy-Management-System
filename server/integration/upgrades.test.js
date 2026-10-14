@@ -23,6 +23,8 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
   const { default: billRoutes } = await import('../routes/billRoutes.js');
   const { default: udharRoutes } = await import('../routes/udharRoutes.js');
   const { default: operationsRoutes } = await import('../routes/operationsRoutes.js');
+  const { default: deletionRoutes } = await import('../routes/deletionRequestRoutes.js');
+  const { default: DeletionRequest } = await import('../models/DeletionRequest.js');
   const { errorHandler } = await import('../middleware/errorMiddleware.js');
   const { generateAccessToken } = await import('../utils/generateToken.js');
   const { createBackup, verifyBackupRecovery } = await import('../utils/backupManager.js');
@@ -34,7 +36,7 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
     const customer = await User.create({ name: 'Test Customer', email: 'customer@test.local', password: 'test-password', role: 'customer', accountStatus: 'approved' });
     const pharmacist = await User.create({ name: 'Test Staff', email: 'staff@test.local', password: 'test-password', role: 'pharmacist', accountStatus: 'approved' });
     const app = express();
-    app.use(express.json()); app.use('/api/bills', billRoutes); app.use('/api/udhar', udharRoutes); app.use('/api/operations', operationsRoutes); app.use(errorHandler);
+    app.use(express.json()); app.use('/api/bills', billRoutes); app.use('/api/udhar', udharRoutes); app.use('/api/operations', operationsRoutes); app.use('/api/deletion-requests', deletionRoutes); app.use(errorHandler);
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -134,6 +136,65 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
         assert.equal(closing.data.salesByMethod.Cash, expected);
         assert.equal(closing.data.billCount, expected ? 3 : 0);
       }
+    });
+    await t.test('training previews never persist or change stock, bills or financial totals', async () => {
+      const stock = JSON.stringify(await Medicine.findById(med._id).lean());
+      const count = await Bill.countDocuments();
+      const totals = (await request('/bills/sales-summary')).data;
+      for (const user of [admin, pharmacist]) {
+        const preview = await request('/bills/instore', { user, method: 'POST', body: { training: true, items: [{ medicineId: med._id, quantity: 1 }] } });
+        assert.equal(preview.status, 200, JSON.stringify(preview.data));
+        assert.equal(preview.data.bill.training, true); assert.equal(preview.data.bill._id, undefined);
+      }
+      assert.equal((await request('/bills/instore', { user: customer, method: 'POST', body: { training: true, items: [{ medicineId: med._id, quantity: 1 }] } })).status, 403);
+      assert.equal((await request('/bills/instore', { method: 'POST', body: { training: 'true', items: [{ medicineId: med._id, quantity: 1 }] } })).status, 400);
+      assert.equal(await Bill.countDocuments(), count);
+      assert.equal(JSON.stringify(await Medicine.findById(med._id).lean()), stock);
+      assert.deepEqual((await request('/bills/sales-summary')).data, totals);
+    });
+    await t.test('saved bill deletion requires Admin approval and restores exact batches only once', async () => {
+      const medicine = await Medicine.create({ name: 'Deletion test', createdBy: admin._id, quantity: 5, purchasePrice: 10, price: 30,
+        expiryDate: '2099-01-01', batches: [{ batchNumber: 'OLD', quantity: 2, purchaseCost: 10, expiryDate: '2099-01-01' },
+          { batchNumber: 'NEW', quantity: 3, purchaseCost: 20, expiryDate: '2099-02-01' }] });
+      const originalBatches = (await Medicine.findById(medicine._id)).batches.map(b => [String(b._id), b.quantity, b.purchaseCost]);
+      const sale = await request('/bills/instore', { user: pharmacist, method: 'POST', body: { items: [{ medicineId: medicine._id, quantity: 3 }] } });
+      assert.equal(sale.status, 201); const id = sale.data.bill._id;
+      assert.equal((await Medicine.findById(medicine._id)).quantity, 2);
+      assert.equal((await request(`/bills/${id}`, { user: customer, method: 'DELETE' })).status, 403);
+      const pending = await request(`/bills/${id}`, { user: pharmacist, method: 'DELETE' });
+      assert.equal(pending.status, 201); assert.ok(await Bill.exists({ _id: id }));
+      assert.equal((await Medicine.findById(medicine._id)).quantity, 2);
+      const review = `/deletion-requests/${pending.data.request._id}/review`;
+      assert.equal((await request(review, { user: pharmacist, method: 'PATCH', body: { decision: 'approve' } })).status, 403);
+      assert.equal((await request(review, { method: 'PATCH', body: { decision: 'reject' } })).status, 200);
+      assert.ok(await Bill.exists({ _id: id }));
+      const again = await request(`/bills/${id}`, { user: pharmacist, method: 'DELETE' });
+      const approvals = await Promise.all([1, 2].map(() => request(`/deletion-requests/${again.data.request._id}/review`, { method: 'PATCH', body: { decision: 'approve' } })));
+      assert.deepEqual(approvals.map(r => r.status).sort(), [200, 409]);
+      assert.equal(await Bill.exists({ _id: id }), null);
+      assert.deepEqual((await Medicine.findById(medicine._id)).batches.map(b => [String(b._id), b.quantity, b.purchaseCost]), originalBatches);
+      assert.equal((await DeletionRequest.findById(again.data.request._id)).deletedBillSnapshot.billNumber, sale.data.bill.billNumber);
+      const nextSale = await request('/bills/instore', { method: 'POST', body: { items: [{ medicineId: medicine._id, quantity: 1 }] } });
+      const nextId = nextSale.data.bill._id;
+      assert.equal((await request(`/bills/${nextId}`, { method: 'DELETE' })).status, 400);
+      assert.equal((await request(`/bills/${nextId}`, { method: 'DELETE', body: { confirmation: 'DELETE' } })).status, 200);
+      assert.equal((await request(`/bills/${nextId}`, { method: 'DELETE', body: { confirmation: 'DELETE' } })).status, 404);
+      assert.equal((await Medicine.findById(medicine._id)).quantity, 5);
+      const before = JSON.stringify(await Medicine.findById(med._id).lean());
+      assert.equal((await request(`/bills/${bill._id}`, { method: 'DELETE', body: { confirmation: 'DELETE' } })).status, 409);
+      assert.ok(await Bill.exists({ _id: bill._id }));
+      assert.equal(JSON.stringify(await Medicine.findById(med._id).lean()), before);
+      const missingMedicine = await Medicine.create({ name: 'Rollback fixture', createdBy: admin._id, quantity: 1, purchasePrice: 10, price: 30, expiryDate: '2099-01-01' });
+      const rollbackSale = await request('/bills/instore', { method: 'POST', body: { items: [
+        { medicineId: medicine._id, quantity: 1 }, { medicineId: missingMedicine._id, quantity: 1 },
+      ] } });
+      assert.equal(rollbackSale.status, 201);
+      const missingSnapshot = (await Medicine.findById(missingMedicine._id)).toObject();
+      await Medicine.deleteOne({ _id: missingMedicine._id });
+      assert.equal((await request(`/bills/${rollbackSale.data.bill._id}`, { method: 'DELETE', body: { confirmation: 'DELETE' } })).status, 409);
+      assert.ok(await Bill.exists({ _id: rollbackSale.data.bill._id }));
+      assert.equal((await Medicine.findById(medicine._id)).quantity, 4, 'failed deletion must roll back earlier stock restoration');
+      await Medicine.create(missingSnapshot);
     });
     await t.test('backup recovery compares restored records in a temporary database', async () => {
       await mongoose.model('MedicineImportIssue').create({ rowNumber: 2, originalRow: { name: 'Previously ignored row' },

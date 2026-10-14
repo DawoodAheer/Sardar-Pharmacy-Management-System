@@ -1,4 +1,5 @@
 import { waitForJob } from '../utils/backgroundJobs';
+import AdminBillDeleteButton from '../components/AdminBillDeleteButton';
 import useSalesPage from '../hooks/useSalesPage';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import lazyPanel from '../components/lazyPanel';
@@ -3111,6 +3112,7 @@ export default function SuperadminDashboard() {
                               </div>
 
                               <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                <AdminBillDeleteButton bill={bill} />
                                 <button
                                   type="button"
                                   onClick={() => setReturnModalBill(bill)}
@@ -3313,6 +3315,7 @@ export default function SuperadminDashboard() {
                               }
                               className="rounded-xl border border-slate-200 p-4 dark:border-slate-700"
                             >
+                              <div className="mb-3 flex justify-end"><AdminBillDeleteButton bill={bill} /></div>
 
                               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 
@@ -3456,6 +3459,7 @@ export default function SuperadminDashboard() {
                     {yearlyBillsList.length ? yearlyBillsList.map((bill, index) => (
                       <article key={bill._id || index} className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
                         <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold">Bill #{bill.billNumber || bill._id}</p><p className="text-xs text-slate-500">{formatDateTime(getBillDate(bill))} · {getCustomerName(bill)}</p></div><p className="font-bold text-emerald-700">{getCurrency(getBillTotal(bill))}</p></div>
+                        <div className="mt-3 flex justify-end"><AdminBillDeleteButton bill={bill} /></div>
                         <div className="mt-3 space-y-1 border-t pt-3 dark:border-slate-700">{getBillItems(bill).map((item, indexItem) => <p key={`${bill._id}-${indexItem}`} className="flex justify-between gap-3 text-sm"><span>{getItemName(item)} × {getItemQuantity(item)}</span><span>{getCurrency(getItemTotal(item))}</span></p>)}</div>
                       </article>
                     )) : <div className="rounded-xl border border-dashed p-10 text-center text-sm text-slate-500">No net sales bills recorded this year.</div>}

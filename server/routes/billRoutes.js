@@ -19,7 +19,7 @@ import {
   getDailyClosingReport,
   getMedicineSalesRanking,
 } from '../controllers/billController.js';
-import { createDeletionRequest } from '../controllers/deletionRequestController.js';
+import { createDeletionRequest, deleteBillAsAdmin } from '../controllers/deletionRequestController.js';
 
 import {
   protect,
@@ -99,8 +99,9 @@ router.post(
   processSalesReturn
 );
 
-// Deleting a bill is always routed through the Admin approval workflow.
-router.delete('/:id', authorize('pharmacist'), (req, res, next) => {
+// Pharmacists request approval; Admins confirm deletion with stock restoration.
+router.delete('/:id', authorize('pharmacist', 'superadmin'), (req, res, next) => {
+  if (req.user.role === 'superadmin') return deleteBillAsAdmin(req, res, next);
   req.deletionTargetType = 'bill';
   return createDeletionRequest(req, res, next);
 });
