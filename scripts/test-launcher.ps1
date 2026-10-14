@@ -15,14 +15,31 @@ try {
     }
     $harness = @'
 param([string]$Scenario, [string]$Fixture)
+$env:PHARMACY_PORT = '5190'
+$blocker = $null
+if ($Scenario -eq 'port-conflict') {
+    $blocker = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Any, 0)
+    $blocker.Start()
+    $env:PHARMACY_PORT = [string]$blocker.LocalEndpoint.Port
+    $blockedPort = $env:PHARMACY_PORT
+}
 function global:docker {
     $line = $args -join ' '
     Add-Content -LiteralPath (Join-Path $Fixture 'calls.txt') -Value $line
     $global:LASTEXITCODE = if ($Scenario -eq 'compose-failure' -and $line -like 'compose up*') { 7 } else { 0 }
 }
-function global:Invoke-RestMethod { return @{ ready = ($Scenario -ne 'api-unready'); databaseConnected = $true } }
+function global:Invoke-RestMethod {
+    param($Uri, $TimeoutSec)
+    if ($Uri -ne "http://localhost:$env:PHARMACY_PORT/api/health") { throw 'Health probe used the wrong port.' }
+    return @{ ready = ($Scenario -ne 'api-unready'); databaseConnected = $true }
+}
 & (Join-Path $Fixture 'scripts/start-pharmacy.ps1') -NoOpen -NoShortcut
-exit $LASTEXITCODE
+$launcherExitCode = $LASTEXITCODE
+if ($blocker) {
+    $blocker.Stop()
+    if ($env:PHARMACY_PORT -eq $blockedPort) { throw 'Launcher reused an occupied port.' }
+}
+exit $launcherExitCode
 '@
     Set-Content -LiteralPath (Join-Path $testRoot 'harness.ps1') -Value $harness -Encoding UTF8
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'success' -Fixture $testRoot
@@ -34,6 +51,8 @@ exit $LASTEXITCODE
     if ($LASTEXITCODE -ne 0) { throw 'Daily launch simulation failed.' }
     if ((Get-Content -LiteralPath (Join-Path $testRoot 'calls.txt') -Raw) -match '--build') { throw 'Unchanged daily launch rebuilt services.' }
     if ((Get-FileHash -LiteralPath (Join-Path $testRoot '.env')).Hash -ne $settingsHash) { throw 'Daily launch replaced installation secrets.' }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'port-conflict' -Fixture $testRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Occupied-port fallback failed.' }
     foreach ($scenario in @('compose-failure','api-unready')) {
         & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario $scenario -Fixture $testRoot
         if ($LASTEXITCODE -eq 0) { throw "Failed services incorrectly reported success: $scenario" }

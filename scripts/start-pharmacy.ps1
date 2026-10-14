@@ -18,6 +18,10 @@ function Test-DockerEngine {
     $ErrorActionPreference = 'Continue'
     try { & docker info *> $null; return $LASTEXITCODE -eq 0 } finally { $ErrorActionPreference = $savedPreference }
 }
+function Test-FreePort([int]$Port) {
+    $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Any, $Port)
+    try { $listener.Start(); return $true } catch { return $false } finally { $listener.Stop() }
+}
 try {
     Write-Host 'Sardar Medical Store - starting' -ForegroundColor Cyan
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -40,6 +44,29 @@ try {
         if (-not (Test-DockerEngine)) { throw 'Docker Engine did not become ready. Check Docker Desktop / WSL setup.' }
     }
     Invoke-Docker -Arguments @('compose', 'version')
+    $preferredPort = 5174
+    if ($env:PHARMACY_PORT) {
+        if (-not [int]::TryParse($env:PHARMACY_PORT, [ref]$preferredPort) -or $preferredPort -lt 1024 -or $preferredPort -gt 65525) { throw 'PHARMACY_PORT must be a port between 1024 and 65525.' }
+    }
+    # A running installation owns its mapping; reuse it on daily launch.
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $running = & docker inspect --format '{{.State.Running}}' pharmadesk-frontend 2>$null
+        $mapping = if ($running -eq 'true') { & docker compose port frontend 80 2>$null } else { '' }
+    } finally { $ErrorActionPreference = $savedPreference }
+    $selectedPort = 0
+    if ($mapping -match ':(\d+)\s*$') { $selectedPort = [int]$Matches[1] }
+    else {
+        foreach ($candidate in $preferredPort..($preferredPort + 10)) {
+            if (Test-FreePort $candidate) { $selectedPort = $candidate; break }
+        }
+    }
+    if (-not $selectedPort) { throw 'No free application port was found. Close another application or set PHARMACY_PORT.' }
+    $env:PHARMACY_PORT = [string]$selectedPort
+    $applicationUrl = "http://localhost:$selectedPort"
+    $env:CLIENT_URL = $applicationUrl
+    Write-Host "Application address: $applicationUrl"
     $settings = Join-Path $projectDirectory '.env'
     if (-not (Test-Path -LiteralPath $settings)) {
         $contents = "JWT_ACCESS_SECRET=$(New-LocalSecret)`nJWT_REFRESH_SECRET=$(New-LocalSecret)`nCLIENT_URL=http://localhost:5174`n"
@@ -58,14 +85,14 @@ try {
     $composeArguments = @('compose', 'up', '-d', '--wait', '--wait-timeout', '180')
     if ($previousBuild -ne $fingerprint) { $composeArguments += '--build' }
     Invoke-Docker -Arguments $composeArguments
-    $health = Invoke-RestMethod -Uri 'http://localhost:5174/api/health' -TimeoutSec 10
+    $health = Invoke-RestMethod -Uri "$applicationUrl/api/health" -TimeoutSec 10
     if ($health.ready -ne $true -or $health.databaseConnected -ne $true) { throw 'The pharmacy API is not ready. No application window was opened.' }
     [IO.File]::WriteAllText($buildMarker, $fingerprint)
     if (-not $NoOpen) {
         $browsers = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe")
         $browserExecutable = $browsers | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-        if ($browserExecutable) { Start-Process -FilePath $browserExecutable -ArgumentList @('--app=http://localhost:5174', '--new-window') }
-        else { Start-Process 'http://localhost:5174' }
+        if ($browserExecutable) { Start-Process -FilePath $browserExecutable -ArgumentList @("--app=$applicationUrl", '--new-window') }
+        else { Start-Process $applicationUrl }
     }
     Write-Host 'Ready. Use the Sardar Medical Store desktop shortcut for daily launch.' -ForegroundColor Green
     Write-Host 'Stop-Sardar-Pharmacy.bat stops services while keeping the database.'

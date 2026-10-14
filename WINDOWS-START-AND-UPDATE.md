@@ -2,6 +2,8 @@
 
 Docker Desktop must have a working WSL 2 engine. Installing Docker alone is insufficient if Windows reports that its hypervisor is not running.
 
+Docker MongoDB and backend stay inside the Docker network; they do not reserve host ports 27017 or 5001. The desktop launcher normally opens port 5174 and automatically selects a free nearby port if another application occupies it. It prints the selected address and reuses a running Docker installation's address. Always launch using the shortcut rather than a saved browser URL. A separately running development instance has its own database; a fresh Docker database does not automatically copy that instance's inventory.
+
 1. Run `Repair-Docker-Windows.bat` and accept the Windows Administrator prompt. It enables WSL and Virtual Machine Platform if missing, and enables hypervisor startup only if the current boot configuration explicitly says Off. It does not restart Windows or delete Docker data.
 2. Save your work, restart Windows, then open Docker Desktop. Wait until its engine is running. If virtualization is disabled in BIOS, enable it there first. Troubleshooting: https://learn.microsoft.com/en-us/windows/wsl/troubleshooting
 3. Extract this project to a permanent folder, then run `Start-Sardar-Pharmacy.bat`. First launch downloads/builds Docker images and can take several minutes. A desktop shortcut opens the application in an Edge/Chrome app window.
