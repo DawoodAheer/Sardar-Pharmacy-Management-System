@@ -22,7 +22,7 @@ Open `http://localhost:5174`. A **new database volume** starts with no medicines
 
 The initial password for these three accounts is `Dawood@@5786`. Existing accounts are never reset by startup. `npm run seed` is now a non-destructive account check; it does not delete or create medicine stock.
 
-An existing database volume is deliberately retained. Restarting or rebuilding does **not** empty its medicines. Do not delete that volume to make an existing installation appear fresh. If local Node/MongoDB services already use ports 5001, 5174 or 27017, stop those services before starting the same application with Docker.
+An existing database volume is deliberately retained. Restarting or rebuilding does **not** empty its medicines. Docker MongoDB/backend use internal ports. The launcher normally opens port 5174 and selects a nearby free port if occupied; it prints and opens the correct address. A development instance uses a separate database, so use the current desktop shortcut for Docker. See [Windows start/update guidance](../WINDOWS-START-AND-UPDATE.md).
 
 The server image excludes local backups and uploads. MongoDB records live in the named `pharmadesk_mongo_data` volume; uploads and backups use `server/uploads` and `server/backups`. The frontend proxies API requests and scanner WebSockets. The API health check waits for the database and initial account setup.
 

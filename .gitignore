@@ -1,4 +1,9 @@
 # Node dependencies
+.agents/
+.gsd/
+GSD-STYLE.md
+PROJECT_RULES.md
+model_capabilities.yaml
 node_modules/
 npm-debug.log*
 yarn-debug.log*
