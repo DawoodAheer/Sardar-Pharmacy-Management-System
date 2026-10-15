@@ -8,7 +8,7 @@ import {
   sendRefreshTokenCookie,
 } from "../utils/generateToken.js";
 
-import { sendPasswordResetEmail } from "../utils/emailService.js";
+import { sendPasswordResetEmail, getTransporter } from "../utils/emailService.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -562,6 +562,7 @@ export const updateUserProfile = async (
 */
 
 export const forgotPassword = async (req, res, next) => {
+  if (!getTransporter()) return res.status(503).json({ success: false, message: 'Email recovery is unavailable offline. Ask an authorized Admin to reset your account password.' });
   try {
     const { email } = req.body;
 
@@ -598,26 +599,12 @@ export const forgotPassword = async (req, res, next) => {
       resetOtp,
     });
 
-    console.log(`[PASSWORD RESET] Generated reset request for: ${user.email}`);
-    console.log(`[PASSWORD RESET] 6-Digit OTP: ${resetOtp}`);
-    console.log(`[PASSWORD RESET] Reset URL: ${resetUrl}`);
-
-    return res.status(200).json({
-      success: true,
-      message: emailSent
-        ? "Password reset instructions have been sent to your email."
-        : "Reset code generated! Since offline mode is active, your recovery code is provided below.",
-      emailSent,
-      // Provide recovery info in response for offline/local usage without SMTP server
-      offlineInfo: !emailSent
-        ? {
-            code: resetOtp,
-            token: resetToken,
-            email: user.email,
-            resetUrl: `/reset-password/${resetToken}`,
-          }
-        : null,
-    });
+    if (!emailSent) {
+      user.resetPasswordToken = undefined; user.resetPasswordOtp = undefined; user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(503).json({ success: false, message: 'Recovery email could not be delivered. Please retry later or contact Admin.' });
+    }
+    return res.status(200).json({ success: true, message: 'Password reset instructions have been sent to your email.', emailSent: true });
   } catch (error) {
     next(error);
   }
@@ -634,6 +621,7 @@ export const forgotPassword = async (req, res, next) => {
 */
 
 export const resetPassword = async (req, res, next) => {
+  if (process.env.OFFLINE_MODE === 'true') return res.status(503).json({ success: false, message: 'Email recovery is unavailable offline. Ask an authorized Admin to reset your account password.' });
   try {
     const token = req.params.token || req.body.token;
     const { otp, email, password } = req.body;

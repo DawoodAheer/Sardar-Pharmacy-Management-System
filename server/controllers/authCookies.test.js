@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { logoutUser } from './authController.js';
+import { logoutUser, forgotPassword, resetPassword } from './authController.js';
+
+test('offline public recovery never exposes reset secrets or accepts previously issued codes', async () => {
+  const previous = process.env.OFFLINE_MODE;
+  process.env.OFFLINE_MODE = 'true';
+  try {
+    for (const handler of [forgotPassword, resetPassword]) {
+      let status, body;
+      const res = { status(value) { status = value; return this; }, json(value) { body = value; } };
+      await handler({ body: { email: 'admin@example.test', code: '123456' }, params: {} }, res, error => { throw error; });
+      assert.equal(status, 503); assert.equal(body.success, false);
+      assert.equal(body.offlineInfo, undefined); assert.equal(body.token, undefined); assert.equal(body.code, undefined);
+    }
+  } finally { if (previous === undefined) delete process.env.OFFLINE_MODE; else process.env.OFFLINE_MODE = previous; }
+});
 import { sendRefreshTokenCookie } from '../utils/generateToken.js';
 
 for (const secure of ['false', 'true']) {

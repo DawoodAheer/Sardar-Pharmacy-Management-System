@@ -43,9 +43,6 @@ export const sendPasswordResetEmail = async ({
   if (!transporter) {
     console.log('----------------------------------------------------');
     console.log('[OFFLINE EMAIL SIMULATOR] SMTP not configured.');
-    console.log(`[OFFLINE RECOVERY] Recipient: ${to} (${name})`);
-    console.log(`[OFFLINE RECOVERY] 6-Digit Code: ${resetOtp}`);
-    console.log(`[OFFLINE RECOVERY] Direct Link: ${resetUrl}`);
     console.log('----------------------------------------------------');
     return false;
   }
