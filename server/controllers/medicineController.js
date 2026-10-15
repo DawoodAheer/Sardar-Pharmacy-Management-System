@@ -701,6 +701,7 @@ export const scanLabel = async (req, res, next) => {
     // 3. Upload image to Cloudinary (if configured)
     let labelImageUrl = '';
     const isCloudinaryConfigured = 
+      process.env.OFFLINE_MODE !== 'true' &&
       process.env.CLOUDINARY_CLOUD_NAME && 
       process.env.CLOUDINARY_API_KEY && 
       process.env.CLOUDINARY_API_SECRET;
@@ -717,7 +718,7 @@ export const scanLabel = async (req, res, next) => {
       }
     } else {
       // Fallback: Local static hosting
-      labelImageUrl = `http://localhost:${process.env.PORT || 5000}/uploads/${req.file.filename}`;
+      labelImageUrl = `/uploads/${req.file.filename}`;
     }
 
     res.json({

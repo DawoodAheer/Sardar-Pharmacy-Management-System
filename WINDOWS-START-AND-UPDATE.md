@@ -34,3 +34,13 @@ Before updating, create and verify a backup from Operations, save a copy outside
 ## Medicine defaults
 
 Only medicine name and positive purchase cost per pack are required. Blank optional fields use: one unit per pack, zero stock, sale price equal to purchase cost per unit, no expiry, and empty manufacturer/rack. Supplied invalid optional numbers/dates are rejected instead of silently changing stock. Add stock and a sale price before billing that item when appropriate.
+
+## Offline daily operation
+
+After the first successful Docker build, daily login, inventory, Excel import/export, billing, returns, profit reports and local backups work without internet. Docker Desktop and the application must still be running. The frontend uses local assets/system fonts and English OCR language data is installed with the backend dependencies. Label images are served through the same local application address.
+
+Docker enables `OFFLINE_MODE=true`: email/cloud image uploads are skipped; in-app notifications remain available. Sending emails (including email password recovery), downloading updates and the first image/dependency downloads require internet. A source ZIP is not a prebuilt air-gapped installer.
+
+Database records persist in the `pharmadesk_mongo_data` Docker volume. Images and backups persist in the installation's host folders. Keep both the Docker volume and those folders; do not delete volumes or factory-reset Docker during updates. Keep verified backup copies outside this PC to recover from disk/PC failure.
+
+`npm run test:docker` uses a separate internal-only Docker network with no internet access. It verifies fresh accounts, frontend/API access, discounted sale profit, partial-refund profit and stock isolation, then container restart persistence. It removes only its uniquely named test storage.

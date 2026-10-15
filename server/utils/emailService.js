@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
  * Returns null if SMTP is not configured
  */
 export const getTransporter = () => {
+  if (process.env.OFFLINE_MODE === 'true') return null;
   const isSmtpConfigured =
     process.env.SMTP_HOST &&
     process.env.SMTP_PORT &&

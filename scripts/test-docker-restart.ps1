@@ -12,6 +12,8 @@ try {
   Invoke-TestCompose -Arguments @('up', '-d', '--build', '--wait', '--wait-timeout', '180')
   Invoke-TestCompose -Arguments @('exec', '-T', 'mongodb', 'mongosh', '--quiet', 'pharmadesk_docker_test', '--eval', "if(db.medicines.countDocuments({})!==0 || db.bills.countDocuments({})!==0) quit(2); if(db.users.countDocuments({})!==3) quit(3); db.persistence_checks.insertOne({_id:'restart-sentinel', value:5786});")
   Invoke-TestCompose -Arguments @('exec', '-T', 'backend', 'node', '-e', "Promise.all([fetch('http://frontend/').then(r=>r.text()),fetch('http://frontend/api/health').then(r=>r.json())]).then(([html,health])=>{if(!html.includes('Sardar')||!health.ready||!health.databaseConnected)process.exit(6);console.log('Frontend page and API proxy passed');}).catch(()=>process.exit(7));")
+  Invoke-TestCompose -Arguments @('cp', (Join-Path (Split-Path $PSScriptRoot -Parent) 'server/integration/offline-smoke.mjs'), 'backend:/app/offline-smoke.mjs')
+  Invoke-TestCompose -Arguments @('exec', '-T', 'backend', 'node', '/app/offline-smoke.mjs')
   Invoke-TestCompose -Arguments @('restart', 'mongodb', 'backend', 'frontend')
   Invoke-TestCompose -Arguments @('up', '-d', '--wait', '--wait-timeout', '180')
   Invoke-TestCompose -Arguments @('exec', '-T', 'mongodb', 'mongosh', '--quiet', 'pharmadesk_docker_test', '--eval', "const row=db.persistence_checks.findOne({_id:'restart-sentinel'}); if(!row||row.value!==5786) quit(4); if(db.users.countDocuments({})!==3) quit(5); print('Docker restart persistence passed');")

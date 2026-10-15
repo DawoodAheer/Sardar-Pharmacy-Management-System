@@ -12,6 +12,7 @@ import { enqueueJob } from './backgroundJobs.js';
 // Setup Nodemailer email transporter
 const getEmailTransporter = () => {
   const isSmtpConfigured =
+    process.env.OFFLINE_MODE !== 'true' &&
     process.env.SMTP_HOST &&
     process.env.SMTP_PORT &&
     process.env.SMTP_USER &&

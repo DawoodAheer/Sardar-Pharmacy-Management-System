@@ -36,6 +36,7 @@ const getLocalDateRange = (startDate, endDate) => {
 };
 
 const sendOrderStatusEmail = async (bill, status, rejectionReason = '') => {
+  if (process.env.OFFLINE_MODE === 'true') return;
   const email = bill?.customerId?.email;
 
   if (!email) {
