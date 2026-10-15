@@ -57,6 +57,7 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
     });
     let bill;
     await t.test('a sale uses oldest unexpired batches and a return restores exact batch stock', async () => {
+      const unrelated = await Medicine.create({ name: 'Unrelated stock guard', createdBy: admin._id, quantity: 0, purchasePrice: 10, price: 30, expiryDate: '2099-01-01' });
       const sale = await request('/bills/instore', { method: 'POST', body: { customerName: 'Test', items: [{ medicineId: med._id, quantity: 4 }], paymentMethod: 'Cash' } });
       assert.equal(sale.status, 201, JSON.stringify(sale.data)); bill = sale.data.bill;
       assert.deepEqual(bill.items[0].batchAllocations.map(b => [b.batchNumber, b.quantity]), [['FIRST', 3], ['SECOND', 1]]);
@@ -66,6 +67,7 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
       const stock = await Medicine.findById(med._id);
       assert.equal(stock.quantity, 7);
       assert.equal(stock.batches.find(b => b.batchNumber === 'FIRST').quantity, 3);
+      assert.equal((await Medicine.findById(unrelated._id)).quantity, 0, 'refund must not increase unrelated medicine stock');
       assert.equal(returned.data.bill.netItems[0].purchasePrice, 20);
       const profit = await request('/bills/profit-summary');
       assert.equal(profit.status, 200); assert.equal(profit.data.dailyProfit, 10);
@@ -195,6 +197,18 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
       assert.ok(await Bill.exists({ _id: rollbackSale.data.bill._id }));
       assert.equal((await Medicine.findById(medicine._id)).quantity, 4, 'failed deletion must roll back earlier stock restoration');
       await Medicine.create(missingSnapshot);
+    });
+    await t.test('Pakistan early-morning sales belong to the correct business day', async () => {
+      const previousTimezone = process.env.TZ;
+      process.env.TZ = 'Asia/Karachi';
+      try {
+        for (const [createdAt, total] of [['2024-12-31T23:52:00Z', 55], ['2025-01-01T19:01:00Z', 99]]) {
+          await Bill.create({ billType: 'INSTORE', orderStatus: 'ACCEPTED', pharmacistId: admin._id,
+            createdAt: new Date(createdAt), subtotal: total, total, paymentMethod: 'Cash' });
+        }
+        const report = await request('/bills/daily-closing?date=2025-01-01');
+        assert.equal(report.status, 200); assert.equal(report.data.billCount, 1); assert.equal(report.data.salesByMethod.Cash, 55);
+      } finally { if (previousTimezone === undefined) delete process.env.TZ; else process.env.TZ = previousTimezone; }
     });
     await t.test('backup recovery compares restored records in a temporary database', async () => {
       await mongoose.model('MedicineImportIssue').create({ rowNumber: 2, originalRow: { name: 'Previously ignored row' },

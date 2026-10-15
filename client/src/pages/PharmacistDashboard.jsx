@@ -362,6 +362,7 @@ const PharmacistDashboard = () => {
   const [orderPage, setOrderPage] = useState(1);
   const [orderStatus, setOrderStatus] = useState('PENDING');
   const [returnPage, setReturnPage] = useState(1);
+  const [recentBillPage, setRecentBillPage] = useState(1);
   const [categoryFilter, setCategoryFilter] =
     useState('');
   const [expiryStatusFilter, setExpiryStatusFilter] =
@@ -716,17 +717,19 @@ const PharmacistDashboard = () => {
   // BILLS QUERY
   // ==========================================================================
 
+  const billListPage = activeTab === 'returns' ? returnPage : recentBillPage;
+  const billListSearch = activeTab === 'returns' ? refundSearchTerm : '';
   const {
     data: billPageData,
     isLoading: isBillsLoading,
     isFetching: isBillsFetching,
     refetch: refetchBills,
   } = useQuery({
-    queryKey: ['bills', returnPage, refundSearchTerm],
+    queryKey: ['bills', activeTab === 'returns' ? 'returns' : 'recent', billListPage, billListSearch],
 
     queryFn: async () => {
       const response =
-        await api.get('/bills', { params: { page: returnPage, limit: 50, search: refundSearchTerm, includeReturned: 'true' } });
+        await api.get('/bills', { params: { page: billListPage, limit: 50, search: billListSearch, includeReturned: 'true' } });
 
       return response.data;
     },
@@ -789,6 +792,7 @@ const PharmacistDashboard = () => {
     setDashboardRefreshMessage('');
     try {
       const results = await Promise.allSettled([
+        queryClient.invalidateQueries({}, { throwOnError: true }),
         refetchMeds({ throwOnError: true }),
         refetchBills({ throwOnError: true }),
         refetchSalesSummary({ throwOnError: true }),
@@ -2101,6 +2105,10 @@ const PharmacistDashboard = () => {
         setSelectedCustomerId('');
         setCustomerName('');
         setGuestPhone('');
+
+        await queryClient.invalidateQueries({ queryKey: ['dailyClosingReport'] });
+        await queryClient.invalidateQueries({ queryKey: ['operations'] });
+        await queryClient.invalidateQueries({ queryKey: ['profitSummary'] });
 
         await refetchMeds();
         await refetchBills();
@@ -3441,7 +3449,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <div className="mb-3"><select value={orderStatus} onChange={e => { setOrderStatus(e.target.value); setOrderPage(1); }}><option value="PENDING">Pending orders</option><option value="ACCEPTED">Accepted orders</option><option value="REJECTED">Rejected orders</option><option value="">All orders</option></select><PageControls page={orderPage} pages={orderPageData?.pages || 1} total={orderPageData?.total || 0} onChange={setOrderPage} /></div>
+                <PageControls page={recentBillPage} pages={billPageData?.pages || 1} total={billPageData?.total || 0} onChange={setRecentBillPage} />
                   <div className="overflow-x-auto">
 
                   <table className="w-full">
@@ -3622,6 +3630,7 @@ const PharmacistDashboard = () => {
                 </div>
               </div>
 
+              <div className="mb-3"><select aria-label="Order status" value={orderStatus} onChange={e => { setOrderStatus(e.target.value); setOrderPage(1); }}><option value="PENDING">Pending orders</option><option value="ACCEPTED">Accepted orders</option><option value="REJECTED">Rejected orders</option><option value="">All orders</option></select><PageControls page={orderPage} pages={orderPageData?.pages || 1} total={orderPageData?.total || 0} onChange={setOrderPage} /></div>
               {isOrdersLoading ? (
                 <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
                   <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />

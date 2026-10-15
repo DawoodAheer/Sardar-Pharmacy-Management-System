@@ -46,6 +46,7 @@ services:
     environment:
       - PORT=5000
       - NODE_ENV=production
+      - TZ=Asia/Karachi
       # Connects directly to internal offline MongoDB container
       - MONGO_URI=mongodb://mongodb:27017/pharmadesk?replicaSet=rs0
       # Preconfigured offline secrets

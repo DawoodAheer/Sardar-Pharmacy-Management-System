@@ -24,6 +24,7 @@ EXPOSE 5000
 
 ENV PORT=5000
 ENV NODE_ENV=production
+ENV TZ=Asia/Karachi
 
 # Start backend server
 CMD ["node", "--import", "./env-loader.js", "server.js"]

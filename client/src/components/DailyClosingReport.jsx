@@ -27,6 +27,7 @@ const money = (v) =>
 export default function DailyClosingReport({ compact = false }) {
   const [date, setDate] = useState(todayStr);
 
+  const [refreshMessage, setRefreshMessage] = useState('');
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['dailyClosingReport', date],
     queryFn: async () =>
@@ -80,7 +81,11 @@ export default function DailyClosingReport({ compact = false }) {
             className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-slate-800 dark:text-white"
           />
           <button
-            type="button" onClick={() => refetch()} aria-label="Refresh daily report"
+            type="button" disabled={isFetching} onClick={async () => {
+              setRefreshMessage('Refreshing…');
+              try { await refetch({ throwOnError: true }); setRefreshMessage(`Report updated ${new Date().toLocaleTimeString('en-PK')}`); }
+              catch { setRefreshMessage('Refresh failed. Check connection and retry.'); }
+            }} aria-label="Refresh daily report"
             className="rounded-lg p-2 text-slate-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40"
           >
             <RefreshCw size={15} className={isFetching ? 'animate-spin text-emerald-600' : ''} />
@@ -89,6 +94,7 @@ export default function DailyClosingReport({ compact = false }) {
       </div>
 
       <div className="p-5">
+        {refreshMessage && <p role="status" className="mb-2 text-xs text-slate-600 dark:text-slate-300">{refreshMessage}</p>}
         {isFetching && !data ? (
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Loader2 size={14} className="animate-spin" /> Loading report…

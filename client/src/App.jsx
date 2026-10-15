@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import useBrowserNotifications from './hooks/useBrowserNotifications';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
+import DataRefresh from './components/DataRefresh';
 
 const OperationsPage = lazy(() => import('./pages/OperationsPage'));
 const Login = lazy(() => import('./pages/Login'));
@@ -60,6 +61,7 @@ const DashboardLayout = () => {
 function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
+      <DataRefresh />
       <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
