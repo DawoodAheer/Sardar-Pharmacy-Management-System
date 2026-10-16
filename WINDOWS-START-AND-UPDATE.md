@@ -15,10 +15,9 @@ Sending the source ZIP through WhatsApp does not send your database. A laptop th
 
 Initial accounts on a fresh database: Admin `aheerdawood014@gmail.com`, Pharmacist `mlksardar6@gmail.com`, Customer `aheerraza0@gmail.com`. Their initial password is `Dawood@@5786`; change passwords after setup. Startup never resets an existing account password.
 
-## Demonstrating bills without keeping test sales
+## Correcting saved bills
 
-In New Bill, check **Training mode**, add medicine items and choose **Preview training bill**. The preview is not saved, consumes no stock and affects no sales/cash reports. **Discard training bill** clears it. It cannot be printed as a real receipt. Real inventory entries made during training still persist; this switch applies to bills only.
-
+Every bill committed in New Bill is saved and updates stock and financial reports.
 For an already saved bill, Admin can use **Delete bill** in daily/monthly/yearly bill details and type `DELETE`. The bill is removed from sales and customer history, stock is restored to its original batches, and an approval/audit snapshot remains. Bills with return/refund history are protected. This is intended for mistakenly recorded or test sales; use Return / Refund for an actual customer refund.
 
 Pharmacist uses the bill's deletion-request button. Nothing is removed until Admin approves in **Deletion Requests**; rejection keeps the bill. Successful approval performs the same stock restoration. All deletion changes are atomic, so a failure does not partially delete a bill or restore only some stock.

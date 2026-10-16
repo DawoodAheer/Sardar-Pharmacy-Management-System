@@ -604,7 +604,6 @@ const PharmacistDashboard = () => {
 
   const [confirmedBill, setConfirmedBill] =
     useState(null);
-  const [trainingMode, setTrainingMode] = useState(false);
 
   // ==========================================================================
   // NOTIFICATIONS
@@ -2049,7 +2048,6 @@ const PharmacistDashboard = () => {
           await api.post(
             '/bills/instore',
             {
-              training: trainingMode,
               customerId:
                 selectedCustomerId ||
                 null,
@@ -4100,7 +4098,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className="max-h-[60vh] overflow-auto overscroll-contain">
 
                   <table className="w-full">
 
@@ -4329,10 +4327,7 @@ const PharmacistDashboard = () => {
           {activeTab ===
             'new-bill' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[600px]">
-              <label className="lg:col-span-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                <input type="checkbox" checked={trainingMode} disabled={isBillingPending} onChange={event => setTrainingMode(event.target.checked)} className="mr-2" />
-                Training mode — preview only. Bills are not saved; stock and financial reports stay unchanged.
-              </label>
+
 
               <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex flex-col">
 
@@ -4417,7 +4412,7 @@ const PharmacistDashboard = () => {
 
                 </div>
 
-                <div className="p-3 space-y-2 overflow-y-auto">
+                <div className="p-3 space-y-2 max-h-[60vh] min-h-0 overflow-y-auto overscroll-contain">
 
                   {filteredBillMedicines.length > 50 && <p className="text-xs text-slate-500">Showing the first 50 matches. Search to narrow the medicine list.</p>}
                   {filteredBillMedicines.slice(0, 50).map(
@@ -4571,7 +4566,7 @@ const PharmacistDashboard = () => {
                   disabled={isBillingPending || billItems.length === 0}
                   className="mx-4 mt-4 w-[calc(100%-2rem)] py-2.5 bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-40"
                 >
-                  {isBillingPending ? 'Processing...' : trainingMode ? 'Preview training bill' : 'Commit & Post Bill'}
+                  {isBillingPending ? 'Processing...' : 'Commit & Post Bill'}
                 </button>
 
                 <div className="flex-1 min-h-0 overflow-y-auto">
@@ -7039,7 +7034,7 @@ const PharmacistDashboard = () => {
               type="button"
               onClick={() => setConfirmedBill(null)}
               aria-label="Close completed bill"
-              title={confirmedBill.training ? 'Discard training bill' : 'Close; the saved bill remains in sales history'}
+              title="Close; the saved bill remains in sales history"
               className="absolute right-3 top-3 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
             >
               <X className="h-5 w-5" />
@@ -7050,7 +7045,7 @@ const PharmacistDashboard = () => {
               <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto" />
 
               <h3 className="text-2xl font-bold mt-2 text-emerald-700">
-                {confirmedBill.training ? 'Training Bill Preview' : '✅ Bill Done!'}
+                ✅ Bill Done!
               </h3>
 
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
@@ -7059,7 +7054,7 @@ const PharmacistDashboard = () => {
                   confirmedBill.billNumber ||
                   confirmedBill._id
                 }{' '}
-                {confirmedBill.training ? 'Not saved. No stock or money was changed.' : 'created successfully.'}
+                created successfully.
               </p>
 
             </div>
@@ -7151,7 +7146,6 @@ const PharmacistDashboard = () => {
             <div className="flex gap-3 mt-5">
 
               <button
-                disabled={confirmedBill.training}
                 onClick={() => printReceiptInPage(confirmedBill._id)}
                 className="flex-1 py-2 border border-blue-700 text-blue-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1"
               >
@@ -7166,7 +7160,7 @@ const PharmacistDashboard = () => {
                 }
                 className="flex-1 py-2 bg-blue-700 text-white rounded-xl text-xs font-bold"
               >
-                {confirmedBill.training ? 'Discard training bill' : 'New Bill'}
+                New Bill
               </button>
 
             </div>

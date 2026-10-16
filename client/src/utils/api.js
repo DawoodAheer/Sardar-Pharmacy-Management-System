@@ -50,7 +50,7 @@ api.interceptors.response.use(
     const method = response.config?.method?.toLowerCase();
     let body = response.config?.data;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = null; } }
-    if (['post', 'put', 'patch', 'delete'].includes(method) && !response.config?.url?.startsWith('/auth/') && !body?.training && !body?.dryRun) {
+    if (['post', 'put', 'patch', 'delete'].includes(method) && !response.config?.url?.startsWith('/auth/') && !body?.dryRun) {
       window.dispatchEvent(new Event('pharmacy:data-changed'));
     }
     return response;

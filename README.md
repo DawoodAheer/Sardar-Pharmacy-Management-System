@@ -37,7 +37,6 @@ The initial password is `Dawood@@5786`. Change initial passwords before business
 - **Profit:** net sales after discounts/refunds minus recorded cost of the remaining sold units. Historical batch costs are retained. Reports use Pakistan business dates (`Asia/Karachi`).
 - **Credit and suppliers:** Udhar statements/payments, supplier invoices, balances, returns and cash reconciliation.
 - **Refresh:** successful writes invalidate cached data; authenticated pages have a refresh control with update/error feedback.
-- **Training bills:** New Bill → Training mode creates a preview without saving a sale or consuming stock. Discard it after demonstration.
 - **Bill deletion:** Pharmacists request Admin approval. Admin-confirmed deletion restores stock and retains a deletion audit. Bills with refund history are protected; use Return / Refund for actual refunds.
 - **Archived medicines:** Admin permanent deletion requires confirmation and a safety backup. Financially referenced medicines remain protected.
 
@@ -106,3 +105,5 @@ Verified workflows include Excel imports, accounting/permissions, stock restorat
 Private `.env` files, database files, uploads, backups, logs, node_modules and generated frontend bundles are excluded. Root environment secrets are generated locally on first launch. Assistant planning files and one-time source-edit scripts are excluded from release archives.
 
 More guidance: [Windows start and update](WINDOWS-START-AND-UPDATE.md), [new-PC setup](docs/NEW-PC.md), [operations](docs/OPERATIONS.md).
+
+Inventory tables and the New Bill medicine catalog use bounded scrolling; inventory remains server-paginated. CSV export downloads a file without expanding the page. Every committed bill is saved and updates stock and financial reports.

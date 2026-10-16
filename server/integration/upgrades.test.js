@@ -139,14 +139,14 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
         assert.equal(closing.data.billCount, expected ? 3 : 0);
       }
     });
-    await t.test('training previews never persist or change stock, bills or financial totals', async () => {
+    await t.test('obsolete preview requests are rejected without changing stock or financial totals', async () => {
       const stock = JSON.stringify(await Medicine.findById(med._id).lean());
       const count = await Bill.countDocuments();
       const totals = (await request('/bills/sales-summary')).data;
       for (const user of [admin, pharmacist]) {
         const preview = await request('/bills/instore', { user, method: 'POST', body: { training: true, items: [{ medicineId: med._id, quantity: 1 }] } });
-        assert.equal(preview.status, 200, JSON.stringify(preview.data));
-        assert.equal(preview.data.bill.training, true); assert.equal(preview.data.bill._id, undefined);
+        assert.equal(preview.status, 400, JSON.stringify(preview.data));
+        assert.match(preview.data.message, /Reload the application/);
       }
       assert.equal((await request('/bills/instore', { user: customer, method: 'POST', body: { training: true, items: [{ medicineId: med._id, quantity: 1 }] } })).status, 403);
       assert.equal((await request('/bills/instore', { method: 'POST', body: { training: 'true', items: [{ medicineId: med._id, quantity: 1 }] } })).status, 400);

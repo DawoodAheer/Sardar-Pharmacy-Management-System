@@ -1219,8 +1219,9 @@ export const createInstoreBill = async (
   res,
   next
 ) => {
-  if (req.body.training !== undefined && typeof req.body.training !== 'boolean') {
-    return res.status(400).json({ message: 'Training mode must be true or false.' });
+  // Refuse obsolete preview requests so an old browser cannot accidentally record a sale.
+  if (req.body.training !== undefined) {
+    return res.status(400).json({ message: 'Bill previews are no longer supported. Reload the application before saving a bill.' });
   }
   const {
     customerName,
@@ -1404,13 +1405,6 @@ export const createInstoreBill = async (
       subtotal - finalDiscount
     );
 
-    if (req.body.training === true) {
-      return res.status(200).json({ success: true, bill: {
-        training: true, billNumber: 'TRAINING — NOT A SALE', createdAt: new Date(),
-        customerName: normalizedCustomerName, customerPhone: normalizedCustomerPhone,
-        items: validatedItems.map(({ ref, ...item }) => item), subtotal, discount: finalDiscount, total, paymentMethod,
-      } });
-    }
     let bill;
     const session = await mongoose.startSession();
     try {
