@@ -43,7 +43,7 @@ This is separate from updating. Stop/Start and a new ZIP deliberately keep exist
 
 Program files, Docker images, database collections/indexes, uploaded files and backup folders remain. No Docker volumes are removed. If reset fails, retain its backup and error message; do not use Docker Clean/Purge data, delete volumes or run `down -v`. Run the normal Start launcher if services need restarting. A large database can take time; do not interrupt a reset. A transaction failure rolls back deletion.
 
-The archive is a full MongoDB backup, not the application's JSON backup format. For recovery, stop application writers and have an operator restore it with `mongorestore --gzip --archive=<archive>` using the existing backup/restore tools; do not upload it to the JSON restore screen. Uploaded files are already preserved separately. Restoring overwrites the database state and requires a deliberate recovery decision.
+The archive is a full MongoDB backup, not the application's JSON backup format. For recovery, stop application writers and have an operator use `scripts/restore-pharmacy.ps1 -SpecifiedBackupPath <full-archive-path>`; the selector also discovers archives in `backups` and `backup-exports`. Do not upload it to the JSON restore screen. Uploaded files are already preserved separately. Restoring overwrites the database state and requires a deliberate recovery decision.
 
 ## Medicine defaults
 

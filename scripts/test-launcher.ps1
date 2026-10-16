@@ -27,6 +27,11 @@ function global:docker {
     $line = $args -join ' '
     Add-Content -LiteralPath (Join-Path $Fixture 'calls.txt') -Value $line
     $global:LASTEXITCODE = if ($Scenario -eq 'compose-failure' -and $line -like 'compose up*') { 7 } else { 0 }
+    if ($args[0] -eq 'inspect' -and $args.Count -eq 2 -and $Scenario -in @('same-folder', 'mixed-folders', 'other-project')) {
+        $owner = if ($Scenario -eq 'mixed-folders' -and $args[1] -eq 'pharmadesk-mongodb') { 'C:\old-installation' } else { $Fixture }
+        $project = if ($Scenario -eq 'other-project') { 'another-project' } else { 'sardar-pharmacy-management-system' }
+        return ConvertTo-Json -InputObject @(@{Config=@{Labels=@{'com.docker.compose.project.working_dir'=$owner; 'com.docker.compose.project'=$project}}}) -Compress -Depth 6
+    }
 }
 function global:Invoke-RestMethod {
     param($Uri, $TimeoutSec)
@@ -53,7 +58,14 @@ exit $launcherExitCode
     if ((Get-FileHash -LiteralPath (Join-Path $testRoot '.env')).Hash -ne $settingsHash) { throw 'Daily launch replaced installation secrets.' }
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'port-conflict' -Fixture $testRoot
     if ($LASTEXITCODE -ne 0) { throw 'Occupied-port fallback failed.' }
-    foreach ($scenario in @('compose-failure','api-unready')) {
+    foreach ($scenario in @('same-folder', 'mixed-folders')) {
+        Clear-Content -LiteralPath (Join-Path $testRoot 'calls.txt')
+        & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario $scenario -Fixture $testRoot
+        if ($LASTEXITCODE -ne 0) { throw "$scenario launch failed." }
+        $forced = (Get-Content -LiteralPath (Join-Path $testRoot 'calls.txt') -Raw) -match '--force-recreate'
+        if ($forced -ne ($scenario -eq 'mixed-folders')) { throw "$scenario container ownership handling failed." }
+    }
+    foreach ($scenario in @('compose-failure','api-unready','other-project')) {
         & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario $scenario -Fixture $testRoot
         if ($LASTEXITCODE -eq 0) { throw "Failed services incorrectly reported success: $scenario" }
     }

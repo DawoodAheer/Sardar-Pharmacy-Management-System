@@ -21,20 +21,23 @@ Write-Host ""
 
 $BackupBaseDir = Join-Path $ProjectRoot "backups"
 
-# Find available backups
-$allArchives = Get-ChildItem -Path $BackupBaseDir -Recurse -Filter "pharmacydb_*.archive.gz" | Sort-Object CreationTime -Descending
-
-if ($allArchives.Count -eq 0) {
-    Write-Host "[ERROR] No database backup files (.archive.gz) found in $BackupBaseDir" -ForegroundColor Red
-    Read-Host "Press Enter to exit..."
-    exit 1
-}
-
+# An explicit archive is valid even when this installation has no legacy backup folder.
 $SelectedBackup = $null
-
-if ($SpecifiedBackupPath -and (Test-Path $SpecifiedBackupPath)) {
-    $SelectedBackup = Get-Item $SpecifiedBackupPath
+if ($SpecifiedBackupPath) {
+    if (-not (Test-Path -LiteralPath $SpecifiedBackupPath -PathType Leaf) -or $SpecifiedBackupPath -notlike '*.archive.gz') {
+        throw 'The specified MongoDB archive was not found or is not an .archive.gz file. Restore was not started.'
+    }
+    $SelectedBackup = Get-Item -LiteralPath $SpecifiedBackupPath
 } else {
+    $allArchives = @(
+        foreach ($directory in @($BackupBaseDir, (Join-Path $ProjectRoot 'backup-exports'))) {
+            if (Test-Path -LiteralPath $directory) {
+                Get-ChildItem -LiteralPath $directory -Recurse -File -Filter '*.archive.gz'
+            }
+        }
+    ) | Sort-Object CreationTime -Descending
+    $allArchives = @($allArchives)
+    if ($allArchives.Count -eq 0) { throw 'No MongoDB archive backups found in backups or backup-exports. Restore was not started.' }
     Write-Host "Available Backups:" -ForegroundColor Yellow
     $maxShow = [math]::Min(10, $allArchives.Count)
     for ($i = 0; $i -lt $maxShow; $i++) {
@@ -42,18 +45,13 @@ if ($SpecifiedBackupPath -and (Test-Path $SpecifiedBackupPath)) {
         $sizeMB = [math]::Round($file.Length / 1MB, 2)
         Write-Host "  [$($i+1)] $($file.Name) ($sizeMB MB - $($file.CreationTime))" -ForegroundColor Cyan
     }
-    Write-Host ""
     $choice = Read-Host "Select backup number to restore [Default: 1 (Latest)]"
-    if (-not $choice) { $choice = "1" }
-    
-    $index = [int]$choice - 1
-    if ($index -ge 0 -and $index -lt $allArchives.Count) {
-        $SelectedBackup = $allArchives[$index]
-    } else {
-        Write-Host "[ERROR] Invalid selection." -ForegroundColor Red
-        Read-Host "Press Enter to exit..."
-        exit 1
+    if (-not $choice) { $choice = '1' }
+    $number = 0
+    if (-not [int]::TryParse($choice, [ref]$number) -or $number -lt 1 -or $number -gt $maxShow) {
+        throw 'Invalid backup selection. Restore was not started.'
     }
+    $SelectedBackup = $allArchives[$number - 1]
 }
 
 Write-Host ""
@@ -74,6 +72,7 @@ Write-Host ""
 Write-Host "[1/4] Creating mandatory Safety Pre-Restore Backup..." -ForegroundColor Yellow
 try {
     & "$ScriptDir\backup-pharmacy.ps1" -BackupType "pre-restore"
+    if ($LASTEXITCODE -ne 0) { throw 'Pre-restore safety backup failed.' }
     Write-Host "[OK] Pre-restore safety backup completed!" -ForegroundColor Green
 } catch {
     Write-Host "[CRITICAL] Safety backup failed! Aborting restore operation to protect data." -ForegroundColor Red

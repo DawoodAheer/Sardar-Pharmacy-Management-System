@@ -74,6 +74,25 @@ try {
     }
     if (-not $NoShortcut) { & (Join-Path $PSScriptRoot 'create-shortcut.ps1') -NoPause }
     Invoke-Docker -Arguments @('compose', 'config', '--quiet')
+    # Compose can reuse an unchanged MongoDB container from a previous ZIP folder.
+    # Align all service ownership labels so maintenance tools target one installation.
+    $folderChanged = $false
+    foreach ($container in @('pharmadesk-mongodb', 'pharmadesk-backend', 'pharmadesk-frontend')) {
+        $savedPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $inspection = & docker inspect $container 2>$null
+            $inspectionExit = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $savedPreference }
+        if ($inspectionExit -ne 0 -or -not $inspection) { continue }
+        $details = ($inspection | ConvertFrom-Json)[0]
+        if ($details.Config.Labels.'com.docker.compose.project' -ne 'sardar-pharmacy-management-system') {
+            throw "$container belongs to a different Docker project. Stop and inspect that installation before continuing."
+        }
+        $owner = $details.Config.Labels.'com.docker.compose.project.working_dir'
+        if (-not $owner) { throw "Missing installation folder for $container. Startup stopped to protect existing data." }
+        if ($owner.Replace('/', '\').TrimEnd('\') -ine $projectDirectory.TrimEnd('\')) { $folderChanged = $true }
+    }
     Write-Host 'Preparing services. The first launch needs internet and can take several minutes.'
     $sourceFiles = @('docker-compose.yml', 'server/Dockerfile', 'server/package.json', 'server/package-lock.json', 'server/server.js', 'server/env-loader.js', 'client/Dockerfile', 'client/nginx.conf', 'client/package.json', 'client/package-lock.json', 'client/index.html', 'client/vite.config.js')
     $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore') | Where-Object { Test-Path -LiteralPath $_ }
@@ -83,6 +102,10 @@ try {
     $buildMarker = Join-Path $projectDirectory '.pharmacy-build-id'
     $previousBuild = if (Test-Path -LiteralPath $buildMarker) { [IO.File]::ReadAllText($buildMarker) } else { '' }
     $composeArguments = @('compose', 'up', '-d', '--wait', '--wait-timeout', '180')
+    if ($folderChanged) {
+        Write-Host 'Aligning containers with this installation folder. The existing database volume is retained.'
+        $composeArguments += '--force-recreate'
+    }
     if ($previousBuild -ne $fingerprint) { $composeArguments += '--build' }
     Invoke-Docker -Arguments $composeArguments
     $health = Invoke-RestMethod -Uri "$applicationUrl/api/health" -TimeoutSec 10

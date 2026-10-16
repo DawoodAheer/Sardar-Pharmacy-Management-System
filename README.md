@@ -14,6 +14,8 @@ Node.js, Git and a separate MongoDB installation are not required for this Docke
 
 The normal address is `http://localhost:5174`. If occupied, the launcher chooses a nearby free port and prints/opens that address. It reuses the running installation's port. MongoDB and the backend communicate inside Docker without reserving host ports 27017 or 5001. A separate development instance has a different database; use the desktop shortcut to avoid confusing the two.
 
+When starting from a different ZIP folder, the launcher recreates this project's containers together so they all belong to the current installation folder. It retains the existing database volume. Keep uploaded files, backups and `.env` when moving/updating an installation.
+
 If Docker reports that its hypervisor is not running, use **Repair-Docker-Windows.bat**, accept the Windows Administrator prompt and restart Windows when instructed. The helper never automatically reboots or deletes data.
 
 ## Fresh installation and accounts
