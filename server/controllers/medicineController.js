@@ -388,10 +388,10 @@ export const bulkImportMedicines = async (req, res, next) => {
 
 export const getMedicineImportIssues = async (req, res, next) => {
   try {
-    const page = Math.max(1, Number(req.query.page) || 1), limit = 50;
+    const { page, limit, skip } = pagination(req.query);
     const issues = await MedicineImportIssue.find({ status: 'pending' })
       .populate('createdBy', 'name email role')
-      .sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean();
+      .sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean();
     const total = await MedicineImportIssue.countDocuments({ status: 'pending' });
     res.json({ issues, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
@@ -401,10 +401,12 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
   try {
     const { medicine, errors } = normalizeMedicineImportRow(req.body || {});
     if (errors.length) return res.status(400).json({ message: errors.join(' '), errors });
+    await MedicineImportRun.updateOne({ _id: 'inventory-import-lock' }, { $setOnInsert: { revision: 0 } }, { upsert: true }).catch(error => { if (error.code !== 11000) throw error; });
     const session = await mongoose.startSession();
     let created;
     try {
       await session.withTransaction(async () => {
+        await MedicineImportRun.updateOne({ _id: 'inventory-import-lock' }, { $inc: { revision: 1 } }, { session });
         const issue = await MedicineImportIssue.findOne({ _id: req.params.id, status: 'pending' }).session(session);
         if (!issue) {
           const error = new Error('This import issue is no longer pending.');
@@ -419,11 +421,12 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
           false
         );
         if (duplicate) {
-          const error = new Error('A medicine with this name/manufacturer or barcode already exists.');
+          const error = new Error('This name and manufacturer already exist. Correct the name/company for a different medicine, discard the duplicate, or use Batch inventory for a new delivery. Existing stock was not changed.');
           error.statusCode = 409;
           throw error;
         }
         [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
+        await recordMedicineAudit({ medicine: created, action: 'bulk_imported', changedFields: AUDITED_MEDICINE_FIELDS, performedBy: req.user._id, session });
         issue.status = 'resolved';
         issue.resolvedMedicine = created._id;
         issue.resolvedBy = req.user._id;

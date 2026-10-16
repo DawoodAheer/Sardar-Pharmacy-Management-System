@@ -95,6 +95,41 @@ test('large Excel imports and fresh-PC startup preserve data', { skip: !process.
       assert.equal((await send(body)).data.insertedCount, 1);
       assert.equal(await Medicine.countDocuments(), before + 1);
     });
+    const resolve = async (id, body, user = admin) => {
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/api/medicines/import-issues/${id}/resolve`, { method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${generateAccessToken(user._id, user.role)}` }, body: JSON.stringify(body) });
+      return { status: response.status, data: await response.json() };
+    };
+    await t.test('a duplicate can be corrected and added without overwriting the original stock', async () => {
+      const original = await Medicine.findOne({ name: 'Import test 0' });
+      const snapshot = JSON.stringify(original.toObject());
+      const issue = await MedicineImportIssue.create({ sourceFile: 'duplicate.xlsx', rowNumber: 2, originalRow: { 'Medicine name': original.name }, createdBy: admin._id });
+      const body = { name: original.name, manufacturer: original.manufacturer, purchasePrice: 100, quantity: 7 };
+      assert.equal((await resolve(issue._id, body)).status, 409);
+      assert.equal((await MedicineImportIssue.findById(issue._id)).status, 'pending');
+      const result = await resolve(issue._id, { ...body, name: 'Corrected duplicate fixture' });
+      assert.equal(result.status, 201, JSON.stringify(result.data));
+      assert.equal(result.data.medicine.quantity, 7);
+      assert.equal((await MedicineImportIssue.findById(issue._id)).status, 'resolved');
+      assert.equal(await MedicineAudit.countDocuments({ medicineId: result.data.medicine._id }), 1);
+      assert.equal(JSON.stringify((await Medicine.findById(original._id)).toObject()), snapshot);
+      assert.equal((await resolve(issue._id, { ...body, name: 'Retry must not add' })).status, 404);
+    });
+    await t.test('concurrent duplicate corrections only add one medicine and pending rows are paginated', async () => {
+      const issues = await MedicineImportIssue.insertMany(Array.from({ length: 23 }, (_, index) => ({ rowNumber: index + 2,
+        sourceFile: 'pagination-test.xlsx', originalRow: { name: 'Duplicate row' }, createdBy: admin._id })));
+      const body = { name: 'Concurrent correction fixture', purchasePrice: 100, quantity: 3 };
+      const customer = await User.findOne({ role: 'customer' });
+      assert.equal((await resolve(issues[0]._id, body, customer)).status, 403);
+      const outcomes = await Promise.all(issues.slice(0, 2).map(issue => resolve(issue._id, body)));
+      assert.deepEqual(outcomes.map(result => result.status).sort(), [201, 409]);
+      assert.equal(await Medicine.countDocuments({ name: body.name }), 1);
+      const getPage = async page => (await fetch(`http://127.0.0.1:${server.address().port}/api/medicines/import-issues?page=${page}&limit=10`,
+        { headers: { Authorization: `Bearer ${generateAccessToken(admin._id, admin.role)}` } })).json();
+      const first = await getPage(1), second = await getPage(2);
+      assert.equal(first.issues.length, 10); assert.equal(second.issues.length, 10); assert.ok(first.pages >= 3);
+      assert.ok(!first.issues.some(a => second.issues.some(b => a._id === b._id)));
+    });
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     if (mongoose.connection.name === databaseName) await mongoose.connection.dropDatabase();

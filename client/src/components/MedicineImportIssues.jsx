@@ -1,6 +1,8 @@
 import { waitForJob } from '../utils/backgroundJobs';
 import PageControls from './PageControls';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { importIssueForm } from '../utils/importIssueForm';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle, CheckCircle2, RefreshCw, Wrench, Eye, XCircle, CheckCheck,
@@ -26,13 +28,6 @@ const OPTIONAL = [
   'quantity',
   'rackLocation',
 ];
-
-const toFormVal = (v) => {
-  if (!v) return '';
-  const s = String(v);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return s;
-};
 
 function PreviewRow({ row }) {
   const hasErrors = Array.isArray(row.errors) && row.errors.length > 0;
@@ -79,6 +74,7 @@ function PreviewRow({ row }) {
 export default function MedicineImportIssues({ compact = false }) {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({});
   const [msg, setMsg] = useState('');
@@ -90,7 +86,7 @@ export default function MedicineImportIssues({ compact = false }) {
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['medicineImportIssues', page],
-    queryFn: async () => (await api.get('/medicines/import-issues', { params: { page } })).data,
+    queryFn: async () => (await api.get('/medicines/import-issues', { params: { page, limit: 10 } })).data,
     refetchInterval: 15000,
   });
 
@@ -149,25 +145,13 @@ export default function MedicineImportIssues({ compact = false }) {
   });
 
   const issues = data?.issues || [];
+  useEffect(() => {
+    if (data && page > Math.max(1, data.pages)) setPage(Math.max(1, data.pages));
+  }, [data, page]);
 
   const beginFix = (issue) => {
-    const orig = issue.originalRow || {};
-    const imp = issue.normalizedRow || {};
-    const pick = (key, keys) => {
-      if (imp[key] !== undefined && imp[key] !== null) return imp[key];
-      for (const k of keys) if (orig[k] !== undefined && orig[k] !== '') return orig[k];
-      return '';
-    };
-    setForm({
-      name: pick('name', ['name', 'Name', 'Medicine Name']),
-      manufacturer: pick('manufacturer', ['manufacturer', 'Manufacturer', 'Manufacture Company']),
-      expiryDate: toFormVal(pick('expiryDate', ['expiryDate', 'Expiry Date'])),
-      purchasePrice: pick('purchasePrice', ['purchasePrice', 'Purchase Price']),
-      unitsPerPack: pick('unitsPerPack', ['unitsPerPack', 'Units Per Pack']) || '1',
-      price: pick('price', ['price', 'Sale Price']),
-      quantity: pick('quantity', ['quantity', 'Quantity']),
-      rackLocation: pick('rackLocation', ['rackLocation', 'Rack Location']),
-    });
+    setForm(importIssueForm(issue));
+    resolveMutation.reset();
     setEditing(issue);
     setMsg('');
   };
@@ -250,7 +234,6 @@ export default function MedicineImportIssues({ compact = false }) {
   // ── Pending Issues Panel ────────────────────────────────
   return (
     <section className="rounded-xl border border-amber-200 bg-amber-50 dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
-      <PageControls page={page} pages={data?.pages || 1} total={data?.total || 0} onChange={setPage} />
       <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
           <AlertTriangle size={16} /> Medicine Rows Needing Review
@@ -259,6 +242,7 @@ export default function MedicineImportIssues({ compact = false }) {
           </span>
         </div>
         <div className="flex gap-2">
+          <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)} className="rounded-lg border border-amber-400 px-3 py-1 text-xs font-bold text-amber-900 dark:text-amber-200">{expanded ? 'Hide review rows' : 'Review rows'}</button>
           {issues.length > 0 && (
             <button
               type="button"
@@ -290,10 +274,11 @@ export default function MedicineImportIssues({ compact = false }) {
         </p>
       )}
 
+      {expanded && <PageControls page={page} pages={data?.pages || 1} total={data?.total || 0} onChange={setPage} />}
       {!issues.length && !editing ? (
         <p className="px-4 pb-4 text-xs text-amber-800 dark:text-amber-400">No unresolved import rows.</p>
       ) : (
-        <div className="space-y-2 px-4 pb-4">
+        expanded && <div className="max-h-[45vh] space-y-2 overflow-y-auto overscroll-contain px-4 pb-4" aria-label="Import rows needing review">
           {issues.map((issue) => (
             <div
               key={issue._id}
@@ -302,7 +287,7 @@ export default function MedicineImportIssues({ compact = false }) {
               <div className="min-w-0">
                 <p className="truncate text-xs font-bold text-slate-800 dark:text-white">
                   Row {issue.rowNumber}:{' '}
-                  {issue.originalRow?.['Medicine Name'] || issue.originalRow?.name || '—'}
+                  {importIssueForm(issue).name || '—'}
                 </p>
                 <p className="text-[10px] text-slate-500">
                   {issue.sourceFile || 'Bulk/Excel import'} · by{' '}
@@ -338,26 +323,31 @@ export default function MedicineImportIssues({ compact = false }) {
       )}
 
       {/* Correction Form */}
-      {editing && (
+      {editing && createPortal(
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-correction-title">
         <form
+          onKeyDown={event => { if (event.key === 'Escape' && !resolveMutation.isPending) { event.stopPropagation(); setEditing(null); } }}
           onSubmit={(e) => {
             e.preventDefault();
             resolveMutation.mutate({ id: editing._id, medicine: form });
           }}
-          className="mx-4 mb-4 rounded-xl border border-amber-300 bg-white p-4 dark:border-amber-700 dark:bg-slate-800"
+          className="max-h-[85vh] w-full max-w-3xl overflow-y-auto overscroll-contain rounded-xl border border-amber-300 bg-white p-4 shadow-xl dark:border-amber-700 dark:bg-slate-800"
         >
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white">
+            <h3 id="import-correction-title" className="text-xs font-bold text-slate-900 dark:text-white">
               Correct Row {editing.rowNumber} &amp; Add
             </h3>
             <button
               type="button"
+              disabled={resolveMutation.isPending}
               onClick={() => setEditing(null)}
               className="text-xs font-semibold text-slate-500 hover:text-rose-600"
             >
               Cancel
             </button>
           </div>
+          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">For a different medicine, correct its name/company and validate. An unchanged duplicate cannot be added twice; discard that row to keep existing stock unchanged. Use Batch inventory for a new delivery of an existing medicine.</p>
+          {resolveMutation.isError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{msg}</p>}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {FIELDS.map(([key, label, type]) => (
@@ -365,13 +355,15 @@ export default function MedicineImportIssues({ compact = false }) {
                 {label}
                 {!OPTIONAL.includes(key) && <span className="text-rose-500"> *</span>}
                 <input
+                  autoFocus={key === 'name'}
+                  disabled={resolveMutation.isPending}
                   required={!OPTIONAL.includes(key)}
                   type={type}
                   min={
                     type === 'number'
                       ? ['unitsPerPack'].includes(key)
                         ? '1'
-                        : ['quantity', 'reorderLevel'].includes(key)
+                        : ['quantity', 'reorderLevel', 'price'].includes(key)
                         ? '0'
                         : '0.01'
                       : undefined
@@ -404,6 +396,7 @@ export default function MedicineImportIssues({ compact = false }) {
             {resolveMutation.isPending ? 'Validating…' : 'Validate & Add Medicine'}
           </button>
         </form>
+        </div>, document.body
       )}
     </section>
   );

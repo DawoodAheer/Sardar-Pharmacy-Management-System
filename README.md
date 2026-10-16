@@ -43,6 +43,8 @@ The initial password is `Dawood@@5786`. Change initial passwords before business
 
 ## Excel expiry dates and units
 
+Rows needing correction stay in **Medicine Rows Needing Review**. Choose **Review rows** to open a scrollable list with 10 rows per page, then **Fix & Add** to open a separate correction dialog. Corrected unique medicines are added with an audit entry. An unchanged name/company duplicate is rejected without overwriting stock; discard a repeated row, or use Batch inventory for a genuine new delivery of an existing medicine.
+
 Template/export dates use **YYYY-MM-DD**, for example `2028-05-22`. Text dates also accept **DD/MM/YYYY**, for example `22/05/2028`. Actual Excel date cells retain their date even when displayed as MM/DD/YYYY. Plain text `03/04/2028` means **3 April**, not March 4.
 
 Purchase cost is per pack; units per pack determine the unit cost. Sale price and stock quantity are per sellable unit. Optional blanks default to one unit per pack, zero stock, sale price equal to unit cost, and no expiry/manufacturer/rack. Invalid supplied values are rejected.
