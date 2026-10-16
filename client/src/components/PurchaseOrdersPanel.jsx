@@ -16,7 +16,7 @@ const STATUS_CONFIG = {
 const fmtDate = (v) =>
   v ? new Date(v).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-export default function PurchaseOrdersPanel({ compact = false }) {
+export default function PurchaseOrdersPanel() {
   const queryClient = useQueryClient();
   const [stockPage, setStockPage] = useState(1), [orderPage, setOrderPage] = useState(1);
   const [supplierOverrides, setSupplierOverrides] = useState({});

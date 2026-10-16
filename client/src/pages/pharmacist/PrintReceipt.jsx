@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
-  CheckCircle2,
   Loader2,
   Printer,
   Receipt,
@@ -348,7 +347,7 @@ const PrintReceipt = () => {
 
       {/* Clean, high-legibility thermal & paper receipt sheet */}
       <div className="receipt-sheet mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-md print:max-w-full print:rounded-none print:border-none print:p-0 print:shadow-none">
-        
+
         {/* ============================================================== */}
         {/* 1. STORE HEADER: SARDAR MEDICAL STORE ONLY */}
         {/* ============================================================== */}

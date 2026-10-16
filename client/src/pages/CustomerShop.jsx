@@ -1,5 +1,6 @@
+import useScopedPage from '../hooks/useScopedPage';
 import PageControls from '../components/PageControls';
-import { useEffect } from 'react';
+
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -137,9 +138,9 @@ const CustomerShop = () => {
   |--------------------------------------------------------------------------
   */
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search);
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useScopedPage(JSON.stringify([debouncedSearch, categoryFilter]));
 
   /*
   |--------------------------------------------------------------------------
@@ -210,7 +211,6 @@ const CustomerShop = () => {
   });
 
   const medicines = medicinePageData?.medicines || [];
-  useEffect(() => setPage(1), [debouncedSearch, categoryFilter]);
   /*
   |--------------------------------------------------------------------------
   | All medicines for categories

@@ -37,12 +37,14 @@ export default function MobileScanner() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
 
-  const [phase, setPhase] = useState('ready'); // ready | scanning | error
+  const [scannerPhase, setPhase] = useState('ready');
+  const phase = sessionId ? scannerPhase : 'error'; // ready | scanning | error
   const [wsStatus, setWsStatus] = useState('disconnected'); // connected | disconnected | reconnecting
   const [laptopConnected, setLaptopConnected] = useState(false);
   const [lastScan, setLastScan] = useState(null);
   const [scanCount, setScanCount] = useState(0);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [scannerErrorMsg, setErrorMsg] = useState('');
+  const errorMsg = sessionId ? scannerErrorMsg : 'Missing session ID. Please scan the QR code from your laptop again.';
   const [cameraStarting, setCameraStarting] = useState(false);
   const [imageScanning, setImageScanning] = useState(false);
   const [ackMsg, setAckMsg] = useState('');
@@ -70,15 +72,21 @@ export default function MobileScanner() {
     return `${protocol}//${host}/ws/scanner?sessionId=${encodeURIComponent(sessionId)}&role=mobile`;
   }, [sessionId]);
 
+  // ── Show acknowledgement banner ───────────────────────────────────────────
+  const showAck = useCallback((msg, isWarn = false) => {
+    setAckMsg({ text: msg, warn: isWarn });
+    clearTimeout(ackTimerRef.current);
+    ackTimerRef.current = setTimeout(() => setAckMsg(''), 2500);
+  }, []);
+
   // ── WebSocket connection ──────────────────────────────────────────────────
-  const connectWs = useCallback(() => {
+  const connectWs = useCallback(function connect() {
     if (!sessionId) return;
     if (
       wsRef.current?.readyState === WebSocket.OPEN ||
       wsRef.current?.readyState === WebSocket.CONNECTING
     ) return;
 
-    setWsStatus('reconnecting');
     const ws = new WebSocket(buildWsUrl());
     wsRef.current = ws;
 
@@ -115,7 +123,7 @@ export default function MobileScanner() {
           setLaptopConnected(true);
           showAck('✓ Laptop reconnected');
         }
-      } catch {}
+      } catch { /* Ignore malformed messages or an already stopped scanner. */ }
     };
 
     ws.onclose = (event) => {
@@ -134,21 +142,14 @@ export default function MobileScanner() {
       // Auto-reconnect after 2 seconds while this page remains open.
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = setTimeout(() => {
-        if (pageActiveRef.current) connectWs();
+        if (pageActiveRef.current) connect();
       }, 2000);
     };
 
     ws.onerror = () => {
       ws.close();
     };
-  }, [buildWsUrl, sessionId]);
-
-  // ── Show acknowledgement banner ───────────────────────────────────────────
-  const showAck = (msg, isWarn = false) => {
-    setAckMsg({ text: msg, warn: isWarn });
-    clearTimeout(ackTimerRef.current);
-    ackTimerRef.current = setTimeout(() => setAckMsg(''), 2500);
-  };
+  }, [buildWsUrl, sessionId, showAck]);
 
   // ── Send scan result ──────────────────────────────────────────────────────
   const sendScan = useCallback((text) => {
@@ -236,7 +237,7 @@ export default function MobileScanner() {
     } finally {
       ocrBusyRef.current = false;
     }
-  }, [sessionId]);
+  }, [sessionId, showAck]);
 
   // ── Start continuous camera scanner ──────────────────────────────────────
   const startScanner = useCallback(async () => {
@@ -301,7 +302,7 @@ export default function MobileScanner() {
     wsRef.current?.close();
     wsRef.current = null;
     if (html5QrRef.current?.isScanning) {
-      try { await html5QrRef.current.stop(); } catch {}
+      try { await html5QrRef.current.stop(); } catch { /* Ignore malformed messages or an already stopped scanner. */ }
     }
     html5QrRef.current = null;
     setPhase('ready');
@@ -310,11 +311,7 @@ export default function MobileScanner() {
 
   // ── On mount: detect cameras and connect WS ───────────────────────────────
   useEffect(() => {
-    if (!sessionId) {
-      setPhase('error');
-      setErrorMsg('Missing session ID. Please scan the QR code from your laptop again.');
-      return;
-    }
+    if (!sessionId) return;
 
     // Connect WS immediately (laptop is waiting)
     pageActiveRef.current = true;

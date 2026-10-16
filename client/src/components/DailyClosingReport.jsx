@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  CalendarCheck, RefreshCw, CreditCard, Banknote, Smartphone,
-  RotateCcw, TrendingUp, Loader2,
+  CalendarCheck, RefreshCw, Banknote, RotateCcw, TrendingUp, Loader2,
 } from 'lucide-react';
 import api from '../utils/api';
 
@@ -24,7 +23,7 @@ const money = (v) =>
     maximumFractionDigits: 2,
   });
 
-export default function DailyClosingReport({ compact = false }) {
+export default function DailyClosingReport() {
   const [date, setDate] = useState(todayStr);
 
   const [refreshMessage, setRefreshMessage] = useState('');

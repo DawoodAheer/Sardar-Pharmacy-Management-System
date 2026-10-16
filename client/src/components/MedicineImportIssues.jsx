@@ -1,6 +1,6 @@
 import { waitForJob } from '../utils/backgroundJobs';
 import PageControls from './PageControls';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { importIssueForm } from '../utils/importIssueForm';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -71,7 +71,7 @@ function PreviewRow({ row }) {
   );
 }
 
-export default function MedicineImportIssues({ compact = false }) {
+export default function MedicineImportIssues() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState(false);
@@ -145,9 +145,7 @@ export default function MedicineImportIssues({ compact = false }) {
   });
 
   const issues = data?.issues || [];
-  useEffect(() => {
-    if (data && page > Math.max(1, data.pages)) setPage(Math.max(1, data.pages));
-  }, [data, page]);
+  if (data && page > Math.max(1, data.pages)) setPage(Math.max(1, data.pages));
 
   const beginFix = (issue) => {
     setForm(importIssueForm(issue));

@@ -1,7 +1,8 @@
+import useScopedPage from '../hooks/useScopedPage';
 import useSalesPage from '../hooks/useSalesPage';
 import lazyPanel from '../components/lazyPanel';
 import useDebouncedValue from '../hooks/useDebouncedValue';
-import { useEffect, useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   useQuery,
@@ -55,7 +56,6 @@ import {
   Bell,
   Settings,
   Receipt,
-  Users,
   LogOut,
   Lock,
   User,
@@ -80,6 +80,8 @@ import {
   Clock3,
   RotateCcw,
 } from 'lucide-react';
+
+const EMPTY_LIST = [];
 
 // ============================================================================
 // HELPERS
@@ -336,7 +338,7 @@ const PharmacistDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const fileInputRef = useRef(null);
+
   const billScanInputRef = useRef(null);
   const cameraVideoRef = useRef(null);
   const cameraStreamRef = useRef(null);
@@ -355,13 +357,11 @@ const PharmacistDashboard = () => {
 
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
-  const [inventoryPage, setInventoryPage] = useState(1);
   const [customerPage, setCustomerPage] = useState(1), [pendingPage, setPendingPage] = useState(1);
   const [customerSearch, setCustomerSearch] = useState('');
   const debouncedCustomerSearch = useDebouncedValue(customerSearch);
   const [orderPage, setOrderPage] = useState(1);
   const [orderStatus, setOrderStatus] = useState('PENDING');
-  const [returnPage, setReturnPage] = useState(1);
   const [recentBillPage, setRecentBillPage] = useState(1);
   const [categoryFilter, setCategoryFilter] =
     useState('');
@@ -371,6 +371,7 @@ const PharmacistDashboard = () => {
     useState(false);
   const [medicineViewFilter, setMedicineViewFilter] =
     useState('ALL');
+  const [inventoryPage, setInventoryPage] = useScopedPage(JSON.stringify([debouncedSearch, categoryFilter, expiryStatusFilter, reorderFilter, medicineViewFilter]));
 
   // ==========================================================================
   // DETAILS
@@ -386,9 +387,8 @@ const PharmacistDashboard = () => {
     useState(null);
 
   // Sales Ranking Modal
-  const [rankingPage, setRankingPage] = useState(1);
   const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
-  useEffect(() => setRankingPage(1), [salesRankingModal]);
+  const [rankingPage, setRankingPage] = useScopedPage(salesRankingModal);
 
   // Modal states for dashboard cards
   const [isExpiryModalOpen, setIsExpiryModalOpen] = useState(false);
@@ -414,10 +414,10 @@ const PharmacistDashboard = () => {
   const [ocrPreview, setOcrPreview] =
     useState(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [cameraTarget, setCameraTarget] = useState('medicine');
+  const cameraTarget = 'medicine';
 
-  const [mobileScannerSession, setMobileScannerSession] = useState(null);
-  const [mobileScannerUrl, setMobileScannerUrl] = useState('');
+  const [, setMobileScannerSession] = useState(null);
+  const mobileScannerUrl = '';
   const [mobileScannerActive, setMobileScannerActive] = useState(false);
   const [mobileConnected, setMobileConnected] = useState(false);
   const mobilePollIntervalRef = useRef(null); // kept for cleanup
@@ -433,16 +433,14 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   const [name, setName] = useState('');
-  const [ setGenericName] =
-    useState('');
+
   const [manufacturer, setManufacturer] =
     useState('');
       const [expiryDate, setExpiryDate] =
     useState('');
   const [quantity, setQuantity] =
     useState('');
-  const [ setReorderLevel] =
-    useState('10');
+
   const [price, setPrice] =
     useState('');
   const [purchasePrice, setPurchasePrice] =
@@ -455,15 +453,14 @@ const PharmacistDashboard = () => {
     useState(null);
   const [returnModalBill, setReturnModalBill] =
     useState(null);
-  const [ setCategory] =
-    useState('Antibiotic');
-  const [ setBarcode] =
-    useState('');
+
+
   const [rackLocation, setRackLocation] =
     useState('');
   const [labelImageUrl, setLabelImageUrl] =
     useState('');
   const [refundSearchTerm, setRefundSearchTerm] = useState('');
+  const [returnPage, setReturnPage] = useScopedPage(refundSearchTerm);
 
   // ==========================================================================
   // ONLINE ORDER ACTIONS
@@ -734,7 +731,7 @@ const PharmacistDashboard = () => {
     },
   });
 
-  const bills = billPageData?.bills || [];
+  const bills = billPageData?.bills || EMPTY_LIST;
   // ==========================================================================
   // ONLINE ORDERS
   // ==========================================================================
@@ -759,9 +756,7 @@ const PharmacistDashboard = () => {
   });
 
   const onlineOrders = orderPageData?.orders || [];
-  const pendingOnlineOrders = onlineOrders.filter(
-    (order) => order?.orderStatus === 'PENDING'
-  );
+
 
   // ==========================================================================
   // SALES SUMMARY
@@ -1105,12 +1100,11 @@ const PharmacistDashboard = () => {
 
     setName(medicine?.name || '');
 
-    
 
     setManufacturer(
       medicine?.manufacturer || ''
     );
-        
+
 
     setExpiryDate(
       medicine?.expiryDate
@@ -1127,7 +1121,6 @@ const PharmacistDashboard = () => {
       medicine?.quantity ?? ''
     );
 
-    
 
     setPrice(
       medicine?.price ?? ''
@@ -1138,9 +1131,6 @@ const PharmacistDashboard = () => {
     );
     setUnitsPerPack(String(medicine?.unitsPerPack ?? 1));
 
-    
-
-    
 
     setRackLocation(
       medicine?.rackLocation || ''
@@ -1190,7 +1180,7 @@ const PharmacistDashboard = () => {
       printWindow.focus();
     } else {
       // Fallback if popup blocked
-      window.location.href = url;
+      window.location.assign(url);
     }
   };
 
@@ -1222,67 +1212,6 @@ const PharmacistDashboard = () => {
   // SALES DETAIL CALCULATIONS
   // ==========================================================================
 
-  const getSalesBills = (type) => {
-    const currentDate = new Date();
-
-    return bills.filter(
-      (bill) => {
-        if (
-          !bill?.createdAt ||
-          bill?.orderStatus === 'PENDING' ||
-          bill?.orderStatus === 'REJECTED'
-        ) {
-          return false;
-        }
-
-        const billDate =
-          new Date(
-            bill.createdAt
-          );
-
-        if (
-          Number.isNaN(
-            billDate.getTime()
-          )
-        ) {
-          return false;
-        }
-
-        if (
-          type === 'yearly' &&
-          Number(bill.netTotal ?? Math.max(0, Number(bill.total || 0) - Number(bill.totalRefunded || 0))) <= 0
-        ) {
-          return false;
-        }
-
-        if (
-          type === 'daily'
-        ) {
-          return (
-            billDate.toDateString() ===
-            currentDate.toDateString()
-          );
-        }
-
-        if (
-          type === 'monthly'
-        ) {
-          return (
-            billDate.getMonth() ===
-              currentDate.getMonth() &&
-            billDate.getFullYear() ===
-              currentDate.getFullYear()
-          );
-        }
-
-        if (type === 'yearly') {
-          return billDate.getFullYear() === currentDate.getFullYear();
-        }
-
-        return false;
-      }
-    );
-  };
 
   const selectedSalesBills = salesPage.bills;
   const selectedSalesTotal = salesDetailsType === 'daily' ? todaySales : salesDetailsType === 'monthly' ? monthlySales : yearlySales;
@@ -1390,21 +1319,6 @@ const PharmacistDashboard = () => {
   // OCR
   // ==========================================================================
 
-  const handleOcrFileChange =
-    async (event) => {
-      const file =
-        event.target.files?.[0];
-
-      if (!file) {
-        return;
-      }
-
-      await processScannedLabel(file, 'medicine');
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    };
 
   const processScannedLabel = async (file, target) => {
       const formData =
@@ -1436,7 +1350,7 @@ const PharmacistDashboard = () => {
 
         setOcrPreview({
           medicineName: data.medicineName || '',
-          
+
           expiryDate: data.expiryDate || '',
           scannedPrices: data.scannedPrices || {},
           confidence: data.confidence || 'low',
@@ -1448,9 +1362,6 @@ const PharmacistDashboard = () => {
           );
         }
 
-        if (data.genericName) {
-          
-        }
 
         if (data.manufacturer) {
           setManufacturer(
@@ -1464,9 +1375,6 @@ const PharmacistDashboard = () => {
           );
         }
 
-        if (data.barcode) {
-          
-        }
 
         if (data.rackLocation) {
           setRackLocation(
@@ -1494,7 +1402,8 @@ const PharmacistDashboard = () => {
             );
           });
           if (!match) {
-                      } else if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
+            setBillError('No matching medicine found. Search the catalog to select it.');
+          } else if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
             setBillError(`${match.name} is expired or out of stock and cannot be added to a bill.`);
           } else {
             setBillError('');
@@ -1516,33 +1425,6 @@ const PharmacistDashboard = () => {
     setCameraActive(false);
   };
 
-  const startCamera = async (target) => {
-    cameraTargetRef.current = target;
-    setCameraTarget(target);
-    setError('');
-    setBillError('');
-    if (!navigator.mediaDevices?.getUserMedia) {
-      const message = 'Live camera access is unavailable. It requires localhost or HTTPS; you can still choose an image. To use a phone camera, open the pharmacy app on the phone itself.';
-      if (target === 'bill') setBillError(message);
-      else setError(message);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' } },
-      });
-      cameraStreamRef.current = stream;
-      setCameraActive(true);
-    } catch (cameraError) {
-      const message = cameraError.name === 'NotAllowedError'
-        ? 'Camera permission was denied. Allow camera access in your browser settings and try again.'
-        : `Unable to open the camera: ${cameraError.message}`;
-      if (target === 'bill') setBillError(message);
-      else setError(message);
-    }
-  };
 
   useEffect(() => {
     if (cameraActive && cameraVideoRef.current && cameraStreamRef.current) {
@@ -1584,135 +1466,7 @@ const PharmacistDashboard = () => {
   };
 
   // ── Mobile Scanner: WebSocket-based real-time ─────────────────────────────
-  const processScanResult = (text, target) => {
-    if (!text) return;
-    const scannedNorm = String(text).trim().toLowerCase();
-
-    if (target === 'bill') {
-      const match = medicines?.find(m =>
-        String(m.barcode || '').trim().toLowerCase() === scannedNorm ||
-        String(m.name || '').trim().toLowerCase().includes(scannedNorm) ||
-        scannedNorm.includes(String(m.name || '').trim().toLowerCase())
-      );
-      if (match) {
-        if (match.expiryStatus === 'EXPIRED' || Number(match.quantity) <= 0) {
-          setBillError(`${match.name} is expired or out of stock.`);
-        } else {
-          setBillError('');
-          handleAddToBill(match);
-        }
-      } else {
-              }
-    } else {
-      // Medicine form: barcode is safe to apply directly. If it belongs to an
-      // existing inventory item, use that saved record to prefill the form.
-            const match = medicines?.find(medicine => String(medicine.barcode || '').trim().toLowerCase() === scannedNorm);
-      if (match) {
-        setName(match.name || '');
-                setManufacturer(match.manufacturer || '');
-        setExpiryDate(match.expiryDate ? new Date(match.expiryDate).toISOString().slice(0, 10) : '');
-        setPurchasePrice(match.purchasePrice ?? '');
-        setUnitsPerPack(String(match.unitsPerPack ?? 1));
-        setPrice(match.price ?? '');
-        setQuantity(match.quantity ?? '');
-                      }
-    }
-  };
-
-  const connectMobileScannerWs = (sessionId, target) => {
-    const wsHost = window.location.hostname;
-    const wsPort = window.location.port || '5173';
-    // On the laptop browser window.location.hostname is localhost, but the WS proxy handles it
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}/ws/scanner?sessionId=${encodeURIComponent(sessionId)}&role=laptop`;
-    const ws = new WebSocket(wsUrl);
-    mobileScannerWsRef.current = ws;
-
-    ws.onopen = () => {
-      setMobileConnected(false); // phone not yet connected
-    };
-    ws.onmessage = (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'mobile_connected') {
-          setMobileConnected(true);
-        }
-        if (msg.type === 'mobile_disconnected') {
-          setMobileConnected(false);
-        }
-        if (msg.type === 'scan_result') {
-          processScanResult(msg.data?. target);
-        }
-        if (msg.type === 'ocr_result' && target === 'medicine') {
-          setOcrPreview({
-            medicineName: '',
-            
-            expiryDate: '',
-            scannedPrices: {},
-            confidence: Number(msg.data?.confidence || 0) >= 55 ? 'review text' : 'low',
-            rawText: msg.data?.rawText || '',
-          });
-        }
-      } catch {}
-    };
-    ws.onclose = () => {
-      setMobileConnected(false);
-      if (mobileScannerActiveRef.current) {
-        clearTimeout(mobileScannerReconnectRef.current);
-        mobileScannerReconnectRef.current = setTimeout(() => {
-          if (mobileScannerActiveRef.current) connectMobileScannerWs(sessionId, target);
-        }, 2500);
-      }
-    };
-  };
-
-  const startMobileScanner = async (target) => {
-    try {
-      mobileScannerActiveRef.current = false;
-      if (mobileScannerReconnectRef.current) clearTimeout(mobileScannerReconnectRef.current);
-      if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
-      mobileScannerWsRef.current?.close();
-      const response = await api.get('/mobile-scanner/url', {
-        params: { frontendPort: window.location.port || '5174' },
-      });
-      const { scannerUrl, sessionId } = response.data;
-      mobileScannerActiveRef.current = true;
-      setMobileScannerUrl(scannerUrl);
-      setMobileScannerSession(sessionId);
-      setMobileScannerActive(true);
-      setMobileConnected(false);
-      cameraTargetRef.current = target;
-      connectMobileScannerWs(sessionId, target);
-      if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
-      mobilePollIntervalRef.current = setInterval(async () => {
-        try {
-          const status = await api.get(`/mobile-scanner/status/${sessionId}`);
-          if (status.data.scannerUrl) setMobileScannerUrl(status.data.scannerUrl);
-          setMobileConnected(Boolean(status.data.mobileConnected));
-          const pending = await api.get(`/mobile-scanner/results/${sessionId}`);
-          if (pending.data.result?.type === 'scan_result') {
-            processScanResult(pending.data.result.data?. target);
-          } else if (pending.data.result?.type === 'ocr_result' && target === 'medicine') {
-            setOcrPreview({
-              medicineName: '',  expiryDate: '', scannedPrices: {},
-              confidence: Number(pending.data.result.data?.confidence || 0) >= 55 ? 'review text' : 'low',
-              rawText: pending.data.result.data?.rawText || '',
-            });
-          }
-        } catch {
-          // A brief LAN interruption is reflected by the WebSocket status and retried next poll.
-        }
-      }, 5000);
-      if (target === 'bill') setBillError('');
-      else setError('');
-    } catch (err) {
-      const msg = 'Could not start mobile scanner: ' + (err.response?.data?.message || err.message);
-      if (target === 'bill') setBillError(msg);
-      else setError(msg);
-    }
-  };
-
-  const stopMobileScanner = () => {
+  const stopMobileScanner = useCallback(() => {
     mobileScannerActiveRef.current = false;
     setMobileScannerActive(false);
     setMobileScannerSession(null);
@@ -1723,16 +1477,9 @@ const PharmacistDashboard = () => {
       mobileScannerWsRef.current = null;
     }
     if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
-  };
-
-  useEffect(() => {
-    return () => {
-      mobileScannerActiveRef.current = false;
-      if (mobilePollIntervalRef.current) clearInterval(mobilePollIntervalRef.current);
-      if (mobileScannerReconnectRef.current) clearTimeout(mobileScannerReconnectRef.current);
-      if (mobileScannerWsRef.current) mobileScannerWsRef.current.close();
-    };
   }, []);
+
+  useEffect(() => stopMobileScanner, [stopMobileScanner]);
 
   // ==========================================================================
   // BULK
@@ -2243,11 +1990,6 @@ const PharmacistDashboard = () => {
   // DASHBOARD DATA
   // ==========================================================================
 
-  const now =
-    new Date();
-
-  const todayString =
-    now.toDateString();
 
   const totalMedicines = dashboardData?.inventory?.total || 0;
 
@@ -2380,8 +2122,6 @@ const PharmacistDashboard = () => {
     const text = refundSearchTerm.toLowerCase();
     return !text || [b.billNumber, b._id, b.customerName, b.customer?.name, b.customerPhone].some(value => String(value || '').toLowerCase().includes(text));
   }), [bills, refundSearchTerm]);
-  useEffect(() => setInventoryPage(1), [debouncedSearch, categoryFilter, expiryStatusFilter, reorderFilter, medicineViewFilter]);
-  useEffect(() => setReturnPage(1), [refundSearchTerm]);
   const safeInventoryPage = inventoryPage;
   const safeReturnPage = returnPage;
   const navItems = [
@@ -2690,7 +2430,7 @@ const PharmacistDashboard = () => {
 
               <MedicineImportIssues compact />
               <DailyClosingReport compact />
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6">
                 <StatCard
                   title="Stock Expiry Alerts"
@@ -5142,7 +4882,7 @@ const PharmacistDashboard = () => {
                           const totalItems = Array.isArray(bill.items)
                             ? bill.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
                             : 0;
-                          const returnsCount = Array.isArray(bill.returns) ? bill.returns.length : 0;
+
                           const isFullyReturned = bill.isFullyReturned;
                           const hasReturns = (bill.totalRefunded || 0) > 0;
 
@@ -5822,7 +5562,6 @@ const PharmacistDashboard = () => {
               </div>
 
 
-
               <div className="flex justify-end gap-2 pt-3 border-t">
 
                 <button
@@ -5934,7 +5673,7 @@ const PharmacistDashboard = () => {
                       Download Sample Excel
                     </button>
                   </div>
-                  
+
                   <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-slate-50 transition hover:bg-slate-100">
                     <Upload className="h-10 w-10 text-slate-400 mb-3" />
                     <label className="bg-white border border-slate-200 text-slate-700 shadow-sm px-4 py-2 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-50 hover:text-slate-900 transition">

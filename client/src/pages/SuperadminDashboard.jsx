@@ -1,3 +1,4 @@
+import useScopedPage from '../hooks/useScopedPage';
 import { waitForJob } from '../utils/backgroundJobs';
 import AdminBillDeleteButton from '../components/AdminBillDeleteButton';
 import useSalesPage from '../hooks/useSalesPage';
@@ -10,10 +11,10 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 
-import { useEffect } from 'react';
+
 import PageControls from '../components/PageControls';
 import api from '../utils/api';
-import { getInventoryPurchaseValue } from '../utils/medicinePricing';
+
 import { useAuth } from '../context/AuthContext';
 const ProfitDetailsModal = lazyPanel(() => import('../components/ProfitDetailsModal'));
 import MedicineImportIssues from '../components/MedicineImportIssues';
@@ -52,6 +53,8 @@ import {
   TrendingUp,
   ShoppingCart,
 } from 'lucide-react';
+
+const EMPTY_LIST = [];
 
 /* =========================================================
    HELPERS
@@ -301,80 +304,6 @@ const getDaysUntilExpiry = (medicine) => {
   );
 };
 
-const startOfToday = () => {
-  const now = new Date();
-
-  return new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    0,
-    0,
-    0,
-    0
-  );
-};
-
-const endOfToday = () => {
-  const now = new Date();
-
-  return new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    23,
-    59,
-    59,
-    999
-  );
-};
-
-const startOfCurrentMonth = () => {
-  const now = new Date();
-
-  return new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    1,
-    0,
-    0,
-    0,
-    0
-  );
-};
-
-const endOfCurrentMonth = () => {
-  const now = new Date();
-
-  return new Date(
-    now.getFullYear(),
-    now.getMonth() + 1,
-    0,
-    23,
-    59,
-    59,
-    999
-  );
-};
-
-const isDateBetween = (
-  value,
-  start,
-  end
-) => {
-  if (!value) return false;
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return false;
-  }
-
-  return (
-    date >= start &&
-    date <= end
-  );
-};
 
 /* =========================================================
    STAT CARD
@@ -456,18 +385,15 @@ export default function SuperadminDashboard() {
   const [selectedView, setSelectedView] =
     useState(null);
 
-  const [detailsPage, setDetailsPage] = useState(1);
-  useEffect(() => setDetailsPage(1), [selectedView]);
-  const [rankingPage, setRankingPage] = useState(1);
+  const [detailsPage, setDetailsPage] = useScopedPage(selectedView);
   const [salesRankingModal, setSalesRankingModal] = useState(null); // null | 'top' | 'least'
-  useEffect(() => setRankingPage(1), [salesRankingModal]);
+  const [rankingPage, setRankingPage] = useScopedPage(salesRankingModal);
 
   const [searchTerm, setSearchTerm] =
     useState('');
 
-  const [userPage, setUserPage] = useState(1);
   const userSearch = useDebouncedValue(searchTerm);
-  useEffect(() => setUserPage(1), [userSearch]);
+  const [userPage, setUserPage] = useScopedPage(userSearch);
   const administrativeView = ['deletionRequests','deletedMedicines','refundActivity','udharPaymentActivity'].includes(selectedView);
   const userView = ['users','superadmins','pharmacists','customers','pharmacistRequests'].includes(selectedView);
   const [message, setMessage] =
@@ -493,25 +419,25 @@ export default function SuperadminDashboard() {
     queryFn: async () => (await api.get('/deletion-requests', { params: { page: selectedView === 'deletionRequests' ? detailsPage : 1 } })).data,
     refetchInterval: selectedView === 'deletionRequests' ? 30000 : false,
   });
-  const deletionRequests = deletionRequestsResponse?.requests || [];
+  const deletionRequests = deletionRequestsResponse?.requests || EMPTY_LIST;
   const { data: returnActivityResponse, refetch: refetchReturnActivity } = useQuery({
     queryKey: ['adminReturnActivity', detailsPage],
     queryFn: async () => (await api.get('/bills/return-activity', { params: { page: selectedView === 'refundActivity' ? detailsPage : 1 } })).data,
     refetchInterval: false,
   });
-  const returnActivity = returnActivityResponse?.returns || [];
+  const returnActivity = returnActivityResponse?.returns || EMPTY_LIST;
   const { data: udharPaymentActivityResponse, refetch: refetchUdharPaymentActivity } = useQuery({
     queryKey: ['adminUdharPaymentActivity', detailsPage],
     queryFn: async () => (await api.get('/udhar/payment-activity', { params: { page: selectedView === 'udharPaymentActivity' ? detailsPage : 1 } })).data,
     refetchInterval: false,
   });
-  const udharPaymentActivity = udharPaymentActivityResponse?.payments || [];
+  const udharPaymentActivity = udharPaymentActivityResponse?.payments || EMPTY_LIST;
   const { data: archivedMedicinesResponse, refetch: refetchArchivedMedicines } = useQuery({
     queryKey: ['superadminDeletedMedicines', detailsPage],
     queryFn: async () => (await api.get('/medicines/deleted', { params: { page: selectedView === 'deletedMedicines' ? detailsPage : 1 } })).data,
     refetchInterval: false,
   });
-  const archivedMedicines = archivedMedicinesResponse?.medicines || [];
+  const archivedMedicines = archivedMedicinesResponse?.medicines || EMPTY_LIST;
   const reviewDeletionMutation = useMutation({
     mutationFn: async ({ requestId, decision }) => (await api.patch(`/deletion-requests/${requestId}/review`, { decision })).data,
     onSuccess: async (result) => {
@@ -605,7 +531,6 @@ export default function SuperadminDashboard() {
   ======================================================= */
 
   const {
-    data: billsResponse,
     isLoading: isBillsLoading,
     isError: isBillsError,
     refetch: refetchBills,
@@ -684,13 +609,6 @@ export default function SuperadminDashboard() {
     [medicinesResponse]
   );
 
-  const bills = useMemo(
-    () =>
-      getArrayFromResponse(
-        billsResponse
-      ),
-    [billsResponse]
-  );
 
   /* =======================================================
      USER COUNTS
@@ -856,9 +774,9 @@ export default function SuperadminDashboard() {
   ======================================================= */
 
   const salesPage = useSalesPage({ todaySales: 'daily', monthlySales: 'monthly', yearlySales: 'yearly' }[selectedView]);
-  const todayBillsList = selectedView === 'todaySales' ? salesPage.bills : [];
-  const monthlyBillsList = selectedView === 'monthlySales' ? salesPage.bills : [];
-  const yearlyBillsList = selectedView === 'yearlySales' ? salesPage.bills : [];
+  const todayBillsList = selectedView === 'todaySales' ? salesPage.bills : EMPTY_LIST;
+  const monthlyBillsList = selectedView === 'monthlySales' ? salesPage.bills : EMPTY_LIST;
+  const yearlyBillsList = selectedView === 'yearlySales' ? salesPage.bills : EMPTY_LIST;
 
   /* =======================================================
      SOLD MEDICINES
@@ -1372,7 +1290,7 @@ export default function SuperadminDashboard() {
         <MedicineImportIssues />
         <BackupRestorePanel />
         <DailyClosingReport compact />
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 my-6">
           <StatCard
             title="Stock Expiry Alerts"

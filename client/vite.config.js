@@ -27,7 +27,7 @@ export default defineConfig({
         target: `http://127.0.0.1:${apiPort}`,
         changeOrigin: true,
         secure: false,
-        configure: (proxy, _options) => {
+        configure: (proxy) => {
           proxy.on('error', (err, _req, res) => {
             // Silently ignore connection errors — these happen during nodemon
             // restarts (ECONNREFUSED) or when the server is reloading (ECONNRESET).
@@ -40,7 +40,7 @@ export default defineConfig({
               try {
                 res.writeHead(503, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ message: 'Server is starting up, please wait a moment and try again.' }));
-              } catch (_) { /* ignore */ }
+              } catch { /* ignore */ }
             }
           });
         },
@@ -49,8 +49,8 @@ export default defineConfig({
         target: `ws://127.0.0.1:${apiPort}`,
         ws: true,
         changeOrigin: true,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
             const ignored = ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'];
             if (!ignored.includes(err.code)) {
               console.log('[vite proxy ws] unexpected error:', err.message);

@@ -1,5 +1,6 @@
 import PageControls from './PageControls';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import useScopedPage from '../hooks/useScopedPage';
 import { useQuery } from '@tanstack/react-query';
 import * as XLSX from 'xlsx';
 import api from '../utils/api';
@@ -13,19 +14,16 @@ const getCurrency = (value) => {
   }).format(value || 0);
 };
 
-export default function ProfitDetailsModal({ isOpen, onClose, initialStartDate = '', initialEndDate = '' }) {
-  const [page, setPage] = useState(1);
+export default function ProfitDetailsModal(props) {
+  if (!props.isOpen) return null;
+  return <ProfitDetailsContent key={JSON.stringify([props.initialStartDate, props.initialEndDate])} {...props} />;
+}
+
+function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialEndDate = '' }) {
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
 
-  useEffect(() => {
-    if (isOpen) {
-      setStartDate(initialStartDate);
-      setEndDate(initialEndDate);
-    }
-  }, [isOpen, initialStartDate, initialEndDate]);
-
-  useEffect(() => setPage(1), [startDate, endDate]);
+  const [page, setPage] = useScopedPage(JSON.stringify([startDate, endDate]));
   const { data: report, isLoading } = useQuery({
     queryKey: ['profitDetails', startDate, endDate, page],
     queryFn: async () => {

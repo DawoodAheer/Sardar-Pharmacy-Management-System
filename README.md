@@ -91,6 +91,7 @@ Keep development and Docker instances separate. See the scripts and environment 
 
 ```powershell
 npm test
+npm run lint --prefix client -- --max-warnings 0
 npm run build --prefix client
 $env:TEST_MONGO_URI='mongodb://127.0.0.1:27017/?replicaSet=rs0&directConnection=true'
 npm run test:integration

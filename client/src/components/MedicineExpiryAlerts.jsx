@@ -69,7 +69,7 @@ function MedicineRow({ medicine }) {
   );
 }
 
-export default function MedicineExpiryAlerts({ compact = false }) {
+export default function MedicineExpiryAlerts() {
   const [page, setPage] = useState(1);
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['medicineExpiryAlerts', page],

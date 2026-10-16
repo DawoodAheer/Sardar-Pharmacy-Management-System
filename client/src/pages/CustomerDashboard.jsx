@@ -23,6 +23,8 @@ import {
   UserRound,
 } from 'lucide-react';
 
+const EMPTY_LIST = [];
+
 const formatPKR = (amount = 0) =>
   new Intl.NumberFormat('en-PK', {
     style: 'currency',
@@ -81,7 +83,7 @@ const CustomerDashboard = () => {
     enabled: Boolean(user?._id),
   });
 
-  const bills = billData?.bills || [], reminders = reminderData?.reminders || [];
+  const bills = billData?.bills || EMPTY_LIST, reminders = reminderData?.reminders || EMPTY_LIST;
   const activeReminders = useMemo(
     () => reminders.filter((reminder) => reminder.isActive),
     [reminders],

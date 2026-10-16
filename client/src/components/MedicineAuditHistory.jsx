@@ -105,7 +105,7 @@ function AuditRecord({ record }) {
   );
 }
 
-export default function MedicineAuditHistory({ compact = false }) {
+export default function MedicineAuditHistory() {
   const [page, setPage] = useState(1);
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['medicineAuditHistory', page],

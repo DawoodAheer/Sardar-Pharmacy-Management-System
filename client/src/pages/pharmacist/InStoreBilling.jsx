@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
-  ArrowLeft,
   Banknote,
   CheckCircle2,
   CreditCard,
@@ -13,7 +12,6 @@ import {
   Plus,
   Receipt,
   Search,
-  ShieldCheck,
   ShoppingCart,
   Trash2,
   User,
@@ -265,7 +263,7 @@ const InStoreBilling = () => {
         {/* Header */}
         <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm text-white sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            
+
 
             <div>
               <div className="flex flex-wrap items-center gap-2">

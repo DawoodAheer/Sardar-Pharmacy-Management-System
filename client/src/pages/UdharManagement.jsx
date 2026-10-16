@@ -1,7 +1,8 @@
+import useScopedPage from '../hooks/useScopedPage';
 import PageControls from '../components/PageControls';
-import { useEffect } from 'react';
+
 import useDebouncedValue from '../hooks/useDebouncedValue';
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -13,14 +14,11 @@ import {
   Phone,
   MapPin,
   User,
-  Calendar,
   Package,
   CheckCircle,
   Clock,
   AlertCircle,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   CreditCard,
   FileText,
   Edit3,
@@ -74,10 +72,9 @@ export default function UdharManagement() {
 
   // list state
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search);
   const [statusFilter, setStatusFilter] = useState('ALL');
-  useEffect(() => setPage(1), [debouncedSearch, statusFilter]);
+  const [page, setPage] = useScopedPage(JSON.stringify([debouncedSearch, statusFilter]));
   const [selectedRecord, setSelectedRecord] = useState(null); // detail view
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
