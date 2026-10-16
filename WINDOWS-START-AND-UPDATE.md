@@ -30,6 +30,21 @@ For a downloaded ZIP, download the latest project again and copy the source into
 
 Before updating, create and verify a backup from Operations, save a copy outside this PC, and separately copy uploaded images. Keeping backups on the same disk does not protect against that disk failing. No software can guarantee zero crashes or zero data loss.
 
+## Intentionally clearing old business data
+
+This is separate from updating. Stop/Start and a new ZIP deliberately keep existing data.
+
+1. Download/extract the latest source into your existing installation folder, preserving `.env`, uploads and backup folders. Use the folder that owns the running Docker installation.
+2. Open Docker Desktop and wait for its engine. Run `Start-Sardar-Pharmacy.bat` once and confirm the app opens. Close all pharmacy app/browser windows and ask other users to stop work.
+3. Double-click **Reset-Pharmacy-Data.bat** in that same folder. The script refuses a different installation folder.
+4. Read the warning. Type exactly **RESET PHARMACY DATA** only if you want to clear all business records: medicines/batches, bills, refunds, udhar, supplier records, cash sessions, imports and audit history. Existing login accounts and passwords remain.
+5. The script stops application writers, creates `backup-exports/before-reset-<timestamp>.archive.gz`, checks its SHA-256 copy and parses the archive, then clears business records in one database transaction. Backup/check failures prevent deletion. Keep the archive and its `.sha256` file outside this PC as well.
+6. After **Reset complete**, reopen the desktop shortcut, log in and refresh. Medicines and bills should be zero. Existing passwords still work. Re-enter business setup/settings as needed.
+
+Program files, Docker images, database collections/indexes, uploaded files and backup folders remain. No Docker volumes are removed. If reset fails, retain its backup and error message; do not use Docker Clean/Purge data, delete volumes or run `down -v`. Run the normal Start launcher if services need restarting. A large database can take time; do not interrupt a reset. A transaction failure rolls back deletion.
+
+The archive is a full MongoDB backup, not the application's JSON backup format. For recovery, stop application writers and have an operator restore it with `mongorestore --gzip --archive=<archive>` using the existing backup/restore tools; do not upload it to the JSON restore screen. Uploaded files are already preserved separately. Restoring overwrites the database state and requires a deliberate recovery decision.
+
 ## Medicine defaults
 
 Only medicine name and positive purchase cost per pack are required. Blank optional fields use: one unit per pack, zero stock, sale price equal to purchase cost per unit, no expiry, and empty manufacturer/rack. Supplied invalid optional numbers/dates are rejected instead of silently changing stock. Add stock and a sale price before billing that item when appropriate.

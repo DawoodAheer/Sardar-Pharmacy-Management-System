@@ -65,6 +65,8 @@ Use Operations to create backups and **verify recovery**. Keep verified copies o
 
 **Never use `docker compose down -v`, volume pruning or Docker Factory Reset as an update/repair step.** Stop safely using **Stop-Sardar-Pharmacy.bat**. After a crash, check whether the last bill saved before entering it again. Collect `docker compose logs --tail 100` for diagnosis; do not publish private logs/backups.
 
+To deliberately start business records again, use **Reset-Pharmacy-Data.bat** from the running installation folder. It requires typing `RESET PHARMACY DATA`, stops application writers, creates/checks a full MongoDB backup in `backup-exports`, then clears business records in a transaction while preserving login accounts/passwords and database indexes. It does not delete Docker volumes or program files. Follow [the reset instructions](WINDOWS-START-AND-UPDATE.md#intentionally-clearing-old-business-data); this is a destructive business-data reset, separate from updating. Reset guard tests: `powershell -File scripts/test-reset.ps1`; disposable Docker reset/restore checks: `powershell -File scripts/test-reset-docker.ps1`.
+
 ## Updating another laptop
 
 1. Make and verify a backup; keep a separate copy of uploaded images.
