@@ -6,7 +6,7 @@ export const MEDICINE_IMPORT_COLUMNS = [
   'Expiry date',
   'Purchase cost per pack (PKR)',
   'Units per pack',
-  'Sale price per unit (PKR)',
+  'Sale price per pack (PKR)',
   'Stock quantity (units)',
   'Rack / shelf location',
 ];
@@ -26,7 +26,7 @@ export const createMedicineInventoryWorkbook = (medicines) => {
     'Expiry date': toExpiryDate(medicine.expiryDate),
     'Purchase cost per pack (PKR)': Number(medicine.purchasePrice) || 0,
     'Units per pack': Number(medicine.unitsPerPack) || 1,
-    'Sale price per unit (PKR)': Number(medicine.price) || 0,
+    'Sale price per pack (PKR)': (Number(medicine.price) || 0) * (Number(medicine.unitsPerPack) || 1),
     'Stock quantity (units)': Number(medicine.quantity) || 0,
     'Rack / shelf location': medicine.rackLocation || '',
   }));
@@ -39,8 +39,11 @@ export const createMedicineInventoryWorkbook = (medicines) => {
     ['Use the Medicines sheet. Its columns match Add Medicine.'],
     ['Purchase cost per pack (PKR) is the full pack/bottle purchase price.'],
     ['Units per pack is tablets per box; use 1 when selling a whole bottle/pack as one unit.'],
-    ['Sale price per unit (PKR) and Stock quantity (units) are per sellable unit.'],
-    ['Expiry date format: YYYY-MM-DD or DD/MM/YYYY. Prices must be > 0; stock levels must be whole numbers.'],
+    ['Sale price per pack (PKR) is divided by Units per pack. Stock quantity is total tablets / sellable units.'],
+    ['Optional blanks: units per pack = 1; stock = 0; sale pack price = purchase pack cost; other fields stay blank.'],
+    ['Expiry date format stays YYYY-MM-DD or DD/MM/YYYY. Supplied units must be positive whole numbers; stock must be non-negative whole numbers.'],
+    ['Old sheets labelled Sale price per unit (PKR) remain supported without conversion.'],
+    ['Only Medicine name and Purchase cost per pack (PKR) are required. Purchase cost must be greater than zero.'],
   ]);
   XLSX.utils.book_append_sheet(workbook, notes, 'Instructions');
   return workbook;

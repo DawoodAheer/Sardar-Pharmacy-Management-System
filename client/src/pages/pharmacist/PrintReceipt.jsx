@@ -316,7 +316,7 @@ const PrintReceipt = () => {
 
       {/* Screen toolbar (hidden during printing) */}
       <div className="no-print mx-auto mb-4 max-w-xl px-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
           <button
             type="button"
             onClick={handleBack}
@@ -336,7 +336,7 @@ const PrintReceipt = () => {
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-900 active:scale-95 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-900 active:scale-95 transition-all"
             >
               <Printer className="h-4 w-4" />
               Print Receipt (Epson / Thermal / A4)

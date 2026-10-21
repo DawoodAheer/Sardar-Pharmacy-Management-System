@@ -217,7 +217,7 @@ const CustomerBills = () => {
   // ==========================================================================
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0f172a] text-slate-900 dark:text-slate-100 p-4 md:p-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-surface-900 text-slate-900 dark:text-slate-100 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-5">
 
         {/* ================================================================= */}
@@ -247,7 +247,7 @@ const CustomerBills = () => {
 
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+          <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700 rounded-xl shadow-xs">
 
             <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
 
@@ -279,7 +279,7 @@ const CustomerBills = () => {
 
           {/* TOTAL ORDERS */}
 
-          <div className="relative overflow-hidden bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 p-4 shadow-sm">
+          <div className="relative overflow-hidden bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 p-4 shadow-xs">
 
             <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-blue-50 dark:bg-blue-900/20" />
 
@@ -315,7 +315,7 @@ const CustomerBills = () => {
 
           {/* TOTAL ITEMS */}
 
-          <div className="relative overflow-hidden bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 p-4 shadow-sm">
+          <div className="relative overflow-hidden bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 p-4 shadow-xs">
 
             <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full bg-violet-50 dark:bg-violet-900/20" />
 
@@ -351,7 +351,7 @@ const CustomerBills = () => {
 
           {/* TOTAL VALUE */}
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-4 shadow-md text-white">
+          <div className="relative overflow-hidden bg-linear-to-br from-blue-600 to-indigo-700 rounded-2xl p-4 shadow-md text-white">
 
             <div className="absolute -right-8 -top-8 w-24 h-24 rounded-full bg-white/10" />
 
@@ -393,7 +393,7 @@ const CustomerBills = () => {
         {/* ORDERS TABLE */}
         {/* ================================================================= */}
 
-        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-xs overflow-hidden">
 
           <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 
@@ -719,7 +719,7 @@ const CustomerBills = () => {
       {modalOpen &&
         selectedBill && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
             onClick={(event) => {
               if (
                 event.target ===
@@ -734,7 +734,7 @@ const CustomerBills = () => {
 
               {/* MODAL HEADER */}
 
-              <div className="sticky top-0 z-10 bg-white/95 dark:bg-[#1a2438]/95 backdrop-blur border-b border-slate-100 dark:border-slate-700/60 px-5 py-4">
+              <div className="sticky top-0 z-10 bg-white/95 dark:bg-[#1a2438]/95 backdrop-blur-sm border-b border-slate-100 dark:border-slate-700/60 px-5 py-4">
 
                 <div className="flex items-center justify-between">
 
@@ -934,7 +934,7 @@ const CustomerBills = () => {
                                     </div>
 
                                     {item.expiryStatus && (
-                                      <span className="inline-flex mt-1 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                      <span className="inline-flex mt-1 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-sm bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                                         {
                                           item.expiryStatus
                                         }

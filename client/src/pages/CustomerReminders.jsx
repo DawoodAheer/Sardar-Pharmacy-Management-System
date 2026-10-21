@@ -526,7 +526,7 @@ const CustomerReminders = () => {
       ================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
-        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-sm">
+        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
@@ -544,7 +544,7 @@ const CustomerReminders = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-sm">
+        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
@@ -562,7 +562,7 @@ const CustomerReminders = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-sm">
+        <div className="bg-white dark:bg-[#1a2438] rounded-xl border border-slate-200 dark:border-slate-700/50 p-3 shadow-xs">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
@@ -587,9 +587,9 @@ const CustomerReminders = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
         {/* Email */}
-        <div className="bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700/50 rounded-xl p-3 shadow-sm">
+        <div className="bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700/50 rounded-xl p-3 shadow-xs">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
               <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
 
@@ -610,9 +610,9 @@ const CustomerReminders = () => {
         </div>
 
         {/* Browser */}
-        <div className="bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700/50 rounded-xl p-3 shadow-sm">
+        <div className="bg-white dark:bg-[#1a2438] border border-slate-200 dark:border-slate-700/50 rounded-xl p-3 shadow-xs">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center shrink-0">
               <Globe className="w-4 h-4 text-violet-600 dark:text-violet-400" />
             </div>
 
@@ -662,7 +662,7 @@ const CustomerReminders = () => {
       ================================================= */}
       {notifPermission !== 'granted' &&
         notifPermission !== 'unsupported' && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-800/40 flex items-center justify-center shrink-0">
@@ -733,7 +733,7 @@ const CustomerReminders = () => {
         {/* =================================================
             CREATE REMINDER
         ================================================= */}
-        <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm h-max">
+        <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs h-max">
 
           <div className="flex items-center justify-between gap-2 border-b border-slate-150 dark:border-slate-700/50 pb-3 mb-4">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
@@ -781,7 +781,7 @@ const CustomerReminders = () => {
                 className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-[#0C1628]
                   border border-slate-200 dark:border-slate-700/60
                   text-slate-900 dark:text-white
-                  focus:outline-none focus:border-[#1A56A0]
+                  focus:outline-hidden focus:border-[#1A56A0]
                   dark:focus:border-sky-400
                   text-xs disabled:opacity-60"
               >
@@ -842,7 +842,7 @@ const CustomerReminders = () => {
                     border border-slate-200 dark:border-slate-700/60
                     text-slate-900 dark:text-white
                     placeholder-slate-400 dark:placeholder-slate-500
-                    focus:outline-none focus:border-[#1A56A0]
+                    focus:outline-hidden focus:border-[#1A56A0]
                     dark:focus:border-sky-400 text-xs"
                 />
               </div>
@@ -891,7 +891,7 @@ const CustomerReminders = () => {
                   className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-slate-50 dark:bg-[#0C1628]
                     border border-slate-200 dark:border-slate-700/60
                     text-slate-900 dark:text-white
-                    text-xs focus:outline-none
+                    text-xs focus:outline-hidden
                     focus:border-[#1A56A0]
                     dark:focus:border-sky-400"
                 />
@@ -938,7 +938,7 @@ const CustomerReminders = () => {
               }
               className="w-full py-2.5 bg-[#1A56A0]
                 hover:bg-[#154b89]
-                text-white font-semibold rounded-lg shadow-sm
+                text-white font-semibold rounded-lg shadow-xs
                 transition-all text-xs flex items-center
                 justify-center gap-1.5
                 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -983,7 +983,7 @@ const CustomerReminders = () => {
           {/* =================================================
               REMINDER LIST
           ================================================= */}
-          <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+          <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs">
 
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
               <div>
@@ -1145,7 +1145,7 @@ const CustomerReminders = () => {
                                 border border-slate-200 dark:border-slate-700
                                 text-[10px] rounded-lg px-2 py-1.5
                                 text-slate-900 dark:text-slate-200
-                                focus:outline-none
+                                focus:outline-hidden
                                 focus:border-[#1A56A0]
                                 dark:focus:border-sky-400
                                 disabled:opacity-50"
@@ -1179,7 +1179,7 @@ const CustomerReminders = () => {
                                 : 'Activate reminder'
                             }
                           >
-                            <span className="w-4 h-4 bg-white rounded-full shadow-sm" />
+                            <span className="w-4 h-4 bg-white rounded-full shadow-xs" />
                           </button>
 
                           <button
@@ -1222,7 +1222,7 @@ const CustomerReminders = () => {
           {/* =================================================
               DELIVERY LOGS
           ================================================= */}
-          <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+          <div className="bg-white dark:bg-[#1a2438] p-4 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-xs">
 
             <div className="flex items-center justify-between gap-3 mb-3">
               <div>
@@ -1293,7 +1293,7 @@ const CustomerReminders = () => {
 
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`inline-flex items-center gap-1 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded border ${badge.className}`}
+                            className={`inline-flex items-center gap-1 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-sm border ${badge.className}`}
                           >
                             <TypeIcon className="w-2.5 h-2.5" />
                             {log.type || 'Notification'}

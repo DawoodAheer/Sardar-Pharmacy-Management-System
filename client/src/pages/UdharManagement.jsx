@@ -230,7 +230,7 @@ export default function UdharManagement() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/30">
               <Wallet className="h-6 w-6" />
             </div>
             <div>
@@ -244,14 +244,14 @@ export default function UdharManagement() {
             type="button"
             onClick={refreshUdhar}
             disabled={isRefreshing}
-            className="inline-flex items-center gap-2 rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="inline-flex items-center gap-2 rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 shadow-xs transition hover:bg-slate-50 disabled:opacity-60 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
           >
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             {isRefreshing ? 'Refreshing…' : 'Refresh'}
           </button>
           <button
             onClick={() => { setForm(blankForm()); setShowCreateModal(true); }}
-            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
+            className="inline-flex items-center gap-2 rounded-2xl bg-linear-to-r from-amber-500 to-orange-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95"
           >
             <Plus className="h-4 w-4" />
             Naya Udhar Likho
@@ -267,7 +267,7 @@ export default function UdharManagement() {
           { label: 'Baaki Amount', value: PKR(overall.totalPending), icon: Banknote, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
           { label: 'Total Customers', value: overall.totalCustomers || 0, icon: User, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
         ].map((c) => (
-          <div key={c.label} className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm`}>
+          <div key={c.label} className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs`}>
             <div className={`mb-2 inline-flex rounded-xl p-2 ${c.bg}`}>
               <c.icon className={`h-5 w-5 ${c.color}`} />
             </div>
@@ -290,13 +290,13 @@ export default function UdharManagement() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Naam ya number search karo..."
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-2 pl-9 pr-3 text-sm text-slate-800 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-hidden"
             >
               <option value="ALL">Sab</option>
               <option value="PENDING">Baaki</option>
@@ -323,7 +323,7 @@ export default function UdharManagement() {
                   className={`w-full rounded-xl border p-3 text-left transition-all ${
                     selectedRecord?._id === rec._id
                       ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30 shadow-md ring-1 ring-amber-400/30'
-                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-amber-300 hover:shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-amber-300 hover:shadow-xs'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -366,7 +366,7 @@ export default function UdharManagement() {
           ) : (
             <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
               {/* Detail Header */}
-              <div className="border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white">
+              <div className="border-b border-slate-100 dark:border-slate-800 bg-linear-to-r from-amber-500 to-orange-600 p-6 text-white">
                 <div className="flex flex-wrap items-start gap-4 justify-between">
                   <div>
                     <div className="flex items-center gap-2">
@@ -419,14 +419,14 @@ export default function UdharManagement() {
                 <div className="flex flex-wrap gap-2 border-b border-slate-100 dark:border-slate-800 p-4 bg-slate-50 dark:bg-slate-800/50">
                   <button
                     onClick={() => { setPayAmount(''); setPayNote(''); setShowPayModal(true); }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 transition"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition"
                   >
                     <CreditCard className="h-3.5 w-3.5" />
                     Payment Lena
                   </button>
                   <button
                     onClick={() => { setNewItem(blankItem()); setShowAddItemModal(true); }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-blue-700 transition"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     Medicine Add Karo
@@ -534,7 +534,7 @@ export default function UdharManagement() {
 
       {/* ── Create Udhar Modal ── */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="my-6 w-full max-w-2xl rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
               <div className="flex items-center gap-2">
@@ -559,7 +559,7 @@ export default function UdharManagement() {
                         value={form.customerName}
                         onChange={(e) => setForm((p) => ({ ...p, customerName: e.target.value }))}
                         placeholder="Jaise: Ali Khan"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                   </div>
@@ -571,7 +571,7 @@ export default function UdharManagement() {
                         value={form.customerPhone}
                         onChange={(e) => setForm((p) => ({ ...p, customerPhone: e.target.value }))}
                         placeholder="03xxxxxxxxx"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                   </div>
@@ -583,7 +583,7 @@ export default function UdharManagement() {
                         value={form.customerAddress}
                         onChange={(e) => setForm((p) => ({ ...p, customerAddress: e.target.value }))}
                         placeholder="Ghar ka address"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                   </div>
@@ -595,7 +595,7 @@ export default function UdharManagement() {
                         value={form.billRef}
                         onChange={(e) => setForm((p) => ({ ...p, billRef: e.target.value }))}
                         placeholder="Bill number"
-                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                        className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-9 pr-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20"
                       />
                     </div>
                   </div>
@@ -607,7 +607,7 @@ export default function UdharManagement() {
                     onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                     rows={2}
                     placeholder="Kuch zaruri notes..."
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-none resize-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-amber-500 focus:outline-hidden resize-none"
                   />
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function UdharManagement() {
                               value={item.medicineName}
                               onChange={(e) => setItem(idx, 'medicineName', e.target.value)}
                               placeholder="Medicine naam"
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-hidden"
                             />
                           </td>
                           <td className="py-1.5 pr-2">
@@ -649,7 +649,7 @@ export default function UdharManagement() {
                               type="number" min={1}
                               value={item.quantity}
                               onChange={(e) => setItem(idx, 'quantity', e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-hidden"
                             />
                           </td>
                           <td className="py-1.5 pr-2">
@@ -657,7 +657,7 @@ export default function UdharManagement() {
                               type="number" min={0}
                               value={item.unitPrice}
                               onChange={(e) => setItem(idx, 'unitPrice', e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-hidden"
                             />
                           </td>
                           <td className="py-1.5 pr-2">
@@ -665,7 +665,7 @@ export default function UdharManagement() {
                               type="date"
                               value={item.dateTaken}
                               onChange={(e) => setItem(idx, 'dateTaken', e.target.value)}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-hidden"
                             />
                           </td>
                           <td className="py-1.5 pr-2">
@@ -673,7 +673,7 @@ export default function UdharManagement() {
                               value={item.notes}
                               onChange={(e) => setItem(idx, 'notes', e.target.value)}
                               placeholder="Note"
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-none"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-2 py-1.5 text-xs text-slate-900 dark:text-white focus:border-amber-400 focus:outline-hidden"
                             />
                           </td>
                           <td className="py-1.5">
@@ -710,7 +710,7 @@ export default function UdharManagement() {
                 <button
                   onClick={handleCreate}
                   disabled={createMut.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:brightness-110 disabled:opacity-60 transition"
+                  className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-amber-500 to-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:brightness-110 disabled:opacity-60 transition"
                 >
                   {createMut.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
                   Udhar Save Karo
@@ -723,7 +723,7 @@ export default function UdharManagement() {
 
       {/* ── Payment Modal ── */}
       {showPayModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
               <div className="flex items-center gap-2">
@@ -746,7 +746,7 @@ export default function UdharManagement() {
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
                   placeholder="Kitne paisy aaye?"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-lg font-bold text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 text-lg font-bold text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-hidden"
                 />
               </div>
               <div>
@@ -755,7 +755,7 @@ export default function UdharManagement() {
                   value={payNote}
                   onChange={(e) => setPayNote(e.target.value)}
                   placeholder="Jaise: Cash payment via hand"
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-hidden"
                 />
               </div>
               {payMut.isError && (
@@ -768,7 +768,7 @@ export default function UdharManagement() {
                 <button
                   onClick={() => payMut.mutate({ id: selectedRecord._id, amount: Number(payAmount), note: payNote })}
                   disabled={payMut.isPending || !payAmount || Number(payAmount) <= 0}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-60 transition"
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-60 transition"
                 >
                   {payMut.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                   Payment Record Karo
@@ -781,7 +781,7 @@ export default function UdharManagement() {
 
       {/* ── Add Item Modal ── */}
       {showAddItemModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
               <div className="flex items-center gap-2">
@@ -807,7 +807,7 @@ export default function UdharManagement() {
                     value={newItem[f.field]}
                     min={f.type === 'number' ? 0 : undefined}
                     onChange={(e) => setNewItem((p) => ({ ...p, [f.field]: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-hidden"
                   />
                 </div>
               ))}
@@ -824,7 +824,7 @@ export default function UdharManagement() {
                 <button
                   onClick={() => addItemMut.mutate({ id: selectedRecord._id, item: { ...newItem, quantity: Number(newItem.quantity), unitPrice: Number(newItem.unitPrice) } })}
                   disabled={addItemMut.isPending || !newItem.medicineName}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-blue-700 disabled:opacity-60 transition"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-60 transition"
                 >
                   {addItemMut.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Add Karo
@@ -837,7 +837,7 @@ export default function UdharManagement() {
 
       {/* ── Edit Customer Info Modal ── */}
       {showEditModal && selectedRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4">
               <div className="flex items-center gap-2">
@@ -861,7 +861,7 @@ export default function UdharManagement() {
                     value={editForm[f.key]}
                     onChange={(e) => setEditForm((p) => ({ ...p, [f.key]: e.target.value }))}
                     placeholder={f.placeholder}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-amber-500 focus:outline-none"
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-amber-500 focus:outline-hidden"
                   />
                 </div>
               ))}
@@ -871,7 +871,7 @@ export default function UdharManagement() {
                   value={editForm.notes}
                   onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-amber-500 focus:outline-none resize-none"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:border-amber-500 focus:outline-hidden resize-none"
                 />
               </div>
               <div className="flex gap-2 justify-end pt-1">
@@ -879,7 +879,7 @@ export default function UdharManagement() {
                 <button
                   onClick={() => updateMut.mutate({ id: selectedRecord._id, data: editForm })}
                   disabled={updateMut.isPending}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow hover:bg-amber-700 disabled:opacity-60 transition"
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-60 transition"
                 >
                   {updateMut.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                   Update Karo

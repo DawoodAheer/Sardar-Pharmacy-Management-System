@@ -1,7 +1,7 @@
 {
   "name": "pharmadesk-server",
   "version": "1.0.0",
-  "description": "Pharmadesk API server \u2014 Express + MongoDB backend",
+  "description": "Pharmadesk API server — Express + MongoDB backend",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -21,12 +21,15 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
+    "exceljs": "4.4.0",
     "express": "^4.19.2",
+    "express-rate-limit": "8.7.1",
+    "helmet": "8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.4.1",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.13",
+    "nodemailer": "10.1.7",
     "pdfkit": "^0.15.0",
     "qrcode": "^1.5.4",
     "tesseract.js": "^5.1.0",
@@ -34,5 +37,13 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.3"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "11.1.1"
+    },
+    "node-cron": {
+      "uuid": "11.1.1"
+    }
   }
 }

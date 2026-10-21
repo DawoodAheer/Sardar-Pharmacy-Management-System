@@ -10,7 +10,7 @@ const getCurrency = (value) => {
   return new Intl.NumberFormat('en-PK', {
     style: 'currency',
     currency: 'PKR',
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(value || 0);
 };
 
@@ -50,6 +50,9 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
       'Medicine Name',
       'Avg Purchase Cost / Unit',
       'Avg Sale Price / Unit',
+      'Profit / Unit (after discount)',
+      'Profit / Pack Equivalent (current pack size)',
+      'Units / Pack',
       'Quantity Sold',
       'Remaining Stock',
       'Total Purchase Cost',
@@ -61,6 +64,9 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
       row.name,
       row.purchasePrice || 0,
       row.salePrice || 0,
+      row.totalProfit / row.quantitySold,
+      (row.totalProfit / row.quantitySold) * (row.unitsPerPack || 1),
+      row.unitsPerPack || 1,
       row.quantitySold || 0,
       row.remainingStock || 0,
       row.totalCost || 0,
@@ -72,6 +78,7 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
       'ALL-PAGES TOTAL SUMMARY',
       '',
       '',
+      '', '', '',
       totals.quantitySold,
       totals.remainingStock,
       totals.totalCost,
@@ -103,12 +110,12 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-7xl overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-slate-900">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
           <div>
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Profit Details Breakdown</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">View detailed purchase rate, sale rate, stock & profit margins per medicine.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Profit includes discounts and refunds. Pack equivalent uses the current inventory pack size; costs come from the saved sale.</p>
           </div>
           <button
             onClick={onClose}
@@ -125,14 +132,14 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               />
               <span className="text-slate-500 text-sm">to</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm outline-hidden dark:border-slate-700 dark:bg-slate-800 dark:text-white"
               />
             </div>
             <button
@@ -147,13 +154,13 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
 
           <PageControls page={page} pages={report?.pages || 1} total={report?.total || 0} onChange={setPage} />
         <div className="h-[420px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-left text-sm text-slate-500 dark:text-slate-400">
-              <thead className="sticky top-0 bg-slate-100 uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300 z-10 shadow-sm">
+            <table className="min-w-[1300px] w-full text-left text-sm text-slate-500 dark:text-slate-400">
+              <thead className="sticky top-0 bg-slate-100 uppercase text-slate-700 dark:bg-slate-800 dark:text-slate-300 z-10 shadow-xs">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Medicine</th>
                   <th className="px-4 py-3 font-semibold">Avg. Purchase Cost / Unit</th>
                   <th className="px-4 py-3 font-semibold">Avg. Sale Price / Unit</th>
-                  <th className="px-4 py-3 font-semibold text-center">Qty Sold</th>
+                  <th className="px-4 py-3 font-semibold">Profit / tablet or unit</th><th className="px-4 py-3 font-semibold">Profit / pack equivalent</th><th className="px-4 py-3 font-semibold">Units / pack</th><th className="px-4 py-3 font-semibold text-center">Qty Sold</th>
                   <th className="px-4 py-3 font-semibold text-center">Remaining Stock</th>
                   <th className="px-4 py-3 font-semibold">Total Cost</th>
                   <th className="px-4 py-3 font-semibold">Discount</th>
@@ -164,13 +171,13 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 bg-white dark:bg-slate-900">
                 {isLoading ? (
                   <tr>
-                    <td colSpan="9" className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan="12" className="px-6 py-12 text-center text-slate-500">
                       Loading profit data...
                     </td>
                   </tr>
                 ) : !data || data.length === 0 ? (
                   <tr>
-                    <td colSpan="9" className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan="12" className="px-6 py-12 text-center text-slate-500">
                       No sales data found for this period.
                     </td>
                   </tr>
@@ -183,6 +190,9 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
                       </td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{getCurrency(item.purchasePrice)}</td>
                       <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{getCurrency(item.salePrice)}</td>
+                      <td className={`px-4 py-3 ${item.totalProfit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{getCurrency(item.totalProfit / item.quantitySold)}</td>
+                      <td className={`px-4 py-3 ${item.totalProfit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{getCurrency(item.totalProfit / item.quantitySold * (item.unitsPerPack || 1))}</td>
+                      <td className="px-4 py-3">{item.unitsPerPack || 1}</td>
                       <td className="px-4 py-3 text-center font-medium text-slate-800 dark:text-slate-200">{item.quantitySold}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
@@ -208,7 +218,7 @@ function ProfitDetailsContent({ isOpen, onClose, initialStartDate = '', initialE
               {data && data.length > 0 && (
                 <tfoot className="sticky bottom-0 bg-slate-100 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white shadow-md">
                   <tr>
-                    <td className="px-4 py-3 uppercase text-xs tracking-wider" colSpan="3">
+                    <td className="px-4 py-3 uppercase text-xs tracking-wider" colSpan="6">
                       OVERALL TOTAL
                     </td>
                     <td className="px-4 py-3 text-center text-blue-600 dark:text-blue-400">

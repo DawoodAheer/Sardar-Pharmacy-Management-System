@@ -89,7 +89,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         
         {/* HEADER */}
@@ -185,7 +185,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                     onClick={() => setAdjustmentType('ADD')}
                     className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition ${
                       adjustmentType === 'ADD'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
                     }`}
                   >
@@ -198,7 +198,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                     onClick={() => setAdjustmentType('SUBTRACT')}
                     className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition ${
                       adjustmentType === 'SUBTRACT'
-                        ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                        ? 'bg-red-600 text-white border-red-600 shadow-xs'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
                     }`}
                   >
@@ -211,7 +211,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                     onClick={() => setAdjustmentType('SET')}
                     className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold border transition ${
                       adjustmentType === 'SET'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200'
                     }`}
                   >
@@ -233,7 +233,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="e.g. 10"
                   required
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs outline-hidden focus:border-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
@@ -264,7 +264,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Specify custom reason..."
                   required
-                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs outline-none focus:border-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs outline-hidden focus:border-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </div>
 
@@ -280,7 +280,7 @@ export default function StockAdjustmentModal({ isOpen, onClose, medicine }) {
                 <button
                   type="submit"
                   disabled={adjustMutation.isPending}
-                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-blue-700 disabled:opacity-50"
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
                 >
                   {adjustMutation.isPending ? 'Updating...' : 'Save Stock Adjustment'}
                 </button>

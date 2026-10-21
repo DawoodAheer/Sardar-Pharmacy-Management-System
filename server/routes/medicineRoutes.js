@@ -1,6 +1,8 @@
+import {approveDuplicateStock} from '../controllers/duplicateStockController.js';
 import express from 'express';
 import {
   getAllMedicines,
+  getMedicine,
   createMedicine,
   updateMedicine,
   deleteMedicine,
@@ -44,6 +46,7 @@ router.post(
 // Bulk import - restricted to pharmacist or superadmin
 router.post('/bulk', authorize('pharmacist', 'superadmin'), bulkImportMedicines);
 router.get('/import-issues', authorize('pharmacist', 'superadmin'), getMedicineImportIssues);
+router.post('/import-issues/:id/approve-stock', authorize('superadmin'), approveDuplicateStock);
 router.post('/import-issues/:id/resolve', authorize('pharmacist', 'superadmin'), resolveMedicineImportIssue);
 router.delete('/import-issues', authorize('pharmacist', 'superadmin'), discardAllMedicineImportIssues);
 router.delete('/import-issues/:id', authorize('pharmacist', 'superadmin'), discardMedicineImportIssue);
@@ -64,6 +67,7 @@ router
 
 router
   .route('/:id')
+  .get(authorize('pharmacist', 'superadmin'), getMedicine)
   .put(authorize('pharmacist', 'superadmin'), updateMedicine)
   .delete(authorize('superadmin'), deleteMedicine);
 

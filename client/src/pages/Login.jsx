@@ -303,7 +303,7 @@ const Login = () => {
 
         <div className="flex items-center gap-3 relative z-10">
 
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
             <Activity className="w-5 h-5 text-white" />
           </div>
 
@@ -335,7 +335,7 @@ const Login = () => {
               management,
             </span>
 
-            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">
+            <span className="block bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-teal-400">
               built for safety.
             </span>
 
@@ -352,7 +352,7 @@ const Login = () => {
         {/* STATISTICS                                                    */}
         {/* ============================================================ */}
 
-        <div className="border border-slate-800/80 bg-slate-900/30 backdrop-blur-sm p-6 rounded-2xl relative z-10">
+        <div className="border border-slate-800/80 bg-slate-900/30 backdrop-blur-xs p-6 rounded-2xl relative z-10">
 
           <div className="grid grid-cols-3 gap-4 divide-x divide-slate-800/80 text-center">
 
@@ -470,7 +470,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "pharmacist"
-                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-xs shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -487,7 +487,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "superadmin"
-                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-xs shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -504,7 +504,7 @@ const Login = () => {
               }}
               className={`py-2.5 px-3 text-xs font-bold rounded-xl border transition-all text-center disabled:opacity-60 disabled:cursor-not-allowed ${
                 role === "customer"
-                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-sm shadow-teal-500/10"
+                  ? "border-teal-600 bg-teal-50 text-teal-700 shadow-xs shadow-teal-500/10"
                   : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -548,7 +548,7 @@ const Login = () => {
                   }}
                   placeholder="you@example.com"
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
 
               </div>
@@ -596,7 +596,7 @@ const Login = () => {
                   }}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-hidden focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                 />
 
                 <button
@@ -633,7 +633,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3 px-4 bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 text-white font-bold rounded-xl transition-all duration-300 shadow-md flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed text-sm mt-6"
+              className="w-full py-3 px-4 bg-linear-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 text-white font-bold rounded-xl transition-all duration-300 shadow-md flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed text-sm mt-6"
             >
 
               {isSubmitting ? (

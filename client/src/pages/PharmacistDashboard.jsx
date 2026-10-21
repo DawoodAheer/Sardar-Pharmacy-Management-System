@@ -1,3 +1,4 @@
+import SalesPeriodReport from '../components/SalesPeriodReport';
 import useScopedPage from '../hooks/useScopedPage';
 import useSalesPage from '../hooks/useSalesPage';
 import lazyPanel from '../components/lazyPanel';
@@ -13,6 +14,8 @@ import PageControls from '../components/PageControls';
 import api from '../utils/api';
 import { waitForJob } from '../utils/backgroundJobs';
 import { getPurchaseCostPerUnit } from '../utils/medicinePricing';
+import { packUnitPrice, validBillLine } from '../utils/billingPack';
+import CounterBillLine from '../components/CounterBillLine';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 const ProfitDetailsModal = lazyPanel(() => import('../components/ProfitDetailsModal'));
@@ -274,7 +277,7 @@ const StatCard = ({
     <button
       type="button"
       onClick={onClick}
-      className="group relative w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
+      className="group relative w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
     >
       {hasNotification && (
         <span className="absolute right-4 top-4 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
@@ -601,6 +604,10 @@ const PharmacistDashboard = () => {
 
   const [confirmedBill, setConfirmedBill] =
     useState(null);
+  const [counterStockSaving, setCounterStockSaving] = useState('');
+  const [medicineNotice,setMedicineNotice] = useState('');
+  const [expandedBillItem, setExpandedBillItem] = useState(null);
+  const [counterNotice, setCounterNotice] = useState('');
 
   // ==========================================================================
   // NOTIFICATIONS
@@ -935,7 +942,9 @@ const PharmacistDashboard = () => {
         return response.data;
       },
 
-      onSuccess: () => {
+      onSuccess: (result) => {
+        setMedicineNotice(result.approvalRequired ? result.message : 'Medicine saved.');
+        queryClient.invalidateQueries({queryKey:['medicineImportIssues']});
         queryClient.invalidateQueries({
           queryKey: ['medicines'],
         });
@@ -1123,7 +1132,7 @@ const PharmacistDashboard = () => {
 
 
     setPrice(
-      medicine?.price ?? ''
+      medicine?.price == null ? '' : medicine.price * (medicine.unitsPerPack || 1)
     );
 
     setPurchasePrice(
@@ -1283,7 +1292,7 @@ const PharmacistDashboard = () => {
     }
 
     const packSize = unitsPerPack === '' || unitsPerPack == null ? 1 : Number(unitsPerPack);
-    const saleValue = price === '' || price == null ? Number((purchaseValue / packSize).toFixed(2)) : Number(price);
+    const saleValue = price === '' || price == null ? purchaseValue / packSize : Number(price) / packSize;
     const stockQty = quantity === '' || quantity == null ? 0 : Number(quantity);
     if (!Number.isInteger(packSize) || packSize < 1 || !Number.isFinite(saleValue) || saleValue < 0 || !Number.isInteger(stockQty) || stockQty < 0) {
       setError('Units per pack must be a positive whole number; stock must be a non-negative whole number and sale price must be non-negative. Leave optional fields blank to use defaults.');
@@ -1499,7 +1508,7 @@ const PharmacistDashboard = () => {
       const job = await waitForJob((await api.post('/jobs/inventory-export')).data);
       const { data } = await api.get(`/jobs/${job.jobId}/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(data), link = document.createElement('a');
-      link.href = url; link.download = 'medicine_inventory.csv'; link.click(); URL.revokeObjectURL(url);
+      link.href = url; link.download = 'medicine_inventory.xlsx'; link.click(); URL.revokeObjectURL(url);
     } catch (exportError) {
       setError(
         exportError.response?.data?.message ||
@@ -1595,6 +1604,8 @@ const PharmacistDashboard = () => {
   const handleAddToBill = (
     medicine
   ) => {
+    if (isBillingPending || counterStockSaving || medicine.expiryStatus === 'EXPIRED') return;
+    setExpandedBillItem(medicine._id);
     setBillItems(
       (previous) => {
         const existing =
@@ -1606,7 +1617,7 @@ const PharmacistDashboard = () => {
 
         const availableQuantity =
           Number(
-            medicine.quantity ||
+            existing?.quantity ?? medicine.quantity ??
               0
           );
 
@@ -1628,8 +1639,9 @@ const PharmacistDashboard = () => {
               medicine._id
                 ? {
                     ...item,
+                    saleMode: 'units',
                     billQuantity:
-                      item.billQuantity +
+                      Number(item.billQuantity) +
                       1,
                   }
                 : item
@@ -1640,74 +1652,50 @@ const PharmacistDashboard = () => {
           ...previous,
           {
             ...medicine,
-            salePrice: Number(medicine.price) || 0,
+            inventoryUnitsPerPack: Number(medicine.unitsPerPack) || 1,
+            unitsPerPack: String(medicine.unitsPerPack || 1),
+            packSalePrice: String((Number(medicine.price) || 0) * (medicine.unitsPerPack || 1)),
             billQuantity: 1,
+            stockDraft: String(medicine.quantity),
           },
         ];
       }
     );
   };
 
-  const incrementQty = (id) => {
-    setBillItems(
-      (previous) =>
-        previous.map(
-          (item) => {
-            if (
-              item._id !== id
-            ) {
-              return item;
-            }
+  const updateBillItem = (id, changes) => setBillItems(previous => previous.map(item => item._id === id ? { ...item, ...changes } : item));
 
-            if (
-              item.billQuantity >=
-              Number(
-                item.quantity ||
-                  0
-              )
-            ) {
-              alert(
-                `Only ${
-                  item.quantity ||
-                  0
-                } units available`
-              );
-
-              return item;
-            }
-
-            return {
-              ...item,
-              billQuantity:
-                item.billQuantity +
-                1,
-            };
-          }
-        )
-    );
+  const saveCounterStock = async item => {
+    if (counterStockSaving || isBillingPending) return;
+    const amount = Number(item.stockDraft);
+    if (String(item.stockDraft).trim() === '' || !Number.isSafeInteger(amount) || amount < 0) {
+      setBillError('Enter a whole, non-negative counted stock.'); return;
+    }
+    setCounterStockSaving(item._id); setBillError('');
+    try {
+      const { data } = await api.post('/medicines/' + item._id + '/adjust-stock', {
+        adjustmentType: 'SET', amount, expectedQuantity: item.quantity,
+        reason: 'Physical count at billing counter',
+      });
+      updateBillItem(item._id, { quantity: data.medicine.quantity, stockDraft: String(data.medicine.quantity), stockEditing: false });
+      setCounterNotice(item.name + ': stock saved as ' + data.medicine.quantity + ' units.');
+      await queryClient.invalidateQueries();
+    } catch (err) { setBillError(err.response?.data?.message || 'Stock correction failed.'); }
+    finally { setCounterStockSaving(''); }
   };
 
-  const decrementQty = (id) => {
-    setBillItems(
-      (previous) =>
-        previous
-          .map(
-            (item) =>
-              item._id === id
-                ? {
-                    ...item,
-                    billQuantity:
-                      item.billQuantity -
-                      1,
-                  }
-                : item
-          )
-          .filter(
-            (item) =>
-              item.billQuantity >
-              0
-          )
-    );
+  const refreshCounterStock = async () => {
+    if (counterStockSaving || isBillingPending) return;
+    setCounterStockSaving('refresh'); setBillError('');
+    try {
+      const refreshed = await Promise.all(billItems.map(async item => {
+        const { data } = await api.get('/medicines/' + item._id);
+        return { ...item, quantity: data.quantity, stockDraft: String(data.quantity), expiryStatus: data.expiryStatus, stockEditing: false };
+      }));
+      setBillItems(refreshed); await queryClient.invalidateQueries();
+      setCounterNotice('Stock refreshed. Check the counts before saving the bill.');
+    } catch (err) { setBillError(err.response?.data?.message || 'Stock refresh failed.'); }
+    finally { setCounterStockSaving(''); }
   };
 
   const removeFromBill = (id) => {
@@ -1724,7 +1712,7 @@ const PharmacistDashboard = () => {
     (sum, item) =>
       sum +
       Number(
-        item.salePrice ?? item.price ?? 0
+        packUnitPrice(item.packSalePrice, item.unitsPerPack) ?? 0
       ) *
         Number(
           item.billQuantity ||
@@ -1750,6 +1738,10 @@ const PharmacistDashboard = () => {
 
       setBillError('');
 
+      if (isBillingPending || counterStockSaving) return;
+      if (billItems.some(item => item.stockEditing || !validBillLine({ ...item, quantity: item.billQuantity, stock: item.quantity }))) {
+        setBillError('Check pack prices, whole units and stock. Save changed stock counts first.'); return;
+      }
       if (
         billItems.length ===
         0
@@ -1825,13 +1817,10 @@ const PharmacistDashboard = () => {
                       item.name,
 
                     quantity:
-                      item.billQuantity,
+                      Number(item.billQuantity),
 
-                    unitPrice:
-                      item.salePrice ?? item.price,
-
-                    salePrice:
-                      item.salePrice ?? item.price,
+                    packSalePrice: Number(item.packSalePrice),
+                    unitsPerPack: Number(item.unitsPerPack),
 
                     expiryStatus:
                       item.expiryStatus,
@@ -1850,6 +1839,7 @@ const PharmacistDashboard = () => {
         setSelectedCustomerId('');
         setCustomerName('');
         setGuestPhone('');
+        setCounterNotice('');
 
         await queryClient.invalidateQueries({ queryKey: ['dailyClosingReport'] });
         await queryClient.invalidateQueries({ queryKey: ['operations'] });
@@ -2181,7 +2171,7 @@ const PharmacistDashboard = () => {
   // ==========================================================================
 
   return (
-    <div className="pharmacist-dashboard min-h-screen bg-[var(--page-bg)] text-[var(--text-body)]">
+    <div className="pharmacist-dashboard min-h-screen bg-(--page-bg) text-(--text-body)">
 
       {/* MOBILE OVERLAY */}
 
@@ -2192,23 +2182,23 @@ const PharmacistDashboard = () => {
               false
             )
           }
-          className="fixed inset-0 z-20 bg-slate-950/70 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-20 bg-slate-950/70 backdrop-blur-xs md:hidden"
         />
       )}
 
       {/* SIDEBAR */}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-[210px] border-r border-slate-200 bg-white/95 shadow-sm transition-transform dark:border-slate-700 dark:bg-slate-900/95 ${
+        className={`fixed inset-y-0 left-0 z-30 w-[210px] border-r border-slate-200 bg-white/95 shadow-xs transition-transform dark:border-slate-700 dark:bg-slate-900/95 ${
           isSidebarMobileOpen
             ? 'translate-x-0'
             : '-translate-x-full'
         } md:translate-x-0`}
       >
 
-        <div className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-teal-50 to-emerald-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-900">
+        <div className="flex items-center gap-3 border-b border-slate-200 bg-linear-to-r from-teal-50 to-emerald-50 p-4 dark:border-slate-700 dark:from-slate-900 dark:to-slate-900">
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 text-lg font-bold text-white shadow-sm shadow-teal-500/20">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-teal-600 to-emerald-500 text-lg font-bold text-white shadow-xs shadow-teal-500/20">
             Rx
           </div>
 
@@ -2254,7 +2244,7 @@ const PharmacistDashboard = () => {
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-all ${
                     active
-                      ? 'bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-bold shadow-sm shadow-teal-500/20'
+                      ? 'bg-linear-to-r from-teal-600 to-emerald-500 text-white font-bold shadow-xs shadow-teal-500/20'
                       : 'text-slate-600 hover:bg-teal-50 hover:text-teal-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   }`}
                 >
@@ -2314,7 +2304,7 @@ const PharmacistDashboard = () => {
 
         {/* HEADER */}
 
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-900/20 bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 px-6 py-3.5 shadow-md backdrop-blur-md dark:border-teal-500/20 dark:from-slate-950 dark:via-teal-950 dark:to-slate-950">
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-emerald-900/20 bg-linear-to-r from-emerald-900 via-teal-900 to-slate-900 px-6 py-3.5 shadow-md backdrop-blur-md dark:border-teal-500/20 dark:from-slate-950 dark:via-teal-950 dark:to-slate-950">
 
           <div className="flex items-center gap-3">
 
@@ -2335,7 +2325,7 @@ const PharmacistDashboard = () => {
                 Sardar Medical Store Operations
               </div>
 
-              <div className="text-base font-bold capitalize text-white drop-shadow-sm">
+              <div className="text-base font-bold capitalize text-white drop-shadow-xs">
                 {activeTab.replace(
                   '-',
                   ' '
@@ -2397,7 +2387,7 @@ const PharmacistDashboard = () => {
           {activeTab === 'dashboard' && (
             <div className="space-y-5">
               {/* SECTION BANNER */}
-              <div className="section-banner bg-gradient-to-r from-teal-800 via-teal-700 to-emerald-600 p-6 rounded-2xl shadow-sm border border-teal-600/30 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="section-banner bg-linear-to-r from-teal-800 via-teal-700 to-emerald-600 p-6 rounded-2xl shadow-xs border border-teal-600/30 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/30 text-emerald-100 text-[10px] font-bold uppercase tracking-wider border border-emerald-400/30">Pharmacy Operations</span>
@@ -2411,7 +2401,7 @@ const PharmacistDashboard = () => {
                     <RefreshCw className={`w-4 h-4 text-emerald-200 ${isDashboardRefreshing ? 'animate-spin' : ''}`} />
                     {isDashboardRefreshing ? 'Refreshing…' : 'Refresh'}
                   </button>
-                  <button onClick={() => setActiveTab('new-bill')} className="bg-white text-emerald-950 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl shadow-sm border border-emerald-100 flex items-center gap-2 text-xs transition-all cursor-pointer">
+                  <button onClick={() => setActiveTab('new-bill')} className="bg-white text-emerald-950 hover:bg-emerald-50 font-bold px-4 py-2.5 rounded-xl shadow-xs border border-emerald-100 flex items-center gap-2 text-xs transition-all cursor-pointer">
                     <Receipt className="w-4 h-4 text-emerald-700" />
                     New Bill POS
                   </button>
@@ -2430,6 +2420,7 @@ const PharmacistDashboard = () => {
 
               <MedicineImportIssues compact />
               <DailyClosingReport compact />
+              <SalesPeriodReport />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 my-6">
                 <StatCard
@@ -2468,7 +2459,7 @@ const PharmacistDashboard = () => {
                   onClick={
                     showAllMedicines
                   }
-                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-blue-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs hover:shadow-md hover:border-blue-300 transition"
                 >
 
                   <div className="flex justify-between">
@@ -2505,7 +2496,7 @@ const PharmacistDashboard = () => {
                   onClick={
                     showExpiredMedicines
                   }
-                  className="text-left bg-white p-4 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition"
+                  className="text-left bg-white p-4 rounded-2xl border border-red-100 shadow-xs hover:shadow-md transition"
                 >
 
                   <div className="flex justify-between">
@@ -2540,7 +2531,7 @@ const PharmacistDashboard = () => {
 
                 <button
                   onClick={showExpiringSixMonths}
-                  className="text-left bg-white p-4 rounded-2xl border border-orange-100 shadow-sm hover:shadow-md transition"
+                  className="text-left bg-white p-4 rounded-2xl border border-orange-100 shadow-xs hover:shadow-md transition"
                 >
 
                   <div className="flex justify-between">
@@ -2579,7 +2570,7 @@ const PharmacistDashboard = () => {
                       'daily'
                     )
                   }
-                  className="text-left bg-white p-4 rounded-2xl border border-violet-100 shadow-sm hover:shadow-md transition"
+                  className="text-left bg-white p-4 rounded-2xl border border-violet-100 shadow-xs hover:shadow-md transition"
                 >
 
                   <div className="flex justify-between">
@@ -2618,7 +2609,7 @@ const PharmacistDashboard = () => {
                       'daily'
                     )
                   }
-                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-emerald-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs hover:shadow-md hover:border-emerald-300 transition"
                 >
 
                   <div className="text-[10px] uppercase font-bold text-emerald-600">
@@ -2664,7 +2655,7 @@ const PharmacistDashboard = () => {
                       'monthly'
                     )
                   }
-                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-blue-300 transition"
+                  className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs hover:shadow-md hover:border-blue-300 transition"
                 >
 
                   <div className="text-[10px] uppercase font-bold text-blue-600">
@@ -2702,7 +2693,7 @@ const PharmacistDashboard = () => {
 
                 </button>
 
-                <button type="button" onClick={() => openSalesDetails('yearly')} className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm hover:shadow-md hover:border-violet-300 transition">
+                <button type="button" onClick={() => openSalesDetails('yearly')} className="text-left bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs hover:shadow-md hover:border-violet-300 transition">
                   <div className="text-[10px] uppercase font-bold text-violet-600">Yearly Sales · {new Date().getFullYear()}</div>
                   <div className="flex justify-between items-end mt-2">
                     <div>
@@ -2723,7 +2714,7 @@ const PharmacistDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setSalesRankingModal('top')}
-                  className="text-left bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-sm hover:shadow-md hover:border-emerald-400 transition group"
+                  className="text-left bg-linear-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800 shadow-xs hover:shadow-md hover:border-emerald-400 transition group"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -2748,7 +2739,7 @@ const PharmacistDashboard = () => {
                 <button
                   type="button"
                   onClick={() => setSalesRankingModal('least')}
-                  className="text-left bg-gradient-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-rose-200 dark:border-rose-800 shadow-sm hover:shadow-md hover:border-rose-400 transition group"
+                  className="text-left bg-linear-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 p-4 rounded-2xl border border-rose-200 dark:border-rose-800 shadow-xs hover:shadow-md hover:border-rose-400 transition group"
                 >
                   <div className="flex justify-between items-start">
                     <div>
@@ -2772,7 +2763,7 @@ const PharmacistDashboard = () => {
               </div>
 
               {/* PROFIT ANALYTICS SUMMARY CARD */}
-              <div className="mt-4 p-5 bg-gradient-to-r from-emerald-900 to-teal-900 rounded-2xl text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="mt-4 p-5 bg-linear-to-r from-emerald-900 to-teal-900 rounded-2xl text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <h3 className="font-bold text-base flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -2786,7 +2777,7 @@ const PharmacistDashboard = () => {
                 </div>
                 <button
                   onClick={() => { setProfitDateRange({ startDate: '', endDate: '' }); setIsProfitModalOpen(true); }}
-                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow"
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition flex items-center gap-2 shrink-0 shadow-sm"
                 >
                   <BarChart className="w-4 h-4" />
                   View Medicine Profit Details
@@ -2795,7 +2786,7 @@ const PharmacistDashboard = () => {
 
               {/* QUICK ACTIONS */}
 
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs">
 
                 <div className="mb-3">
 
@@ -2873,7 +2864,7 @@ const PharmacistDashboard = () => {
 
               {/* CHART */}
 
-              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs">
 
                 <div className="flex justify-between mb-5">
 
@@ -2900,6 +2891,7 @@ const PharmacistDashboard = () => {
                   <ResponsiveContainer
                     width="100%"
                     height="100%"
+                    initialDimension={{ width: 320, height: 280 }}
                   >
 
                     <BarChart
@@ -2955,7 +2947,7 @@ const PharmacistDashboard = () => {
 
               {/* TOP 100 EXPIRY */}
 
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs overflow-hidden">
 
                 <div className="p-5 border-b flex items-center justify-between gap-3">
 
@@ -3158,7 +3150,7 @@ const PharmacistDashboard = () => {
 
               {/* RECENT BILLS */}
 
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs overflow-hidden">
 
                 <div className="p-5 border-b flex items-center justify-between">
 
@@ -3345,7 +3337,7 @@ const PharmacistDashboard = () => {
             'orders' && (
             <div className="space-y-4">
 
-              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+              <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs dark:bg-slate-900 dark:border-slate-700">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h2 className="font-bold text-sm">
@@ -3370,14 +3362,14 @@ const PharmacistDashboard = () => {
 
               <div className="mb-3"><select aria-label="Order status" value={orderStatus} onChange={e => { setOrderStatus(e.target.value); setOrderPage(1); }}><option value="PENDING">Pending orders</option><option value="ACCEPTED">Accepted orders</option><option value="REJECTED">Rejected orders</option><option value="">All orders</option></select><PageControls page={orderPage} pages={orderPageData?.pages || 1} total={orderPageData?.total || 0} onChange={setOrderPage} /></div>
               {isOrdersLoading ? (
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-xs dark:bg-slate-900 dark:border-slate-700">
                   <RefreshCw className="w-6 h-6 animate-spin text-blue-600 mx-auto" />
                   <p className="text-xs text-slate-600 dark:text-slate-400 mt-3">
                     Loading customer orders...
                   </p>
                 </div>
               ) : onlineOrders.length === 0 ? (
-                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-sm dark:bg-slate-900 dark:border-slate-700">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 p-10 text-center shadow-xs dark:bg-slate-900 dark:border-slate-700">
                   <ClipboardList className="w-8 h-8 text-slate-300 mx-auto" />
                   <p className="text-sm font-bold mt-3">
                     No customer orders yet
@@ -3395,7 +3387,7 @@ const PharmacistDashboard = () => {
                     return (
                       <div
                         key={order?._id}
-                        className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm p-4 dark:bg-slate-900 dark:border-slate-700"
+                        className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs p-4 dark:bg-slate-900 dark:border-slate-700"
                       >
                         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                           <div className="min-w-0 flex-1">
@@ -3512,9 +3504,10 @@ const PharmacistDashboard = () => {
             'medicines' && (
             <div className="space-y-4">
 
+              {medicineNotice && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{medicineNotice}</p>}
               <MedicineImportIssues />
 
-              <div className="section-banner p-4 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="section-banner p-4 rounded-2xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
 
                 <div>
 
@@ -3533,11 +3526,11 @@ const PharmacistDashboard = () => {
                   <button
                     onClick={exportAllMedicines}
                     disabled={isExportingMedicines}
-                    className="inline-flex items-center gap-2 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50 disabled:opacity-60"
+                    className="inline-flex items-center gap-2 rounded-lg bg-white! px-3 py-2 text-xs font-bold text-emerald-900! shadow-xs transition hover:bg-emerald-50! disabled:opacity-60"
                     title="Download all medicines as an Excel backup"
                   >
-                    <Download className="h-4 w-4 !text-emerald-700" />
-                    {isExportingMedicines ? 'Exporting…' : 'Export CSV for Excel'}
+                    <Download className="h-4 w-4 text-emerald-700!" />
+                    {isExportingMedicines ? 'Exporting…' : 'Export Excel'}
                   </button>
 
                   <button
@@ -3548,12 +3541,12 @@ const PharmacistDashboard = () => {
 
                       refetchMeds();
                     }}
-                    className="flex items-center justify-center rounded-lg !bg-white px-3 py-2 !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
+                    className="flex items-center justify-center rounded-lg bg-white! px-3 py-2 text-emerald-900! shadow-xs transition hover:bg-emerald-50!"
                     disabled={isMedsFetching}
                     title="Refresh"
                     aria-label="Refresh medicine inventory"
                   >
-                    <RefreshCw className={`h-4 w-4 !text-emerald-700 ${isMedsFetching ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`h-4 w-4 text-emerald-700! ${isMedsFetching ? 'animate-spin' : ''}`} />
                   </button>
 
                   <button
@@ -3570,7 +3563,7 @@ const PharmacistDashboard = () => {
                         false
                       );
                     }}
-                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
+                    className="rounded-lg bg-white! px-3 py-2 text-xs font-bold text-emerald-900! shadow-xs transition hover:bg-emerald-50!"
                   >
                     All
                   </button>
@@ -3584,7 +3577,7 @@ const PharmacistDashboard = () => {
                         'ALL'
                       );
                     }}
-                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-rose-700 shadow-sm transition hover:!bg-rose-50"
+                    className="rounded-lg bg-white! px-3 py-2 text-xs font-bold text-rose-700! shadow-xs transition hover:bg-rose-50!"
                   >
                     Expired
                   </button>
@@ -3593,7 +3586,7 @@ const PharmacistDashboard = () => {
                     onClick={
                       showLowStockMedicines
                     }
-                    className="rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-amber-800 shadow-sm transition hover:!bg-amber-50"
+                    className="rounded-lg bg-white! px-3 py-2 text-xs font-bold text-amber-800! shadow-xs transition hover:bg-amber-50!"
                   >
                     Low Stock
                   </button>
@@ -3604,9 +3597,9 @@ const PharmacistDashboard = () => {
                         true
                       )
                     }
-                    className="flex items-center gap-1 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
+                    className="flex items-center gap-1 rounded-lg bg-white! px-3 py-2 text-xs font-bold text-emerald-900! shadow-xs transition hover:bg-emerald-50!"
                   >
-                    <Upload className="h-3.5 w-3.5 !text-emerald-700" />
+                    <Upload className="h-3.5 w-3.5 text-emerald-700!" />
                     Bulk
                   </button>
 
@@ -3614,9 +3607,9 @@ const PharmacistDashboard = () => {
                     onClick={
                       openAddModal
                     }
-                    className="flex items-center gap-1 rounded-lg !bg-white px-3 py-2 text-xs font-bold !text-emerald-900 shadow-sm transition hover:!bg-emerald-50"
+                    className="flex items-center gap-1 rounded-lg bg-white! px-3 py-2 text-xs font-bold text-emerald-900! shadow-xs transition hover:bg-emerald-50!"
                   >
-                    <Plus className="h-3.5 w-3.5 !text-emerald-700" />
+                    <Plus className="h-3.5 w-3.5 text-emerald-700!" />
                     Add Medicine
                   </button>
 
@@ -3658,7 +3651,7 @@ const PharmacistDashboard = () => {
               {billItems.length > 0 && (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-emerald-500/30 bg-emerald-50 p-4 dark:bg-emerald-950/40 shadow-md">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
                       <ShoppingCart className="h-5 w-5" />
                     </div>
                     <div>
@@ -3683,7 +3676,7 @@ const PharmacistDashboard = () => {
 
               <PageControls page={safeInventoryPage} pages={Math.ceil((medicinePageData?.total || 0) / 50)} total={medicinePageData?.total || 0} onChange={setInventoryPage} />
               <p className="mb-3 text-xs text-slate-500">Manufacturer A–Z · medicine name A–Z within each company</p>
-              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs grid grid-cols-1 md:grid-cols-4 gap-3">
 
                 <div className="relative md:col-span-2">
 
@@ -3701,7 +3694,7 @@ const PharmacistDashboard = () => {
                       );
                     }}
                     placeholder="Search medicine, generic name, manufacturer or rack..."
-                    className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-600 dark:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
+                    className="w-full pl-12 pr-4 py-3 border-2 border-slate-200 rounded-xl text-sm font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-600 dark:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-4 focus:ring-blue-100"
                   />
 
                 </div>
@@ -3813,7 +3806,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs overflow-hidden">
 
                 <div className="p-4 border-b flex items-center justify-between">
 
@@ -3981,7 +3974,7 @@ const PharmacistDashboard = () => {
                               <td className="p-3">
 
                                 <div className="flex flex-col items-start gap-1">
-                                  <span className={`rounded px-2 py-1 text-[10px] font-bold whitespace-nowrap ${getStockBadgeClass(getStockStatus(medicine.quantity))}`}>
+                                  <span className={`rounded-sm px-2 py-1 text-[10px] font-bold whitespace-nowrap ${getStockBadgeClass(getStockStatus(medicine.quantity))}`}>
                                     {getStockStatus(medicine.quantity)}
                                   </span>
                                   <ExpiryBadge status={medicine.expiryStatus} />
@@ -4066,10 +4059,10 @@ const PharmacistDashboard = () => {
 
           {activeTab ===
             'new-bill' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-[600px]">
+            <fieldset disabled={isBillingPending || Boolean(counterStockSaving)} className="grid min-w-0 grid-cols-1 lg:grid-cols-2 gap-4 min-h-[600px]">
 
 
-              <div className="bg-white rounded-2xl border shadow-sm overflow-hidden flex flex-col">
+              <div className="bg-white rounded-2xl border shadow-xs overflow-hidden flex flex-col">
 
                 <div className="p-4 border-b flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -4078,9 +4071,9 @@ const PharmacistDashboard = () => {
                       Search by name, rack, or barcode
                     </p>
                   </div>
-                  <button type="button" onClick={() => { refetchMeds(); refetchBills(); }} disabled={isMedsFetching || isBillsFetching} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800 ml-auto">
+                  <button type="button" onClick={refreshCounterStock} disabled={isMedsFetching || isBillsFetching || Boolean(counterStockSaving)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800 ml-auto">
                     <RefreshCw className={`inline w-3.5 h-3.5 mr-1 ${isMedsFetching || isBillsFetching ? 'animate-spin' : ''}`} />
-                    {isMedsFetching || isBillsFetching ? 'Refreshing…' : 'Refresh'}
+                    {isMedsFetching || isBillsFetching || counterStockSaving === 'refresh' ? 'Refreshing…' : 'Refresh stock'}
                   </button>
                   <div className="flex flex-wrap gap-2">
                     <input
@@ -4159,10 +4152,6 @@ const PharmacistDashboard = () => {
                     (medicine) => {
 
                       const disabled =
-                        Number(
-                          medicine.quantity ||
-                            0
-                        ) === 0 ||
                         medicine.expiryStatus ===
                           'EXPIRED';
 
@@ -4232,7 +4221,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white rounded-2xl border shadow-sm flex flex-col overflow-hidden lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
+              <div className="bg-white rounded-2xl border shadow-xs flex flex-col overflow-hidden lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
 
                 <div className="p-4 border-b">
 
@@ -4303,7 +4292,7 @@ const PharmacistDashboard = () => {
 
                 <button
                   onClick={handleConfirmBill}
-                  disabled={isBillingPending || billItems.length === 0}
+                  disabled={isBillingPending || Boolean(counterStockSaving) || billItems.length === 0 || billItems.some(item => item.stockEditing || !validBillLine({ ...item, quantity: item.billQuantity, stock: item.quantity }))}
                   className="mx-4 mt-4 w-[calc(100%-2rem)] py-2.5 bg-blue-700 text-white rounded-xl text-xs font-bold disabled:opacity-40"
                 >
                   {isBillingPending ? 'Processing...' : 'Commit & Post Bill'}
@@ -4330,102 +4319,11 @@ const PharmacistDashboard = () => {
 
                   ) : (
 
-                    billItems.map(
-                      (item) => (
-                        <div
-                          key={
-                            item._id
-                          }
-                          className="p-3 border-b flex justify-between items-center"
-                        >
+                    billItems.map((item, index) => <CounterBillLine key={item._id} item={item} number={index + 1} expanded={expandedBillItem === item._id} onToggle={() => setExpandedBillItem(current => current === item._id ? null : item._id)}
+                      disabled={isBillingPending || Boolean(counterStockSaving)} saving={counterStockSaving === item._id}
+                      onChange={changes => updateBillItem(item._id, changes)}
+                      onSaveStock={() => saveCounterStock(item)} onRemove={() => removeFromBill(item._id)} />)
 
-                          <div>
-
-                            <div className="text-xs font-bold">
-                              {
-                                item.name
-                              }
-                            </div>
-
-                            <div className="text-[10px] text-slate-600 dark:text-slate-400">
-                              {
-                                item.billQuantity
-                              }{' '}
-                              ×{' '}
-                              {getCurrency(item.salePrice ?? item.price)}
-                            </div>
-                            <div className="mt-2 flex flex-col gap-1">
-                              <span className="text-[10px] text-slate-400">Cost/unit (fixed): {getCurrency(item.purchasePrice)}</span>
-                              <label className="flex items-center gap-2">
-                                <span className="text-lg font-extrabold text-slate-800 dark:text-slate-200 whitespace-nowrap">Sale Price (PKR):</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.salePrice ?? item.price}
-                                  onChange={(event) => {
-                                    const nextPrice = event.target.value;
-                                    setBillItems((previous) =>
-                                      previous.map((line) =>
-                                        line._id === item._id
-                                          ? { ...line, salePrice: Number(nextPrice) }
-                                          : line
-                                      )
-                                    );
-                                  }}
-                                  className="flex-1 min-w-0 rounded-xl border-2 border-blue-600 bg-blue-100 px-4 py-3 text-xl font-bold text-blue-900 focus:border-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                                />
-                              </label>
-                            </div>
-
-                          </div>
-
-                          <div className="flex items-center gap-1">
-
-                            <button
-                              onClick={() =>
-                                decrementQty(
-                                  item._id
-                                )
-                              }
-                              className="w-6 h-6 border rounded"
-                            >
-                              -
-                            </button>
-
-                            <span className="w-6 text-center text-xs">
-                              {
-                                item.billQuantity
-                              }
-                            </span>
-
-                            <button
-                              onClick={() =>
-                                incrementQty(
-                                  item._id
-                                )
-                              }
-                              className="w-6 h-6 border rounded"
-                            >
-                              +
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                removeFromBill(
-                                  item._id
-                                )
-                              }
-                              className="w-6 h-6 text-red-500"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mx-auto" />
-                            </button>
-
-                          </div>
-
-                        </div>
-                      )
-                    )
 
                   )}
 
@@ -4458,6 +4356,7 @@ const PharmacistDashboard = () => {
 
                   </div>
 
+                  {counterNotice && <p role="status" className="rounded-lg bg-emerald-50 p-2 text-xs text-emerald-800">{counterNotice}</p>}
                   {billError && (
                     <div className="p-2 bg-red-50 text-red-700 rounded-lg text-xs">
                       {
@@ -4498,7 +4397,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-            </div>
+            </fieldset>
           )}
 
           {/* ================================================================= */}
@@ -4512,7 +4411,7 @@ const PharmacistDashboard = () => {
 
 
               {currentUser?.role === 'superadmin' && pendingCustomers.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-sm">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 shadow-xs">
                   <div className="flex items-center justify-between gap-3 mb-3">
                     <div>
                       <h3 className="font-bold text-sm text-amber-900">
@@ -4567,7 +4466,7 @@ const PharmacistDashboard = () => {
                 </div>
               )}
 
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs overflow-hidden">
 
               <div className="p-5 border-b">
 
@@ -4663,7 +4562,7 @@ const PharmacistDashboard = () => {
 
                             <td className="p-3">
 
-                              <span className="text-[10px] bg-slate-100 rounded px-2 py-1 uppercase">
+                              <span className="text-[10px] bg-slate-100 rounded-sm px-2 py-1 uppercase">
                                 {
                                   customer.role
                                 }
@@ -4745,7 +4644,7 @@ const PharmacistDashboard = () => {
                     key={
                       item.number
                     }
-                    className="bg-white p-4 rounded-2xl border shadow-sm flex items-center justify-between"
+                    className="bg-white p-4 rounded-2xl border shadow-xs flex items-center justify-between"
                   >
 
                     <div className="flex items-center gap-3">
@@ -4813,7 +4712,7 @@ const PharmacistDashboard = () => {
           {/* ================================================================= */}
           {activeTab === 'returns' && (
             <div className="space-y-4">
-              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
@@ -4836,7 +4735,7 @@ const PharmacistDashboard = () => {
                       value={refundSearchTerm}
                       onChange={(e) => setRefundSearchTerm(e.target.value)}
                       placeholder="Search bill #, customer, phone..."
-                      className="pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-amber-500 w-64"
+                      className="pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-hidden focus:border-amber-500 w-64"
                     />
                   </div>
                   <button
@@ -4853,7 +4752,7 @@ const PharmacistDashboard = () => {
 
               <PageControls page={safeReturnPage} pages={billPageData?.pages || 1} total={billPageData?.total || 0} onChange={setReturnPage} />
               {/* BILLS LIST FOR RETURNS */}
-              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-sm overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-slate-200 dark:border-gray-800 shadow-xs overflow-hidden">
                 <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Original Sales Bills ({bills.filter((b) => b?.orderStatus !== 'PENDING' && b?.orderStatus !== 'REJECTED').length})
@@ -4917,15 +4816,15 @@ const PharmacistDashboard = () => {
                               </td>
                               <td className="p-3">
                                 {isFullyReturned ? (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
                                     Fully Returned (-{getCurrency(bill.totalRefunded)})
                                   </span>
                                 ) : hasReturns ? (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
                                     Partial Return (-{getCurrency(bill.totalRefunded)})
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                                     No Returns
                                   </span>
                                 )}
@@ -4987,12 +4886,12 @@ const PharmacistDashboard = () => {
             <div className="max-w-xl mx-auto space-y-4">
 
               {currentUser?.role === 'superadmin' && (
-                <button type="button" onClick={() => navigate('/superadmin')} className="w-full rounded-xl bg-teal-700 px-4 py-3 text-left text-sm font-bold text-white shadow-sm hover:bg-teal-800">
+                <button type="button" onClick={() => navigate('/superadmin')} className="w-full rounded-xl bg-teal-700 px-4 py-3 text-left text-sm font-bold text-white shadow-xs hover:bg-teal-800">
                   Admin Settings · Open User Control Panel
                 </button>
               )}
 
-              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs">
 
                 <div className="flex items-center gap-3">
 
@@ -5037,7 +4936,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs">
 
                 <div className="flex items-center gap-2 mb-4">
 
@@ -5095,7 +4994,7 @@ const PharmacistDashboard = () => {
 
               </div>
 
-              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-sm">
+              <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-slate-200 dark:border-gray-800 text-slate-900 dark:text-slate-50 shadow-xs">
 
                 <div className="flex items-center gap-2 mb-4">
 
@@ -5230,7 +5129,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {mobileScannerActive && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900 text-center relative">
             <button type="button" onClick={stopMobileScanner} className="absolute right-4 top-4 rounded-full p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
               <X className="h-5 w-5" />
@@ -5286,7 +5185,7 @@ const PharmacistDashboard = () => {
       )}
 
       {cameraActive && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-xs">
           <div className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-2xl dark:bg-slate-900">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -5327,7 +5226,7 @@ const PharmacistDashboard = () => {
       )}
 
       {medModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-y-auto">
 
@@ -5497,7 +5396,7 @@ const PharmacistDashboard = () => {
                 </label>
 
                 <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  Sale price per unit (PKR) (Optional)
+                  Sale price per pack (PKR) (Optional)
                   <input
                     type="number"
                     step="0.01"
@@ -5521,7 +5420,7 @@ const PharmacistDashboard = () => {
                 </label>
               </div>
               <p className="-mt-2 text-[10px] text-slate-500">
-                Sale and stock are per tablet/unit. Unit purchase cost is pack cost divided by units per pack; e.g. PKR 100 divided by 10 tablets = PKR 10 per tablet.
+                Enter full pack prices. Selling rate and purchase cost are divided by units per pack. Stock is counted in tablets / units.
               </p>
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -5531,12 +5430,13 @@ const PharmacistDashboard = () => {
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800/60">
                   <span className="text-slate-500">Profit per tablet/unit</span>
-                  <strong className={`ml-2 ${Number(price) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack) < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                    {getCurrency((Number(price) || 0) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack))}
+                  <strong className={`ml-2 ${(Number(price) / (Number(unitsPerPack) || 1)) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack) < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    {getCurrency(((price === '' || price == null ? (Number(purchasePrice) || 0) : Number(price)) / (Number(unitsPerPack) || 1)) - getPurchaseCostPerUnit(purchasePrice, unitsPerPack))}
                   </strong>
                 </div>
               </div>
-              {Number(purchasePrice) > 0 && Number(unitsPerPack) > 0 && Number(price) > 0 && Number(price) < getPurchaseCostPerUnit(purchasePrice, unitsPerPack) && (
+              <p className="text-xs font-semibold text-teal-700">Sale / tablet: {getCurrency((price === '' || price == null ? (Number(purchasePrice) || 0) : Number(price)) / (Number(unitsPerPack) || 1))} · Profit / pack: {getCurrency((price === '' || price == null ? (Number(purchasePrice) || 0) : Number(price)) - (Number(purchasePrice) || 0))}</p>
+              {Number(purchasePrice) > 0 && Number(unitsPerPack) > 0 && Number(price) > 0 && (Number(price) / (Number(unitsPerPack) || 1)) < getPurchaseCostPerUnit(purchasePrice, unitsPerPack) && (
                 <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                   Warning: this tablet/unit will be sold below its purchase cost.
                 </p>
@@ -5602,7 +5502,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {bulkModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-5">
 
@@ -5652,14 +5552,14 @@ const PharmacistDashboard = () => {
                 <button
                   type="button"
                   onClick={() => { setImportMode('excel'); setBulkPreviewResult(null); }}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'excel' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'excel' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   Excel File Upload
                 </button>
                 <button
                   type="button"
                   onClick={() => { setImportMode('json'); setBulkPreviewResult(null); }}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'json' ? 'bg-white shadow-sm text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-md transition ${importMode === 'json' ? 'bg-white shadow-xs text-blue-700' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   JSON Upload
                 </button>
@@ -5668,7 +5568,7 @@ const PharmacistDashboard = () => {
               {importMode === 'excel' ? (
                 <>
                   <div className="flex justify-between items-center mb-2">
-                    <p className="text-xs text-slate-500">Upload Excel file (.xlsx) with medicine data.</p>
+                    <p className="text-xs text-slate-500">Upload Excel with sale price per pack. Only medicine name and purchase cost per pack are required.</p>
                     <button type="button" onClick={downloadExcelTemplate} className="text-blue-600 hover:text-blue-800 underline text-xs font-semibold transition">
                       Download Sample Excel
                     </button>
@@ -5676,7 +5576,7 @@ const PharmacistDashboard = () => {
 
                   <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-center bg-slate-50 transition hover:bg-slate-100">
                     <Upload className="h-10 w-10 text-slate-400 mb-3" />
-                    <label className="bg-white border border-slate-200 text-slate-700 shadow-sm px-4 py-2 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-50 hover:text-slate-900 transition">
+                    <label className="bg-white border border-slate-200 text-slate-700 shadow-xs px-4 py-2 rounded-lg text-sm font-bold cursor-pointer hover:bg-slate-50 hover:text-slate-900 transition">
                       Select Excel File
                       <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleFileUpload} />
                     </label>
@@ -5694,17 +5594,18 @@ const PharmacistDashboard = () => {
                   rows={10}
                   value={bulkJson}
                   onChange={(event) => { setBulkJson(event.target.value); setBulkPreviewResult(null); }}
-                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "purchasePrice": 400,\n    "unitsPerPack": 20,\n    "price": 25,\n    "quantity": 500,\n    "rackLocation": "R-02-B"\n  }\n]`}
+                  placeholder={`[\n  {\n    "name": "Panadol 500mg",\n    "manufacturer": "GSK",\n    "expiryDate": "2028-01-01",\n    "purchasePrice": 400,\n    "unitsPerPack": 20,\n    "packSalePrice": 500,\n    "quantity": 500,\n    "rackLocation": "R-02-B"\n  }\n]`}
                   className="w-full border rounded-lg p-3 font-mono text-xs"
                 />
               )}
 
+              <p className="text-xs text-slate-600">Bulk format: name and purchasePrice are required. packSalePrice is the full pack sale price; unitsPerPack divides it into the tablet/unit rate. Optional blanks: unitsPerPack = 1, quantity = 0, packSalePrice = purchasePrice. Manufacturer, expiry and rack can stay blank.</p>
               {bulkPreviewResult && (
                 <div className="max-h-72 overflow-auto rounded-xl border border-blue-200 bg-blue-50 p-3">
                   <p className="text-xs font-bold text-blue-900">Preview: {bulkPreviewResult.validCount} valid · {bulkPreviewResult.invalidCount} skipped / need correction · {bulkPreviewResult.totalRows} total</p>
                   <p className="mt-1 text-[10px] text-blue-800">Valid rows will be imported after confirmation. Invalid rows are saved for Admin and Pharmacist review.</p>
                   <div className="mt-2 space-y-1">
-                    {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
+                    {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/pack {Number.isFinite(row.medicine.price) && Number.isFinite(row.medicine.unitsPerPack) ? row.medicine.price * row.medicine.unitsPerPack : '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
                     {bulkPreviewResult.rows.length > 80 && <p className="text-[10px] text-slate-600">Showing first 80 rows. {bulkPreviewResult.rows.length - 80} more rows are included in the preview validation.</p>}
                   </div>
                 </div>
@@ -5715,7 +5616,7 @@ const PharmacistDashboard = () => {
                 disabled={
                     bulkParsing || bulkImportMutation.isPending || (importMode === 'excel' ? (!bulkFile || bulkData.length === 0) : !bulkJson.trim())
                 }
-                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold shadow hover:brightness-110 disabled:opacity-50 transition"
+                className="w-full py-2.5 bg-linear-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold shadow-sm hover:brightness-110 disabled:opacity-50 transition"
               >
                 {
                   bulkImportMutation.isPending
@@ -5736,7 +5637,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {selectedMedicine && (
-        <div className="fixed inset-0 z-[60] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-60 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
 
@@ -6102,7 +6003,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {salesDetailsType && (
-        <div className="fixed inset-0 z-[65] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-65 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-5xl rounded-2xl shadow-xl max-h-[92vh] overflow-hidden">
 
@@ -6460,7 +6361,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {selectedBill && (
-        <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-70 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl max-h-[90vh] overflow-hidden">
 
@@ -6765,7 +6666,7 @@ const PharmacistDashboard = () => {
       {/* ===================================================================== */}
 
       {confirmedBill && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
 
           <div className="relative bg-white w-full max-w-md rounded-2xl shadow-xl p-6">
 
@@ -6934,11 +6835,11 @@ const PharmacistDashboard = () => {
       {/* MEDICINE SALES RANKING MODAL */}
       {/* ================================================================= */}
       {salesRankingModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
 
             {/* Header */}
-            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-rose-600 to-orange-600'}`}>
+            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-linear-to-r from-emerald-600 to-teal-600' : 'bg-linear-to-r from-rose-600 to-orange-600'}`}>
               <div>
                 <div className="text-[10px] uppercase font-bold text-white/70 tracking-widest">Medicine Performance</div>
                 <h3 className="text-base font-extrabold text-white mt-0.5">
@@ -7025,7 +6926,7 @@ const PharmacistDashboard = () => {
       )}
       {/* Expiry Alerts Modal */}
       {isExpiryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsExpiryModalOpen(false)}
@@ -7040,7 +6941,7 @@ const PharmacistDashboard = () => {
 
       {/* Purchase Orders Modal */}
       {isPurchaseOrdersModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsPurchaseOrdersModalOpen(false)}
@@ -7055,7 +6956,7 @@ const PharmacistDashboard = () => {
 
       {/* Audit History Modal */}
       {isAuditHistoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsAuditHistoryModalOpen(false)}

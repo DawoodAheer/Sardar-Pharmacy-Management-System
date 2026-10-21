@@ -18,8 +18,8 @@ const Unauthorized = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-48px)] flex items-center justify-center bg-[var(--page-bg)] px-4 transition-colors duration-200">
-      <div className="max-w-md w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="min-h-[calc(100vh-48px)] flex items-center justify-center bg-(--page-bg) px-4 transition-colors duration-200">
+      <div className="max-w-md w-full rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xs dark:border-slate-700 dark:bg-slate-900">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-rose-100 border border-rose-200 text-rose-600 dark:bg-rose-950/30 dark:border-rose-800 dark:text-rose-300 mb-4 animate-pulse">
           <ShieldAlert className="w-6 h-6" />
         </div>

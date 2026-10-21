@@ -128,7 +128,7 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-teal-950 px-4 py-12 text-slate-800 sm:px-6 lg:px-8">
+    <div className="relative flex min-h-screen items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-teal-950 px-4 py-12 text-slate-800 sm:px-6 lg:px-8">
       {/* Background ambient glows */}
       <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-teal-500/10 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-20 -right-20 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -136,7 +136,7 @@ const ResetPassword = () => {
       <div className="relative w-full max-w-md">
         {/* Header */}
         <div className="mb-8 text-center">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white shadow-lg shadow-teal-500/20">
+          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-tr from-teal-500 to-emerald-400 text-white shadow-lg shadow-teal-500/20">
             <Activity className="h-7 w-7" />
           </div>
           <h1
@@ -177,7 +177,7 @@ const ResetPassword = () => {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 py-3 text-sm font-bold text-slate-950 shadow-lg transition hover:brightness-110"
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-teal-500 to-emerald-500 py-3 text-sm font-bold text-slate-950 shadow-lg transition hover:brightness-110"
               >
                 Sign In Now
               </button>
@@ -210,7 +210,7 @@ const ResetPassword = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="name@pharmacy.com"
-                          className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                          className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-4 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
                         />
                       </div>
                     </div>
@@ -230,7 +230,7 @@ const ResetPassword = () => {
                           value={otp}
                           onChange={(e) => setOtp(e.target.value)}
                           placeholder="123456"
-                          className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-4 font-mono text-sm tracking-widest text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                          className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-4 font-mono text-sm tracking-widest text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
                         />
                       </div>
                     </div>
@@ -253,7 +253,7 @@ const ResetPassword = () => {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                      className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
                     />
                     <button
                       type="button"
@@ -300,7 +300,7 @@ const ResetPassword = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                      className="block w-full rounded-xl border border-slate-700 bg-slate-900/60 py-3 pl-11 pr-11 text-sm text-white placeholder-slate-500 transition focus:border-teal-500 focus:bg-slate-900 focus:outline-hidden focus:ring-2 focus:ring-teal-500/20"
                     />
                     <button
                       type="button"
@@ -322,7 +322,7 @@ const ResetPassword = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:brightness-110 disabled:opacity-50"
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-linear-to-r from-teal-500 to-emerald-500 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:brightness-110 disabled:opacity-50"
                 >
                   {loading ? (
                     <>

@@ -34,7 +34,7 @@ export function medicineProfitStages() {
     ...profitStages().slice(0, 5),
     { $set: { netQty: { $max: [0, { $subtract: ['$items.quantity', '$returnedQty'] }] }, itemSales: { $round: [{ $max: [0, { $subtract: [{ $subtract: [gross, discount] }, refund] }] }, 2] } } },
     { $match: { netQty: { $gt: 0 } } },
-    { $group: { _id: '$items.medicineId', name: { $first: '$items.name' }, remainingStock: { $first: { $ifNull: [{ $arrayElemAt: ['$medicine.quantity', 0] }, 0] } }, quantitySold: { $sum: '$netQty' }, totalCost: { $sum: '$itemCost' }, totalSales: { $sum: '$itemSales' }, grossSales: { $sum: { $multiply: ['$netQty', { $ifNull: ['$items.salePrice', '$items.unitPrice'] }] } } } },
+    { $group: { _id: '$items.medicineId', name: { $first: '$items.name' }, unitsPerPack: { $first: { $max: [1, { $ifNull: [{ $arrayElemAt: ['$medicine.unitsPerPack', 0] }, 1] }] } }, remainingStock: { $first: { $ifNull: [{ $arrayElemAt: ['$medicine.quantity', 0] }, 0] } }, quantitySold: { $sum: '$netQty' }, totalCost: { $sum: '$itemCost' }, totalSales: { $sum: '$itemSales' }, grossSales: { $sum: { $multiply: ['$netQty', { $ifNull: ['$items.salePrice', '$items.unitPrice'] }] } } } },
     { $set: { medicineId: '$_id', purchasePrice: { $divide: ['$totalCost', '$quantitySold'] }, salePrice: { $divide: ['$grossSales', '$quantitySold'] }, totalDiscount: { $subtract: ['$grossSales', '$totalSales'] }, totalProfit: { $subtract: ['$totalSales', '$totalCost'] } } },
   ];
 }

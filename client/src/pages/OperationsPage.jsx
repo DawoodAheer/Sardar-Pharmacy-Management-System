@@ -16,7 +16,7 @@ function Field({ label, ...props }) {
   return <label className="block text-sm"><span className="mb-1 block font-medium">{label}</span><input className={inputStyle} {...props} /></label>;
 }
 function Panel({ title, children }) {
-  return <section className="rounded-xl border bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 text-lg font-bold">{title}</h2>{children}</section>;
+  return <section className="rounded-xl border bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900"><h2 className="mb-4 text-lg font-bold">{title}</h2>{children}</section>;
 }
 function useAction() {
   const queryClient = useQueryClient();

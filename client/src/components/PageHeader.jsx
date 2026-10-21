@@ -1,7 +1,7 @@
 
 const PageSectionHeader = ({ title, subtitle }) => {
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-teal-700/40 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm shadow-teal-900/10">
+    <div className="mb-6 overflow-hidden rounded-2xl border border-teal-700/40 bg-linear-to-r from-teal-700 to-emerald-600 p-5 shadow-xs shadow-teal-900/10">
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-bold tracking-tight text-white">{title}</h1>
         {subtitle && <p className="text-sm text-emerald-50">{subtitle}</p>}

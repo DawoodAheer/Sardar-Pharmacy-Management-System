@@ -39,9 +39,9 @@ const Sidebar = () => {
 
   return (
     <>
-      <aside className="hidden w-64 flex-col border-r border-slate-200 bg-white/95 p-4 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95 md:flex">
-        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 px-3 py-3 dark:border-teal-800/60 dark:from-slate-800 dark:to-slate-800">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 text-white shadow-sm shadow-teal-500/20">
+      <aside className="hidden w-64 flex-col border-r border-slate-200 bg-white/95 p-4 shadow-xs backdrop-blur-xs dark:border-slate-700 dark:bg-slate-900/95 md:flex">
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-teal-200 bg-linear-to-r from-teal-50 to-emerald-50 px-3 py-3 dark:border-teal-800/60 dark:from-slate-800 dark:to-slate-800">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-teal-600 to-emerald-500 text-white shadow-xs shadow-teal-500/20">
             <Pill className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -61,7 +61,7 @@ const Sidebar = () => {
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? 'border-teal-600 bg-gradient-to-r from-teal-600 to-emerald-500 text-white shadow-sm shadow-teal-600/20'
+                      ? 'border-teal-600 bg-linear-to-r from-teal-600 to-emerald-500 text-white shadow-xs shadow-teal-600/20'
                       : 'border-transparent text-slate-600 hover:bg-teal-50 hover:text-teal-800 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                   }`
                 }
@@ -84,7 +84,7 @@ const Sidebar = () => {
         </div>
       </aside>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-slate-200 bg-white/95 px-1 shadow-lg backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95 md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-14 items-center justify-around border-t border-slate-200 bg-white/95 px-1 shadow-lg backdrop-blur-xs dark:border-slate-700 dark:bg-slate-900/95 md:hidden">
         {links.map((link) => {
           const Icon = link.icon;
           let shortName = link.name;

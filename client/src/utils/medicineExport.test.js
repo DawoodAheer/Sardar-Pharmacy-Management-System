@@ -15,7 +15,7 @@ test('exports every supplied medicine with import-compatible columns and exact n
   assert.deepEqual(rows[0], MEDICINE_IMPORT_COLUMNS);
   assert.equal(rows.length, 51);
   assert.deepEqual(rows[1], [
-    'Medicine 1', 'Example Pharma', '2028-06-30', 133.45, 10, 150.75,
+    'Medicine 1', 'Example Pharma', '2028-06-30', 133.45, 10, 1507.5,
     0, 'R-0',
   ]);
   assert.equal(rows.at(-1)[0], 'Medicine 50');
@@ -25,7 +25,7 @@ test('exports every supplied medicine with import-compatible columns and exact n
     'Expiry date': '2028-06-30',
     'Purchase cost per pack (PKR)': '133.45',
     'Units per pack': '10',
-    'Sale price per unit (PKR)': '150.75',
+    'Sale price per pack (PKR)': '1507.5',
     'Stock quantity (units)': '0',
     'Rack / shelf location': 'R-0',
   });
@@ -47,4 +47,14 @@ test('downloadable blank template keeps the same import columns and documents pa
   const templateRows = XLSX.utils.sheet_to_json(workbook.Sheets.Medicines, { header: 1, raw: true });
   assert.deepEqual(templateRows[0], MEDICINE_IMPORT_COLUMNS);
   assert.equal(workbook.Sheets.Instructions['A4'].v.toLowerCase().includes('units per pack'), true);
+});
+
+test('export and reimport preserve per-unit sale prices with pack-labelled sheets', async () => {
+ const {normalizeMedicineImportRow} = await import('../../../server/utils/medicineImport.js');
+ const source={name:'Roundtrip',purchasePrice:200,unitsPerPack:10,price:30,quantity:25};
+ const workbook=createMedicineInventoryWorkbook([source]);
+ const [row]=XLSX.utils.sheet_to_json(workbook.Sheets.Medicines,{raw:true});
+ const imported=normalizeMedicineImportRow(row);
+ assert.deepEqual(imported.errors,[]); assert.equal(row['Sale price per pack (PKR)'],300);
+ assert.equal(imported.medicine.price,30); assert.equal(imported.medicine.quantity,25);
 });

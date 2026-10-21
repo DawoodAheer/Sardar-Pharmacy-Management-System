@@ -735,7 +735,7 @@ const CustomerShop = () => {
       <aside className="hidden h-full w-[210px] shrink-0 flex-col justify-between border-r border-slate-200 bg-white p-4 md:flex dark:border-slate-800 dark:bg-slate-900">
         <div>
           <div className="mb-6 flex items-center gap-2.5 border-b border-slate-100 pb-5 dark:border-slate-800">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-xs font-extrabold text-white shadow-sm shadow-blue-600/20">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-xs font-extrabold text-white shadow-xs shadow-blue-600/20">
               Rx
             </div>
 
@@ -868,7 +868,7 @@ const CustomerShop = () => {
               <button
                 type="button"
                 onClick={() => setCartOpen(true)}
-                className="flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
+                className="flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2.5 text-xs font-bold text-white shadow-xs shadow-blue-600/20 transition hover:bg-blue-700"
               >
                 <ShoppingCart className="h-4 w-4" />
                 <span className="hidden sm:inline">
@@ -899,7 +899,7 @@ const CustomerShop = () => {
                 onChange={(event) =>
                   setSearch(event.target.value)
                 }
-                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-xs text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-xs text-slate-900 outline-hidden transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               />
             </div>
 
@@ -912,7 +912,7 @@ const CustomerShop = () => {
                   )
                 }
                 disabled={categoriesLoading}
-                className="w-full min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                className="w-full min-w-[180px] rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 outline-hidden focus:border-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
               >
                 <option value="">
                   All Categories
@@ -1058,7 +1058,7 @@ const CustomerShop = () => {
                 return (
                   <div
                     key={medicine._id}
-                    className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
+                    className="flex flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-xs transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span
@@ -1164,7 +1164,7 @@ const CustomerShop = () => {
                               medicine
                             )
                           }
-                          className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-blue-600/20 transition hover:bg-blue-700"
+                          className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-[11px] font-bold text-white shadow-xs shadow-blue-600/20 transition hover:bg-blue-700"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           Add
@@ -1183,7 +1183,7 @@ const CustomerShop = () => {
           CART DRAWER
       ================================================= */}
       {cartOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs">
           <button
             type="button"
             aria-label="Close cart"
@@ -1364,7 +1364,7 @@ const CustomerShop = () => {
           ORDER CHECKOUT
       ================================================= */}
       {checkoutOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
             {/* Header */}
             <div className="border-b border-slate-200 px-6 py-5 dark:border-slate-800">
@@ -1459,7 +1459,7 @@ const CustomerShop = () => {
                       )
                     }
                     placeholder="+92 3XX XXXXXXX"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-hidden placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
                   />
                 </div>
 
@@ -1483,7 +1483,7 @@ const CustomerShop = () => {
                       )
                     }
                     placeholder="House/Flat, Street, Area, City"
-                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-hidden placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800"
                   />
                 </div>
 
@@ -1589,9 +1589,9 @@ const CustomerShop = () => {
           ORDER SUCCESS
       ================================================= */}
       {checkoutSuccess && lastReceipt && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
-            <div className="bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-7 text-white">
+            <div className="bg-linear-to-br from-emerald-600 to-teal-600 px-6 py-7 text-white">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">

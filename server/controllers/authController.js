@@ -341,7 +341,8 @@ export const refreshAccessToken = async (
 
     const decoded = jwt.verify(
       refreshToken,
-      process.env.JWT_REFRESH_SECRET
+      process.env.JWT_REFRESH_SECRET,
+      { algorithms: ['HS256'], maxAge: '30d' }
     );
 
     if (!decoded?.id) {

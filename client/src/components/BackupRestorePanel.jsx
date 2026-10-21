@@ -101,7 +101,7 @@ export default function BackupRestorePanel() {
   const collectionCount = backupData ? Object.keys(backupData.collections || {}).length : 0;
 
   return (
-    <section className="rounded-2xl border border-indigo-200 bg-white shadow-sm dark:border-indigo-900/50 dark:bg-slate-900 overflow-hidden">
+    <section className="rounded-2xl border border-indigo-200 bg-white shadow-xs dark:border-indigo-900/50 dark:bg-slate-900 overflow-hidden">
       <div className="border-b p-4">
         <button type="button" disabled={verifyMutation.isPending || (!hasBackup && !backupData)} onClick={() => verifyMutation.mutate()} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{verifyMutation.isPending ? 'Verifying recovery…' : 'Verify backup recovery'}</button>
         <p className="mt-2 text-xs">Last recovery check: {fmtDT(status?.lastVerifiedAt)}. {backupData ? 'Checks the selected backup.' : 'Checks the latest backup.'}</p>
@@ -214,7 +214,7 @@ export default function BackupRestorePanel() {
                     type="text" value={confirmation}
                     onChange={(e) => setConfirmation(e.target.value)}
                     placeholder="Type RESTORE to confirm"
-                    className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-mono focus:border-amber-500 focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-white"
+                    className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-mono focus:border-amber-500 focus:outline-hidden dark:border-amber-700 dark:bg-slate-800 dark:text-white"
                   />
                   <button
                     type="button"

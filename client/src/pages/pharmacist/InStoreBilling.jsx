@@ -258,10 +258,10 @@ const InStoreBilling = () => {
   };
 
     return (
-    <div className="min-h-screen bg-[var(--page-bg)] px-4 py-5 font-sans text-[var(--text-body)] sm:px-6">
+    <div className="min-h-screen bg-(--page-bg) px-4 py-5 font-sans text-(--text-body) sm:px-6">
       <div className="mx-auto max-w-7xl space-y-5">
         {/* Header */}
-        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm text-white sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-linear-to-r from-teal-700 to-emerald-600 p-5 shadow-xs text-white sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
 
 
@@ -282,7 +282,7 @@ const InStoreBilling = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-white shadow-sm backdrop-blur-sm">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-3.5 py-2.5 text-white shadow-xs backdrop-blur-xs">
             <User className="h-4 w-4 text-emerald-100" />
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-50/80">
@@ -303,7 +303,7 @@ const InStoreBilling = () => {
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           {/* Left side */}
           <div className="space-y-5">
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-3xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
               {/* Search */}
               <div className="p-5">
                 <div className="mb-2 flex items-center justify-between gap-3">
@@ -334,7 +334,7 @@ const InStoreBilling = () => {
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     placeholder="Search medicines..."
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-12 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 dark:focus:bg-slate-800"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-12 text-sm text-slate-900 outline-hidden transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-blue-400 dark:focus:bg-slate-800"
                   />
 
                   {searchQuery && (
@@ -477,7 +477,7 @@ const InStoreBilling = () => {
             </div>
 
             {/* Cart */}
-            <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-3xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
@@ -550,7 +550,7 @@ const InStoreBilling = () => {
                                   min="0"
                                   value={item.unitPrice}
                                   onChange={(e) => updatePrice(item.medicineId, Number(e.target.value))}
-                                  className="w-16 ml-1 px-1 py-0.5 text-[10px] rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  className="w-16 ml-1 px-1 py-0.5 text-[10px] rounded-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
                                 />
                               </span>
 
@@ -643,7 +643,7 @@ const InStoreBilling = () => {
 
           {/* Right side */}
           <aside className="space-y-5 lg:sticky lg:top-5">
-            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900">
               <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
@@ -669,7 +669,7 @@ const InStoreBilling = () => {
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
                       placeholder="Optional"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     />
                   </div>
                   <div>
@@ -681,7 +681,7 @@ const InStoreBilling = () => {
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       placeholder="Optional"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
                     />
                   </div>
                 </div>
@@ -748,7 +748,7 @@ const InStoreBilling = () => {
                       step="0.01"
                       value={discount}
                       onChange={handleDiscountChange}
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-right text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-800"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-right text-sm font-semibold text-slate-800 outline-hidden transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:bg-slate-800"
                     />
                   </div>
 
@@ -829,14 +829,14 @@ const InStoreBilling = () => {
 
       {/* Success Modal */}
       {confirmedBill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-xs">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="bill-success-title"
             className="w-full max-w-lg overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
           >
-            <div className="bg-gradient-to-br from-emerald-600 to-teal-600 px-6 py-7 text-white">
+            <div className="bg-linear-to-br from-emerald-600 to-teal-600 px-6 py-7 text-white">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15">

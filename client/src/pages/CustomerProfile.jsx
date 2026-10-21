@@ -303,16 +303,16 @@ const CustomerProfileContent = ({
 
           {/* Identity Card */}
           <div className="bg-white dark:bg-[#111827] border border-slate-200
-            dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
 
-            <div className="h-14 bg-gradient-to-br from-[#1A56A0] to-[#0ea5e9]" />
+            <div className="h-14 bg-linear-to-br from-[#1A56A0] to-[#0ea5e9]" />
 
             <div className="flex justify-center -mt-6 relative z-10">
               <div
                 className="w-12 h-12 rounded-full border-[3px]
                   border-white dark:border-[#111827]
                   bg-[#1A56A0] flex items-center justify-center
-                  text-sm font-semibold text-white flex-shrink-0
+                  text-sm font-semibold text-white shrink-0
                   select-none"
               >
                 {displayName?.[0]?.toUpperCase() || 'U'}
@@ -430,7 +430,7 @@ const CustomerProfileContent = ({
           <div
             className="bg-white dark:bg-[#111827]
               border border-slate-200 dark:border-slate-800
-              rounded-xl p-3 shadow-sm"
+              rounded-xl p-3 shadow-xs"
           >
             <p className="text-[11px] font-medium text-slate-700 dark:text-slate-200 mb-2">
               Quick actions
@@ -482,7 +482,7 @@ const CustomerProfileContent = ({
           <div
             className="bg-white dark:bg-[#111827]
               border border-slate-200 dark:border-slate-800
-              rounded-xl overflow-hidden shadow-sm"
+              rounded-xl overflow-hidden shadow-xs"
           >
             <div
               className="px-4 py-2.5 border-b
@@ -549,7 +549,7 @@ const CustomerProfileContent = ({
                           border border-slate-200 dark:border-slate-700
                           bg-slate-50 dark:bg-slate-800
                           text-slate-800 dark:text-slate-100
-                          outline-none focus:border-[#1A56A0]
+                          outline-hidden focus:border-[#1A56A0]
                           focus:ring-1 focus:ring-[#1A56A0]/20"
                       />
 
@@ -563,7 +563,7 @@ const CustomerProfileContent = ({
                           border border-slate-200 dark:border-slate-700
                           bg-slate-50 dark:bg-slate-800
                           text-slate-800 dark:text-slate-100
-                          outline-none focus:border-[#1A56A0]
+                          outline-hidden focus:border-[#1A56A0]
                           focus:ring-1 focus:ring-[#1A56A0]/20"
                       />
                     </div>
@@ -669,7 +669,7 @@ const CustomerProfileContent = ({
                         border border-slate-200 dark:border-slate-700
                         bg-slate-50 dark:bg-slate-800
                         text-slate-800 dark:text-slate-100
-                        outline-none focus:border-[#1A56A0]
+                        outline-hidden focus:border-[#1A56A0]
                         focus:ring-1 focus:ring-[#1A56A0]/20"
                     />
 
@@ -682,7 +682,7 @@ const CustomerProfileContent = ({
                         text-[10px] text-amber-700
                         dark:text-amber-400"
                     >
-                      <Lock className="w-3 h-3 flex-shrink-0" />
+                      <Lock className="w-3 h-3 shrink-0" />
                       Confirm your current password to update phone number
                     </div>
 
@@ -698,7 +698,7 @@ const CustomerProfileContent = ({
                         dark:border-amber-850/50
                         bg-slate-50 dark:bg-slate-800
                         text-slate-800 dark:text-slate-100
-                        outline-none focus:border-amber-400
+                        outline-hidden focus:border-amber-400
                         focus:ring-1 focus:ring-amber-400/20"
                     />
 
@@ -846,7 +846,7 @@ const CustomerProfileContent = ({
 
                   <button
                     onClick={handleCopyId}
-                    className="flex-shrink-0 w-6 h-6
+                    className="shrink-0 w-6 h-6
                       flex items-center justify-center rounded
                       border border-slate-200
                       dark:border-slate-700
@@ -878,7 +878,7 @@ const CustomerProfileContent = ({
             <div
               className="bg-white dark:bg-[#111827]
                 border border-slate-200 dark:border-slate-800
-                rounded-xl p-4 shadow-sm"
+                rounded-xl p-4 shadow-xs"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -923,7 +923,7 @@ const CustomerProfileContent = ({
             <div
               className="bg-white dark:bg-[#111827]
                 border border-slate-200 dark:border-slate-800
-                rounded-xl p-4 shadow-sm"
+                rounded-xl p-4 shadow-xs"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -977,7 +977,7 @@ const CustomerProfileContent = ({
           <div
             className="bg-white dark:bg-[#111827]
               border border-slate-200 dark:border-slate-800
-              rounded-xl overflow-hidden shadow-sm"
+              rounded-xl overflow-hidden shadow-xs"
           >
             <div
               className="px-4 py-2.5 border-b
@@ -1000,7 +1000,7 @@ const CustomerProfileContent = ({
                 <div className="flex items-center gap-3">
                   <div
                     className="w-7 h-7 rounded-lg
-                      flex items-center justify-center flex-shrink-0
+                      flex items-center justify-center shrink-0
                       bg-emerald-50 text-emerald-700
                       dark:bg-emerald-950/30
                       dark:text-emerald-400"
@@ -1034,7 +1034,7 @@ const CustomerProfileContent = ({
                 <div className="flex items-center gap-3">
                   <div
                     className="w-7 h-7 rounded-lg
-                      flex items-center justify-center flex-shrink-0
+                      flex items-center justify-center shrink-0
                       bg-blue-50 text-blue-700
                       dark:bg-blue-950/40
                       dark:text-blue-400"
@@ -1068,7 +1068,7 @@ const CustomerProfileContent = ({
                 <div className="flex items-center gap-3">
                   <div
                     className="w-7 h-7 rounded-lg
-                      flex items-center justify-center flex-shrink-0
+                      flex items-center justify-center shrink-0
                       bg-slate-100 text-slate-500
                       dark:bg-slate-800
                       dark:text-slate-400"

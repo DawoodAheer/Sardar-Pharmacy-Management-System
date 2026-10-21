@@ -1,35 +1,15 @@
 import mongoose from 'mongoose';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { once } from 'node:events';
-import { createWriteStream } from 'node:fs';
+
+
 import '../env-loader.js';
 import BackgroundJob from '../models/BackgroundJob.js';
-import Medicine from '../models/Medicine.js';
+
 import User from '../models/User.js';
-import { MANUFACTURER_SORT, MEDICINE_COLLATION } from './medicineOrdering.js';
+import { exportInventoryXlsx, exportSalesXlsx } from './excelExports.js';
 import { JOB_DIR } from './backgroundJobs.js';
 import { createBackup, verifyBackupRecovery } from './backupManager.js';
-
-const csvCell = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
-async function exportInventory(id) {
-  await fs.mkdir(JOB_DIR, { recursive: true });
-  const artifact = `${id}.csv`, partial = path.join(JOB_DIR, `${id}.tmp`);
-  const stream = createWriteStream(partial, { encoding: 'utf8' });
-  let streamError; stream.on('error', error => { streamError = error; });
-  try {
-    stream.write('\uFEFFname,manufacturer,purchasePrice,unitsPerPack,price,quantity,expiryDate,rackLocation\r\n');
-    for await (const med of Medicine.find({ isDeleted: { $ne: true } }).collation(MEDICINE_COLLATION).sort(MANUFACTURER_SORT).lean().cursor()) {
-      if (streamError) throw streamError;
-      const row = [med.name, med.manufacturer, med.purchasePrice, med.unitsPerPack, med.price, med.quantity, med.expiryDate ? new Date(med.expiryDate).toISOString().slice(0, 10) : '', med.rackLocation];
-      // Prevent spreadsheet formula execution in exported text.
-      const line = row.map(value => csvCell(typeof value === 'string' && /^[=+@\-]/.test(value) ? `'${value}` : value)).join(',') + '\r\n';
-      if (!stream.write(line)) await once(stream, 'drain');
-    }
-    stream.end(); await once(stream, 'finish');
-    await fs.rename(partial, path.join(JOB_DIR, artifact)); return artifact;
-  } catch (error) { stream.destroy(); await fs.rm(partial, { force: true }); throw error; }
-}
 
 let job;
 try {
@@ -50,7 +30,8 @@ try {
   }
   else if (job.type === 'backup') { const file = await createBackup(); result = { message: 'Database backup completed.', fileName: path.basename(file) }; }
   else if (job.type === 'verify') result = { ...await verifyBackupRecovery(payload.backupData), message: 'Backup recovery verified in an isolated temporary database.' };
-  else if (job.type === 'export') { artifact = await exportInventory(job._id); result = { message: 'Inventory CSV ready. Open it in Excel.' }; }
+  else if (job.type === 'export') { artifact = await exportInventoryXlsx(job._id, JOB_DIR); result = { message: 'Inventory Excel ready, including readable expiry dates.' }; }
+  else if (job.type === 'sales-export') { artifact = await exportSalesXlsx(job._id, JOB_DIR, payload); result = { message: 'Sales Excel ready.' }; }
   else if (job.type === 'import') {
     const { bulkImportMedicines } = await import('../controllers/medicineController.js');
     result = await new Promise((resolve, reject) => {

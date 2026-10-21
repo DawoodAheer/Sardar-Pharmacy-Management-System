@@ -25,14 +25,14 @@ function Test-FreePort([int]$Port) {
 try {
     Write-Host 'Sardar Medical Store - starting' -ForegroundColor Cyan
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        $cli = @("$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\resources\bin\docker.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+        $cli = @("$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe", "$env:LOCALAPPDATA\Programs\DockerDesktop\resources\bin\docker.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\resources\bin\docker.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         if ($cli) { $env:PATH = (Split-Path $cli -Parent) + ';' + $env:PATH }
         else { throw 'Install Docker Desktop and complete its initial setup, then run this launcher again.' }
     }
     if (-not (Test-DockerEngine)) {
         $computer = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
         if ($computer -and -not $computer.HypervisorPresent) { throw 'Windows hypervisor is not running. Run Repair-Docker-Windows.bat, restart Windows when instructed, then retry.' }
-        $desktopExecutables = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe")
+        $desktopExecutables = @("$env:ProgramFiles\Docker\Docker\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\DockerDesktop\Docker Desktop.exe", "$env:LOCALAPPDATA\Programs\Docker\Docker\Docker Desktop.exe")
         $dockerDesktop = $desktopExecutables | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
         if (-not $dockerDesktop) { throw 'Docker Engine is unavailable. Start Docker Desktop and retry.' }
         Start-Process -FilePath $dockerDesktop -WindowStyle Hidden
@@ -58,7 +58,10 @@ try {
     $selectedPort = 0
     if ($mapping -match ':(\d+)\s*$') { $selectedPort = [int]$Matches[1] }
     else {
-        foreach ($candidate in $preferredPort..($preferredPort + 10)) {
+        # Windows/Hyper-V can reserve a whole range around 5174. Try separate
+        # application ranges too, without changing Windows port reservations.
+        $candidates = @($preferredPort..($preferredPort + 10)) + @(8080..8090) + @(3000..3010)
+        foreach ($candidate in ($candidates | Select-Object -Unique)) {
             if (Test-FreePort $candidate) { $selectedPort = $candidate; break }
         }
     }
@@ -95,8 +98,9 @@ try {
     }
     Write-Host 'Preparing services. The first launch needs internet and can take several minutes.'
     $sourceFiles = @('docker-compose.yml', 'server/Dockerfile', 'server/package.json', 'server/package-lock.json', 'server/server.js', 'server/env-loader.js', 'client/Dockerfile', 'client/nginx.conf', 'client/package.json', 'client/package-lock.json', 'client/index.html', 'client/vite.config.js')
-    $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore') | Where-Object { Test-Path -LiteralPath $_ }
+    $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore', 'client/postcss.config.js') | Where-Object { Test-Path -LiteralPath $_ }
     $sourceDirectories = @('server/controllers','server/models','server/utils','server/routes','server/config','server/middleware','client/src','client/public')
+    if (Test-Path -LiteralPath 'client/vendor') { $sourceDirectories += 'client/vendor' }
     $sourceFiles += Get-ChildItem -LiteralPath $sourceDirectories -Recurse -File | ForEach-Object { $_.FullName }
     $fingerprint = ($sourceFiles | Sort-Object | ForEach-Object { (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash }) -join ''
     $buildMarker = Join-Path $projectDirectory '.pharmacy-build-id'

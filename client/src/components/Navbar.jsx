@@ -44,9 +44,9 @@ const Navbar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur-sm transition-colors duration-200 dark:border-slate-700 dark:bg-slate-900/95 sm:px-6">
+    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-xs backdrop-blur-xs transition-colors duration-200 dark:border-slate-700 dark:bg-slate-900/95 sm:px-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 text-white shadow-sm shadow-teal-600/20">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-teal-600 to-emerald-500 text-white shadow-xs shadow-teal-600/20">
           <Stethoscope className="h-5 w-5" />
         </div>
         <div className="leading-tight">
@@ -66,7 +66,7 @@ const Navbar = () => {
             type="button"
             onClick={handleRefresh}
             disabled={refreshState === 'loading'}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition-colors hover:bg-emerald-500 disabled:cursor-wait disabled:opacity-70 dark:border-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
             title="Refresh data on the current page"
             aria-label="Refresh current page data"
           >

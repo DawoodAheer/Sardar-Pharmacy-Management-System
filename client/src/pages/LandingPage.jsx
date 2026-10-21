@@ -73,7 +73,7 @@ export default function LandingPage() {
     : medicineShowcase.filter(m => m.type === activeTab);
 
   return (
-    <div className="min-h-screen bg-[var(--page-bg)] text-[var(--text-heading)] transition-colors duration-300 font-sans selection:bg-emerald-500 selection:text-white">
+    <div className="min-h-screen bg-(--page-bg) text-(--text-heading) transition-colors duration-300 font-sans selection:bg-emerald-500 selection:text-white">
       
       {/* 1️⃣ NAVBAR */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -85,14 +85,14 @@ export default function LandingPage() {
           
           {/* Brand */}
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/25 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/25 group-hover:scale-105 transition-transform">
               <span className="text-base font-black text-white">⚕</span>
             </div>
             <div className="flex flex-col">
               <div className="flex items-center font-extrabold text-sm tracking-tight">
                 <span className="text-slate-900 dark:text-white">SARDAR</span>
                 <span className="ml-1 text-teal-700 dark:text-teal-300">PHARMACY</span>
-                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded border border-cyan-500/20">AI</span>
+                <span className="ml-1.5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-sm border border-cyan-500/20">AI</span>
               </div>
               <span className="text-[9px] text-slate-400 dark:text-slate-500 -mt-0.5 font-medium">Quality & Management</span>
             </div>
@@ -112,7 +112,7 @@ export default function LandingPage() {
             {/* Theme Toggle */}
             <button 
               onClick={toggle} 
-              className="p-2 rounded-xl transition-all border border-slate-200 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm"
+              className="p-2 rounded-xl transition-all border border-slate-200 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-xs"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             >
               {theme === 'dark' ? (
@@ -137,7 +137,7 @@ export default function LandingPage() {
             {user ? (
               <Link 
                 to={getDashboardPath(user.role)}
-                className="text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-[#1A56A0] to-[#0ea5e9] hover:from-[#154682] hover:to-[#0284c7] text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 hover:-translate-y-0.5"
+                className="text-xs font-bold px-4 py-2 rounded-xl bg-linear-to-r from-[#1A56A0] to-[#0ea5e9] hover:from-[#154682] hover:to-brand-secondary text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-blue-500/35 hover:-translate-y-0.5"
               >
                 Go to Dashboard →
               </Link>
@@ -151,7 +151,7 @@ export default function LandingPage() {
                 </Link>
                 <Link 
                   to="/register" 
-                  className="text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 text-white transition-all shadow-md shadow-teal-500/20 hover:shadow-teal-500/35 hover:-translate-y-0.5"
+                  className="text-xs font-bold px-4 py-2 rounded-xl bg-linear-to-r from-teal-600 to-emerald-500 text-white transition-all shadow-md shadow-teal-500/20 hover:shadow-teal-500/35 hover:-translate-y-0.5"
                 >
                   Get Started
                 </Link>
@@ -164,7 +164,7 @@ export default function LandingPage() {
       {/* 2️⃣ HERO SECTION WITH CINEMATIC IMAGE & HUD OVERLAY */}
       <section id="hero" className="relative pt-28 pb-16 lg:pt-36 lg:pb-24 overflow-hidden">
         {/* Background glow effects */}
-        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[800px] h-[450px] bg-gradient-to-tr from-blue-600/15 via-cyan-500/10 to-emerald-500/10 blur-[130px] rounded-full pointer-events-none -z-10" />
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[800px] h-[450px] bg-linear-to-tr from-blue-600/15 via-cyan-500/10 to-emerald-500/10 blur-[130px] rounded-full pointer-events-none -z-10" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -177,7 +177,7 @@ export default function LandingPage() {
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.15]">
-                Intelligent Medicine Quality, <span className="bg-gradient-to-r from-teal-700 via-emerald-500 to-teal-500 bg-clip-text text-transparent">Zero Compromise</span> Healthcare.
+                Intelligent Medicine Quality, <span className="bg-linear-to-r from-teal-700 via-emerald-500 to-teal-500 bg-clip-text text-transparent">Zero Compromise</span> Healthcare.
               </h1>
 
               <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
@@ -189,7 +189,7 @@ export default function LandingPage() {
                 {user ? (
                   <Link
                     to={getDashboardPath(user.role)}
-                    className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#1A56A0] to-[#0ea5e9] text-white font-bold text-sm shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                    className="px-6 py-3 rounded-xl bg-linear-to-r from-[#1A56A0] to-[#0ea5e9] text-white font-bold text-sm shadow-xl shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
                   >
                     <span>Open Dashboard</span>
                     <span>→</span>
@@ -198,7 +198,7 @@ export default function LandingPage() {
                   <>
                     <Link
                       to="/register"
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-500 text-white font-bold text-sm shadow-xl shadow-teal-500/25 hover:shadow-teal-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
+                      className="px-6 py-3 rounded-xl bg-linear-to-r from-teal-600 to-emerald-500 text-white font-bold text-sm shadow-xl shadow-teal-500/25 hover:shadow-teal-500/40 hover:-translate-y-0.5 transition-all flex items-center gap-2"
                     >
                       <span>Get Started Free</span>
                       <span>→</span>
@@ -237,7 +237,7 @@ export default function LandingPage() {
               <div className="relative group">
                 
                 {/* Glow Backdrop */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000 -z-10" />
+                <div className="absolute -inset-1 bg-linear-to-r from-blue-600 to-cyan-500 rounded-3xl blur-xl opacity-30 group-hover:opacity-50 transition duration-1000 -z-10" />
 
                 {/* Main Hero Image Container */}
                 <div className="relative rounded-2xl overflow-hidden border border-slate-200/80 dark:border-cyan-500/30 shadow-2xl bg-slate-900">
@@ -248,7 +248,7 @@ export default function LandingPage() {
                   />
                   
                   {/* Gradient Overlay for Text Readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
+                  <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
 
                   {/* Floating Overlay Badge 1: Top Left */}
                   <div className="absolute top-4 left-4 backdrop-blur-md bg-slate-900/80 border border-cyan-400/40 rounded-xl p-2.5 shadow-lg flex items-center gap-3">
@@ -267,7 +267,7 @@ export default function LandingPage() {
                   <div className="absolute bottom-4 right-4 backdrop-blur-md bg-slate-900/85 border border-emerald-400/40 rounded-xl p-3 shadow-xl max-w-[240px]">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="text-[10px] font-bold text-slate-300">Batch Inspection</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASS</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASS</span>
                     </div>
                     <div className="text-xs font-bold text-white truncate">Cefuroxime Axetil 500mg</div>
                     <div className="text-[10px] text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
@@ -306,25 +306,25 @@ export default function LandingPage() {
             <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/60 self-start md:self-auto">
               <button 
                 onClick={() => setActiveTab('all')} 
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-[#1A56A0] text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-[#1A56A0] text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
               >
                 All Products
               </button>
               <button 
                 onClick={() => setActiveTab('tablets')} 
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'tablets' ? 'bg-[#1A56A0] text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'tablets' ? 'bg-[#1A56A0] text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
               >
                 Tablets & Blisters
               </button>
               <button 
                 onClick={() => setActiveTab('syrups')} 
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'syrups' ? 'bg-[#1A56A0] text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'syrups' ? 'bg-[#1A56A0] text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
               >
                 Syrups & Liquids
               </button>
               <button 
                 onClick={() => setActiveTab('capsules')} 
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'capsules' ? 'bg-[#1A56A0] text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'capsules' ? 'bg-[#1A56A0] text-white shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}
               >
                 Capsules
               </button>
@@ -346,11 +346,11 @@ export default function LandingPage() {
                     className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
                   />
                   <div className="absolute top-3 left-3">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900/80 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-900/80 backdrop-blur-md text-cyan-300 border border-cyan-400/30 shadow-sm">
                       {med.tag}
                     </span>
                   </div>
-                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/90 text-white shadow">
+                  <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/90 text-white shadow-sm">
                     <span>✓</span>
                     <span>AI Score: {med.score}</span>
                   </div>
@@ -419,13 +419,13 @@ export default function LandingPage() {
                 alt="AI Medicine Quality Verification" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
                   Spectrographic AI Check
                 </span>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
                   Automated
                 </span>
               </div>
@@ -459,13 +459,13 @@ export default function LandingPage() {
                 alt="Pharmacist POS & Billing Counter" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                   Instant POS Invoicing
                 </span>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                   Live Sync
                 </span>
               </div>
@@ -499,13 +499,13 @@ export default function LandingPage() {
                 alt="SMS & Medication Reminders" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-transparent to-transparent" />
               <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                 <span className="text-xs font-bold text-white flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-400"></span>
                   Daily SMS Dispatches
                 </span>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm bg-amber-500/20 text-amber-300 border border-amber-400/30">
                   Twilio API
                 </span>
               </div>
@@ -616,7 +616,7 @@ export default function LandingPage() {
               <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <Link
                   to="/register"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#1A56A0] to-[#0ea5e9] text-white font-bold text-xs flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/30 transition-all"
+                  className="w-full py-3 rounded-xl bg-linear-to-r from-[#1A56A0] to-[#0ea5e9] text-white font-bold text-xs flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-blue-500/30 transition-all"
                 >
                   <span>Register as Pharmacist</span>
                   <span>→</span>
@@ -641,7 +641,7 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
           
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-sm">
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-xs">
             <span className="text-3xl font-black text-slate-300 dark:text-slate-700">01</span>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Create Your Account</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -649,7 +649,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-sm">
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-xs">
             <span className="text-3xl font-black text-slate-300 dark:text-slate-700">02</span>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Access Smart Tools</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -657,7 +657,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-sm">
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#111C30] border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-xs">
             <span className="text-3xl font-black text-slate-300 dark:text-slate-700">03</span>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Automate Healthcare</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -669,7 +669,7 @@ export default function LandingPage() {
       </section>
 
       {/* 7️⃣ CTA BANNER */}
-      <section className="py-16 bg-gradient-to-r from-[#1A56A0] via-blue-700 to-cyan-600 text-white relative overflow-hidden">
+      <section className="py-16 bg-linear-to-r from-[#1A56A0] via-blue-700 to-cyan-600 text-white relative overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 text-center space-y-6 relative z-10">
           <h2 className="text-2xl sm:text-4xl font-black tracking-tight">
             Ready to Upgrade Your Medicine Management?

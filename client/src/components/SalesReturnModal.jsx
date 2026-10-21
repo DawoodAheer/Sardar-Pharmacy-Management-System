@@ -155,7 +155,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
   if (!isOpen || !bill) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
       <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         
         {/* HEADER */}
@@ -198,7 +198,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
               <button
                 type="button"
                 onClick={() => handlePrintRefund(processedBillId)}
-                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-800 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-900 active:scale-95 transition-all"
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-800 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-900 active:scale-95 transition-all"
               >
                 <Printer size={14} />
                 Print Refund Receipt
@@ -272,7 +272,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                         </td>
                         <td className="px-3 py-3">
                           {maxAvail === 0 ? (
-                            <span className="text-[11px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                            <span className="text-[11px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-sm">
                               Fully Returned
                             </span>
                           ) : (
@@ -282,7 +282,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                               max={maxAvail}
                               value={qtyToReturn}
                               onChange={(e) => handleQtyChange(item.medicineId, e.target.value, maxAvail)}
-                              className="w-20 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500"
+                              className="w-20 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs font-bold text-slate-900 dark:text-white outline-hidden focus:border-amber-500"
                             />
                           )}
                         </td>
@@ -294,7 +294,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
                               onChange={(e) => handleReasonChange(item.medicineId, e.target.value)}
                               placeholder="Return reason..."
                               disabled={qtyToReturn === 0}
-                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs outline-none focus:border-amber-500 dark:bg-slate-800 dark:text-white disabled:opacity-40"
+                              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-2.5 py-1 text-xs outline-hidden focus:border-amber-500 dark:bg-slate-800 dark:text-white disabled:opacity-40"
                             />
                           )}
                         </td>
@@ -341,7 +341,7 @@ export default function SalesReturnModal({ isOpen, onClose, bill }) {
               <button
                 type="submit"
                 disabled={returnMutation.isPending || totalRefundPreview === 0}
-                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2"
+                className="rounded-xl bg-amber-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2"
               >
                 <RotateCcw size={16} />
                 {returnMutation.isPending ? 'Processing Return...' : `Confirm Return & Refund (${getCurrency(totalRefundPreview)})`}

@@ -20,7 +20,7 @@ export const generateAccessToken = (
     },
     process.env.JWT_ACCESS_SECRET,
     {
-      expiresIn: "3650d", // 10 years for offline pharmacy uninterrupted use
+      expiresIn: "15m",
     }
   );
 };
@@ -29,7 +29,7 @@ export const generateAccessToken = (
 |--------------------------------------------------------------------------
 | Generate Refresh Token
 |--------------------------------------------------------------------------
-| Long-lived token used to obtain a new access token (10 years offline).
+| Refresh session renewed during use; a month of inactivity requires login.
 |--------------------------------------------------------------------------
 */
 export const generateRefreshToken = (
@@ -43,7 +43,7 @@ export const generateRefreshToken = (
     },
     process.env.JWT_REFRESH_SECRET,
     {
-      expiresIn: "3650d", // 10 years for offline pharmacy uninterrupted use
+      expiresIn: "30d",
     }
   );
 };
@@ -72,6 +72,6 @@ export const sendRefreshTokenCookie = (
     path: "/",
 
     maxAge:
-      10 * 365 * 24 * 60 * 60 * 1000, // 10 years
+      30 * 24 * 60 * 60 * 1000,
   });
 };

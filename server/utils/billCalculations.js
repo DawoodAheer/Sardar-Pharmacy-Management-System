@@ -1,3 +1,16 @@
+export const getInstoreSalePrice = (item, defaultPrice) => {
+  if (item.packSalePrice === undefined && item.unitsPerPack === undefined) {
+    return getSalePrice(item.salePrice, defaultPrice);
+  }
+  const packPrice = Number(item.packSalePrice);
+  const units = Number(item.unitsPerPack);
+  if (String(item.packSalePrice ?? '').trim() === '' || !Number.isFinite(packPrice) || packPrice <= 0 ||
+      String(item.unitsPerPack ?? '').trim() === '' || !Number.isSafeInteger(units) || units < 1) {
+    throw new Error('Enter a positive pack sale price and a positive whole number of units per pack');
+  }
+  return packPrice / units;
+};
+
 export const getSalePrice = (requestedPrice, defaultPrice) => {
   const salePrice =
     requestedPrice === undefined ||

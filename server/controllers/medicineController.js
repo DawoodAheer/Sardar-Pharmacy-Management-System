@@ -1,3 +1,4 @@
+import {prepareInventoryLock,lockInventory,findSameName} from './duplicateStockController.js';
 import { pagination } from '../utils/pagination.js';
 import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering.js';
 import { createHash } from 'node:crypto';
@@ -118,6 +119,14 @@ export const getAllMedicines = async (req, res, next) => {
 // @desc    Create a new medicine
 // @route   POST /api/medicines
 // @access  Private/Pharmacist,Superadmin
+export const getMedicine = async (req, res, next) => {
+  try {
+    const medicine = await Medicine.findById(req.params.id);
+    if (!medicine || medicine.isDeleted) return res.status(404).json({ message: 'Medicine is unavailable. Remove it from the bill.' });
+    res.json({ ...medicine.toObject(), expiryStatus: medicine.quantity > 0 ? saleExpiryStatus(medicine) : checkExpiryStatus(medicine.expiryDate) });
+  } catch (error) { next(error); }
+};
+
 export const createMedicine = async (req, res, next) => {
   const {
     name,
@@ -149,10 +158,17 @@ export const createMedicine = async (req, res, next) => {
     }
     const { unitsPerPack: numericUnitsPerPack, price: numericPrice, quantity: parsedQuantity, expiryDate: parsedExpiryDate } = normalized.medicine;
 
+    await prepareInventoryLock();
     const session = await mongoose.startSession();
-    let medicine;
+    let medicine, pendingIssue;
     try {
       await session.withTransaction(async () => {
+        await lockInventory(session);
+        const duplicate=await findSameName(name,session);
+        if(duplicate){
+          [pendingIssue]=await MedicineImportIssue.create([{sourceFile:'Manual entry',rowNumber:1,originalRow:req.body,normalizedRow:normalized.medicine,validationErrors:['Same medicine name exists. Admin approval is required to add delivery stock.'],createdBy:req.user._id}],{session});
+          return;
+        }
         [medicine] = await Medicine.create([{
           name: String(name).trim(),
           manufacturer: String(manufacturer || '').trim(),
@@ -169,6 +185,7 @@ export const createMedicine = async (req, res, next) => {
       });
     } finally { await session.endSession(); }
 
+    if(pendingIssue)return res.status(202).json({approvalRequired:true,issueId:pendingIssue._id,message:'Same-name medicine found. Delivery stock is waiting for Admin approval; stock was not changed.'});
     const populatedMed = await Medicine.findById(medicine._id).populate('createdBy', 'name email');
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
@@ -337,13 +354,13 @@ export const bulkImportMedicines = async (req, res, next) => {
   const runId = createHash('sha256').update(JSON.stringify({ user: String(req.user._id), sourceFile, rows: medicineArray })).digest('hex');
   const classify = async session => {
     const existing = await Medicine.find({ isDeleted: { $ne: true } }).select('name manufacturer').session(session || null).lean();
-    const names = new Set(existing.map(item => `${item.name.trim().toLowerCase()}|${(item.manufacturer || '').trim().toLowerCase()}`));
+    const names = new Set(existing.map(item => item.name.trim().toLowerCase()));
     const seen = new Set(), validRows = [], invalidRows = [];
     medicineArray.forEach((row, index) => {
       const { medicine, errors } = normalizeMedicineImportRow(row);
-      const key = `${medicine.name.toLowerCase()}|${medicine.manufacturer.toLowerCase()}`;
-      if (medicine.name && names.has(key)) errors.push('This medicine and manufacturer already exist in active inventory. Existing stock was kept unchanged.');
-      if (medicine.name && seen.has(key)) errors.push('This medicine is duplicated in the uploaded file.');
+      const key = medicine.name.toLowerCase();
+      if (medicine.name && names.has(key)) errors.push('Same medicine name exists. Admin approval is required to add delivery stock.');
+      if (medicine.name && seen.has(key)) errors.push('Same medicine name is repeated in this file. Admin approval is required to add delivery stock.');
       const details = { rowNumber: index + (sourceFile ? 2 : 1), medicine,
         originalRow: row && typeof row === 'object' ? row : { rawValue: row ?? null } };
       if (errors.length) invalidRows.push({ ...details, errors });
@@ -393,7 +410,9 @@ export const getMedicineImportIssues = async (req, res, next) => {
       .populate('createdBy', 'name email role')
       .sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean();
     const total = await MedicineImportIssue.countDocuments({ status: 'pending' });
-    res.json({ issues, total, page, pages: Math.ceil(total / limit) });
+    const candidates = await Medicine.find({isDeleted:{$ne:true},name:{$in:issues.map(issue=>String(issue.normalizedRow?.name || '').trim()).filter(Boolean)}}).collation(MEDICINE_COLLATION).select('name manufacturer quantity unitsPerPack purchasePrice expiryDate').lean();
+    const rows=issues.map(issue=>({...issue,stockCandidates:candidates.filter(candidate=>candidate.name.trim().toLowerCase()===String(issue.normalizedRow?.name||'').trim().toLowerCase())}));
+    res.json({ issues:rows, total, page, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
@@ -415,13 +434,9 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
         }
         const existing = await Medicine.find({ isDeleted: { $ne: true } })
           .select('name manufacturer').session(session).lean();
-        const duplicate = existing.some((item) =>
-          (String(item.name).trim().toLowerCase() === medicine.name.toLowerCase() &&
-            String(item.manufacturer || '').trim().toLowerCase() === medicine.manufacturer.toLowerCase()) ||
-          false
-        );
+        const duplicate = existing.some(item => String(item.name).trim().toLowerCase() === medicine.name.toLowerCase());
         if (duplicate) {
-          const error = new Error('This name and manufacturer already exist. Correct the name/company for a different medicine, discard the duplicate, or use Batch inventory for a new delivery. Existing stock was not changed.');
+          const error = new Error('This medicine name already exists. Use Admin stock approval for a delivery, or correct the name for a genuinely different medicine. Existing stock was not changed.');
           error.statusCode = 409;
           throw error;
         }
@@ -747,7 +762,7 @@ export const scanLabel = async (req, res, next) => {
 // @access  Private/Pharmacist,Superadmin
 export const adjustStock = async (req, res, next) => {
   const { id } = req.params;
-  const { adjustmentType, amount, reason } = req.body;
+  const { adjustmentType, amount, reason, expectedQuantity } = req.body;
 
   try {
     const medicine = await Medicine.findById(id);
@@ -761,14 +776,15 @@ export const adjustStock = async (req, res, next) => {
       return next(new Error('Medicine is archived and unavailable for stock adjustments'));
     }
 
-    if (!reason || !reason.trim()) {
+    if (typeof reason !== 'string' || !reason.trim()) {
       res.status(400);
       return next(new Error('Adjustment reason is required'));
     }
 
     const qtyAmount = Number(amount);
     if (
-      !Number.isInteger(qtyAmount) ||
+      (typeof amount !== 'number' && typeof amount !== 'string') || String(amount).trim() === '' ||
+      !Number.isSafeInteger(qtyAmount) ||
       qtyAmount < 0 ||
       (adjustmentType !== 'SET' && qtyAmount === 0)
     ) {
@@ -776,6 +792,12 @@ export const adjustStock = async (req, res, next) => {
       return next(new Error('Amount must be a valid whole quantity'));
     }
 
+    if (expectedQuantity !== undefined && (!Number.isSafeInteger(expectedQuantity) || expectedQuantity < 0)) {
+      return res.status(400).json({ message: 'Expected stock must be a non-negative whole number.' });
+    }
+    if (expectedQuantity !== undefined && expectedQuantity !== medicine.quantity) {
+      return res.status(409).json({ message: 'Stock changed since you opened billing. Refresh stock, count again and retry.', currentQuantity: medicine.quantity });
+    }
     const previousQuantity = medicine.quantity;
     let newQuantity = previousQuantity;
     let quantityChanged = 0;

@@ -75,7 +75,7 @@ export default function PurchaseOrdersPanel() {
   const orders = ordersData?.orders || [];
 
   return (
-    <section className="rounded-2xl border border-orange-200 bg-white shadow-sm dark:border-orange-900/50 dark:bg-slate-900 overflow-hidden">
+    <section className="rounded-2xl border border-orange-200 bg-white shadow-xs dark:border-orange-900/50 dark:bg-slate-900 overflow-hidden">
       <PageControls page={stockPage} pages={lowData?.pages || 1} total={lowData?.total || 0} onChange={setStockPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-orange-100 bg-orange-50/70 px-5 py-4 dark:border-orange-900/40 dark:bg-orange-950/20">
@@ -169,7 +169,7 @@ export default function PurchaseOrdersPanel() {
                           onChange={(e) =>
                             setQuantities((p) => ({ ...p, [medicine._id]: e.target.value }))
                           }
-                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-none dark:border-orange-800 dark:bg-slate-800 dark:text-white"
+                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-hidden dark:border-orange-800 dark:bg-slate-800 dark:text-white"
                         />
                       </label>
                       <label className="flex flex-col gap-0.5">
@@ -183,7 +183,7 @@ export default function PurchaseOrdersPanel() {
                             }))
                           }
                           placeholder="Supplier name"
-                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-none dark:border-orange-800 dark:bg-slate-800 dark:text-white"
+                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-hidden dark:border-orange-800 dark:bg-slate-800 dark:text-white"
                         />
                       </label>
                       <label className="flex flex-col gap-0.5">
@@ -197,7 +197,7 @@ export default function PurchaseOrdersPanel() {
                             }))
                           }
                           placeholder="Contact"
-                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-none dark:border-orange-800 dark:bg-slate-800 dark:text-white"
+                          className="rounded-lg border border-orange-200 bg-white px-2 py-1 text-xs focus:border-orange-400 focus:outline-hidden dark:border-orange-800 dark:bg-slate-800 dark:text-white"
                         />
                       </label>
                     </div>

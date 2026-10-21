@@ -7,6 +7,7 @@ const aliases = {
   purchasePrice: ['purchasePrice', 'Purchase Price', 'Purchase Pack Cost', 'Purchase cost per pack (PKR)'],
   unitsPerPack: ['unitsPerPack', 'Units Per Pack', 'Units per pack'],
   price: ['price', 'Sale Price', 'Sale Price / Unit', 'Sale price per unit (PKR)'],
+  packSalePrice: ['packSalePrice', 'Sale Price / Pack', 'Sale price per pack (PKR)', 'Sale Price Per Pack'],
   quantity: ['quantity', 'Quantity', 'Quantity (Units)', 'Stock Quantity (Units)', 'Stock quantity (units)'],
   rackLocation: ['rackLocation', 'Rack', 'Rack Location', 'Rack / Shelf', 'Rack / shelf location'],
 };
@@ -50,6 +51,7 @@ export const normalizeMedicineImportRow = (row = {}) => {
   const purchaseRaw = readAlias(row, aliases.purchasePrice);
   const unitsRaw = readAlias(row, aliases.unitsPerPack);
   const priceRaw = readAlias(row, aliases.price);
+  const packSaleRaw = readAlias(row, aliases.packSalePrice);
   const quantityRaw = readAlias(row, aliases.quantity);
 
   const numeric = value => {
@@ -60,8 +62,8 @@ export const normalizeMedicineImportRow = (row = {}) => {
   };
   const parsedUnitsPerPack = unitsRaw === undefined ? 1 : numeric(unitsRaw);
   const parsedPurchasePrice = purchaseRaw === undefined ? NaN : numeric(purchaseRaw);
-  const parsedSalePrice = priceRaw === undefined
-    ? Number((parsedPurchasePrice / parsedUnitsPerPack).toFixed(2)) : numeric(priceRaw);
+  const parsedSalePrice = packSaleRaw !== undefined ? numeric(packSaleRaw) / parsedUnitsPerPack
+    : priceRaw === undefined ? parsedPurchasePrice / parsedUnitsPerPack : numeric(priceRaw);
   const parsedQuantity = quantityRaw === undefined ? 0 : numeric(quantityRaw);
 
   const parsedExpiry = expiryRaw ? parseMedicineExpiryDate(expiryRaw) : null;
@@ -78,6 +80,7 @@ export const normalizeMedicineImportRow = (row = {}) => {
   };
 
   const errors = [];
+  if (packSaleRaw !== undefined && priceRaw !== undefined) errors.push('Supply either sale price per pack or sale price per unit, not both.');
   if (!medicine.name) errors.push('Medicine name is required.');
   if (!Number.isFinite(medicine.purchasePrice) || medicine.purchasePrice <= 0) {
     errors.push('Purchase price per pack is required and must be greater than zero.');

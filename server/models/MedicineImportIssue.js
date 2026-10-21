@@ -10,6 +10,7 @@ const medicineImportIssueSchema = new mongoose.Schema({
   resolvedMedicine: { type: mongoose.Schema.Types.ObjectId, ref: 'Medicine', default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  stockApproval: { type: mongoose.Schema.Types.Mixed, default: null },
   resolvedAt: { type: Date, default: null },
 }, { timestamps: true });
 

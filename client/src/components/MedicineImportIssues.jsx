@@ -1,3 +1,4 @@
+import DuplicateStockApproval from './DuplicateStockApproval';
 import { waitForJob } from '../utils/backgroundJobs';
 import PageControls from './PageControls';
 import { useState } from 'react';
@@ -234,7 +235,7 @@ export default function MedicineImportIssues() {
     <section className="rounded-xl border border-amber-200 bg-amber-50 dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
-          <AlertTriangle size={16} /> Medicine Rows Needing Review
+          <AlertTriangle size={16} /> Medicine review / Admin stock approvals
           <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs dark:bg-amber-700 dark:text-amber-200">
             {data?.total || issues.length}
           </span>
@@ -297,7 +298,7 @@ export default function MedicineImportIssues() {
                   ))}
                 </ul>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0"><DuplicateStockApproval issue={issue} onDone={setMsg} />
                 <button
                   type="button"
                   onClick={() => beginFix(issue)}
@@ -322,7 +323,7 @@ export default function MedicineImportIssues() {
 
       {/* Correction Form */}
       {editing && createPortal(
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-correction-title">
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="import-correction-title">
         <form
           onKeyDown={event => { if (event.key === 'Escape' && !resolveMutation.isPending) { event.stopPropagation(); setEditing(null); } }}
           onSubmit={(e) => {
@@ -344,7 +345,7 @@ export default function MedicineImportIssues() {
               Cancel
             </button>
           </div>
-          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">For a different medicine, correct its name/company and validate. An unchanged duplicate cannot be added twice; discard that row to keep existing stock unchanged. Use Batch inventory for a new delivery of an existing medicine.</p>
+          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">For a different medicine, correct its name/company and validate. To add duplicate delivery stock to an existing medicine, use Review stock addition with Admin approval. Fix & Add is for a different, correctly named medicine.</p>
           {resolveMutation.isError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{msg}</p>}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -375,7 +376,7 @@ export default function MedicineImportIssues() {
                   }
                   value={form[key] ?? ''}
                   onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal focus:border-teal-400 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-white"
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal focus:border-teal-400 focus:outline-hidden dark:border-slate-600 dark:bg-slate-900 dark:text-white"
                 />
               </label>
             ))}

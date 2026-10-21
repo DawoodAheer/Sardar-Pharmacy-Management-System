@@ -11,3 +11,8 @@ test('normalized values take priority while blank legacy values fall back to the
   const form = importIssueForm({ normalizedRow: { name: '', quantity: 0, expiryDate: '2028-05-22T00:00:00.000Z' }, originalRow: { 'Medicine Name': 'Legacy', Quantity: 30, 'Purchase Price': 40 } });
   assert.equal(form.name, 'Legacy'); assert.equal(form.quantity, 0); assert.equal(form.purchasePrice, 40); assert.equal(form.expiryDate, '2028-05-22');
 });
+
+test('failed pack-price import reopens with its per-unit internal value for editing', () => {
+ const form=importIssueForm({originalRow:{'Medicine name':'Test','Purchase cost per pack (PKR)':200,'Units per pack':10,'Sale price per pack (PKR)':300}});
+ assert.equal(form.price,30);
+});

@@ -10,6 +10,8 @@ WORKDIR /app
 
 # Copy dependency manifests
 COPY package*.json ./
+# Pinned official SheetJS package is bundled for reproducible builds.
+COPY vendor ./vendor
 
 # Install all dependencies (including devDependencies needed for build)
 RUN npm ci --legacy-peer-deps

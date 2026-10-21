@@ -21,6 +21,7 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
   const { default: Bill } = await import('../models/Bill.js');
   const { default: Udhar } = await import('../models/Udhar.js');
   const { default: billRoutes } = await import('../routes/billRoutes.js');
+  const { default: medicineRoutes } = await import('../routes/medicineRoutes.js');
   const { default: udharRoutes } = await import('../routes/udharRoutes.js');
   const { default: operationsRoutes } = await import('../routes/operationsRoutes.js');
   const { default: deletionRoutes } = await import('../routes/deletionRequestRoutes.js');
@@ -36,7 +37,7 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
     const customer = await User.create({ name: 'Test Customer', email: 'customer@test.local', password: 'test-password', role: 'customer', accountStatus: 'approved' });
     const pharmacist = await User.create({ name: 'Test Staff', email: 'staff@test.local', password: 'test-password', role: 'pharmacist', accountStatus: 'approved' });
     const app = express();
-    app.use(express.json()); app.use('/api/bills', billRoutes); app.use('/api/udhar', udharRoutes); app.use('/api/operations', operationsRoutes); app.use('/api/deletion-requests', deletionRoutes); app.use(errorHandler);
+    app.use(express.json()); app.use('/api/bills', billRoutes); app.use('/api/medicines', medicineRoutes); app.use('/api/udhar', udharRoutes); app.use('/api/operations', operationsRoutes); app.use('/api/deletion-requests', deletionRoutes); app.use(errorHandler);
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -209,6 +210,51 @@ test('pharmacy upgrades end-to-end in an isolated replica-set database', { skip:
         const report = await request('/bills/daily-closing?date=2025-01-01');
         assert.equal(report.status, 200); assert.equal(report.data.billCount, 1); assert.equal(report.data.salesByMethod.Cash, 55);
       } finally { if (previousTimezone === undefined) delete process.env.TZ; else process.env.TZ = previousTimezone; }
+    });
+    await t.test('counter counts 30 units, sells five at 300/10, and refunds only that medicine', async () => {
+      const counter = await Medicine.create({ name: 'Counter pack price test', createdBy: admin._id,
+        purchasePrice: 200, unitsPerPack: 10, price: 0, quantity: 20, expiryDate: '2099-01-01' });
+      const unrelated = await Medicine.create({ name: 'Counter untouched', createdBy: admin._id,
+        purchasePrice: 100, unitsPerPack: 10, quantity: 7, expiryDate: '2099-01-01' });
+      const adjust = body => request(`/medicines/${counter._id}/adjust-stock`, { user: pharmacist, method: 'POST', body });
+      const correction = { adjustmentType: 'SET', amount: 30, expectedQuantity: 20, reason: 'Physical count at counter' };
+      assert.equal((await request(`/medicines/${counter._id}/adjust-stock`, { user: customer, method: 'POST', body: correction })).status, 403);
+      assert.equal((await adjust(correction)).status, 200);
+      assert.equal((await adjust(correction)).status, 409, 'stale/repeated corrections cannot overwrite newer stock');
+      const sale = await request('/bills/instore', { user: pharmacist, method: 'POST', body: {
+        items: [{ medicineId: counter._id, quantity: 5, packSalePrice: 300, unitsPerPack: 10, salePrice: 1 }] } });
+      assert.equal(sale.status, 201, JSON.stringify(sale.data));
+      assert.equal(sale.data.bill.total,150); assert.equal(sale.data.bill.items[0].salePrice,30);
+      assert.equal(sale.data.bill.items[0].purchasePrice,20);
+      assert.equal((await Medicine.findById(counter._id)).quantity,25);
+      assert.equal((await Medicine.findById(unrelated._id)).quantity,7);
+      const refund = await request(`/bills/${sale.data.bill._id}/return`, { user: pharmacist, method: 'POST', body: {
+        returns: [{ medicineId: counter._id, quantityReturned: 2, reason: 'Counter return' }] } });
+      assert.equal(refund.status,200);assert.equal((await Medicine.findById(counter._id)).quantity,27);
+      assert.equal((await Medicine.findById(unrelated._id)).quantity,7);
+      const before = await Bill.countDocuments();
+      for (const unitsPerPack of [0,1.5,'']) {
+        const bad=await request('/bills/instore',{method:'POST',body:{items:[{medicineId:counter._id,quantity:1,packSalePrice:300,unitsPerPack}]}});
+        assert.equal(bad.status,400);
+      }
+      assert.equal(await Bill.countDocuments(),before); assert.equal((await Medicine.findById(counter._id)).quantity,27);
+      const packSale = await request('/bills/instore', { user: pharmacist, method:'POST', body: {
+        items:[{medicineId:counter._id,quantity:10,packSalePrice:300,unitsPerPack:10}] } });
+      assert.equal(packSale.status,201); assert.equal(packSale.data.bill.total,300);
+      assert.equal((await Medicine.findById(counter._id)).quantity,17);
+      const profitRows = await request('/bills/profit-details?limit=100');
+      const packProfit = profitRows.data.profitDetails.find(row => String(row.medicineId) === String(counter._id));
+      assert.equal(packProfit.unitsPerPack,10);
+      assert.equal(packProfit.totalProfit / packProfit.quantitySold,10);
+      assert.equal(packProfit.totalProfit / packProfit.quantitySold * packProfit.unitsPerPack,100);
+      const empty = await Medicine.create({ name: 'Counter zero count', createdBy: admin._id, purchasePrice: 100,
+        unitsPerPack: 10, quantity: 0, expiryDate: '2099-01-01' });
+      const details = await request(`/medicines/${empty._id}`, { user: pharmacist });
+      assert.equal(details.status,200);assert.notEqual(details.data.expiryStatus,'EXPIRED');
+      assert.equal((await request(`/medicines/${empty._id}`,{user:customer})).status,403);
+      const recount = await request(`/medicines/${empty._id}/adjust-stock`, { user: pharmacist, method:'POST', body: {
+        adjustmentType:'SET', amount:10, expectedQuantity:0, reason:'Found one full pack at counter' } });
+      assert.equal(recount.status,200);assert.equal(recount.data.medicine.quantity,10);
     });
     await t.test('backup recovery compares restored records in a temporary database', async () => {
       await mongoose.model('MedicineImportIssue').create({ rowNumber: 2, originalRow: { name: 'Previously ignored row' },

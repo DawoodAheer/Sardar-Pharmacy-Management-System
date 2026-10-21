@@ -15,6 +15,14 @@ export const importIssueForm = (issue = {}) => {
     const value = usable(normalized) ? normalized : aliases.map(alias => original[key(alias)]).find(usable);
     form[field] = value ?? '';
   }
+  if (form.price === '') {
+    const pack = ['packSalePrice', 'Sale Price / Pack', 'Sale price per pack (PKR)', 'Sale Price Per Pack'].map(alias => original[key(alias)]).find(value => value !== undefined && value !== null && String(value).trim() !== '');
+    if (pack !== undefined) {
+      const numericPack = Number(String(pack).replaceAll(',', ''));
+      const units = Number(form.unitsPerPack || 1);
+      if (Number.isFinite(numericPack) && Number.isSafeInteger(units) && units > 0) form.price = numericPack / units;
+    }
+  }
   const date = String(form.expiryDate);
   if (/^\d{4}-\d{2}-\d{2}/.test(date)) form.expiryDate = date.slice(0, 10);
   else {

@@ -4,8 +4,21 @@ import {
   getDiscountedReturnRefund,
   getNetItemAmounts,
   getSalePrice,
+  getInstoreSalePrice,
 } from './billCalculations.js';
 import { getPurchaseCostPerUnit } from './medicinePricing.js';
+
+test('counter pack pricing calculates units on the server and ignores a forged unit rate', () => {
+  assert.equal(getInstoreSalePrice({ packSalePrice: 300, unitsPerPack: 10, salePrice: 1 }, 99), 30);
+  assert.equal(getInstoreSalePrice({ packSalePrice: 315, unitsPerPack: 1 }, 0), 315);
+  assert.equal(getInstoreSalePrice({ packSalePrice: 400.73, unitsPerPack: 20 }, 0), 20.0365);
+  assert.equal(getInstoreSalePrice({ salePrice: 17 }, 99), 17);
+  for (const item of [{packSalePrice: 300}, {unitsPerPack: 10}, {packSalePrice: '', unitsPerPack: 10},
+    {packSalePrice: -1, unitsPerPack: 10}, {packSalePrice: 300, unitsPerPack: 0},
+    {packSalePrice: 300, unitsPerPack: 1.5}, {packSalePrice: Infinity, unitsPerPack: 10}]) {
+    assert.throws(() => getInstoreSalePrice(item, 99), /pack sale price/);
+  }
+});
 
 test('a bill-only sale price override does not replace the default medicine price', () => {
   const defaultPrice = 150;

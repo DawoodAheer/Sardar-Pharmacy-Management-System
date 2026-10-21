@@ -135,7 +135,7 @@ const CustomerDashboard = () => {
   return (
     <div className="dashboard-shell mx-auto max-w-7xl space-y-5 p-4 transition-colors duration-200">
       {/* Welcome Banner */}
-      <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-teal-700 to-emerald-600 p-5 shadow-sm">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-linear-to-r from-teal-700 to-emerald-600 p-5 shadow-xs">
         <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -153,7 +153,7 @@ const CustomerDashboard = () => {
 
           <Link
             to="/customer/shop"
-            className="flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-teal-700 shadow-sm transition-all hover:bg-emerald-50"
+            className="flex w-fit items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-teal-700 shadow-xs transition-all hover:bg-emerald-50"
           >
             <ShoppingBag className="w-4 h-4" />
             Browse Medicine Shop
@@ -162,7 +162,7 @@ const CustomerDashboard = () => {
       </section>
 
       {/* Customer Information */}
-      <section className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm p-5">
+      <section className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs p-5">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -228,7 +228,7 @@ const CustomerDashboard = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700/50 dark:bg-[#1a2438]">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700/50 dark:bg-[#1a2438]">
         <div className="mb-4">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white">
             Quick Actions
@@ -288,7 +288,7 @@ const CustomerDashboard = () => {
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Purchases */}
-        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
           <button
             type="button"
             onClick={() => toggleCard('purchases')}
@@ -377,7 +377,7 @@ const CustomerDashboard = () => {
         </div>
 
         {/* Reminders */}
-        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
           <button
             type="button"
             onClick={() => toggleCard('reminders')}
@@ -463,7 +463,7 @@ const CustomerDashboard = () => {
         </div>
 
         {/* Expiring Medicines */}
-        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-[#1a2438] rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
           <button
             type="button"
             onClick={() => toggleCard('expiry')}
@@ -518,7 +518,7 @@ const CustomerDashboard = () => {
                       className="p-3 rounded-xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
                     >
                       <div className="flex items-center gap-3">
-                        <Package className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                        <Package className="w-4 h-4 text-amber-500 shrink-0" />
 
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -544,7 +544,7 @@ const CustomerDashboard = () => {
       </div>
 
       {/* Medication Expiry Section */}
-      <section className="bg-white dark:bg-[#1a2438] p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm transition-colors duration-200">
+      <section className="bg-white dark:bg-[#1a2438] p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs transition-colors duration-200">
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -608,7 +608,7 @@ const CustomerDashboard = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="bg-white dark:bg-[#1a2438] p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm">
+      <section className="bg-white dark:bg-[#1a2438] p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-4">
           <Activity className="w-4 h-4 text-[#1A56A0] dark:text-sky-400" />
           Dashboard Shortcuts

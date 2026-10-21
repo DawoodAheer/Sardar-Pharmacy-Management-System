@@ -6,6 +6,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from 'helmet';
 
 import connectDB from "./config/db.js";
 
@@ -48,6 +49,10 @@ const databaseStartup = connectDB();
 databaseStartup.then(async () => { await startJobQueue(); databaseInitialized = true; initializeNotificationScheduler(); });
 
 const app = express();
+// Production exposes only Nginx. Trust exactly that final proxy hop, so its
+// appended client address wins over any visitor-supplied forwarding header.
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : false);
+app.use(helmet({ contentSecurityPolicy: false, strictTransportSecurity: false }));
 app.use(monitorRequests);
 
 // CORS configuration

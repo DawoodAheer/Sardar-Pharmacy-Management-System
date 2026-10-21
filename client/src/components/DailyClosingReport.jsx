@@ -56,7 +56,7 @@ export default function DailyClosingReport() {
     : [];
 
   return (
-    <section className="rounded-2xl border border-emerald-200 bg-white shadow-sm dark:border-emerald-900/50 dark:bg-slate-900 overflow-hidden">
+    <section className="rounded-2xl border border-emerald-200 bg-white shadow-xs dark:border-emerald-900/50 dark:bg-slate-900 overflow-hidden">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-5 py-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
         <div className="flex items-center gap-3">
@@ -77,7 +77,7 @@ export default function DailyClosingReport() {
             value={date}
             max={todayStr()}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none dark:border-emerald-700 dark:bg-slate-800 dark:text-white"
+            className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-hidden dark:border-emerald-700 dark:bg-slate-800 dark:text-white"
           />
           <button
             type="button" disabled={isFetching} onClick={async () => {

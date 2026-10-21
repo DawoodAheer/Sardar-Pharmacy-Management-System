@@ -26,9 +26,12 @@ import {
   authorize,
 } from '../middleware/authMiddleware.js';
 
+import { getSalesPeriodReport } from '../utils/salesPeriodReport.js';
+
 const router = express.Router();
 
 router.use(protect);
+router.get('/sales-period', authorize('superadmin','pharmacist'), getSalesPeriodReport);
 
 // Lookup customer by phone
 router.get('/lookup-customer', authorize('superadmin', 'pharmacist'), lookupCustomerByPhone);

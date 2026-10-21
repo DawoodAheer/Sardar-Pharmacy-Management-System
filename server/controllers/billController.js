@@ -1,6 +1,6 @@
 import { pagination } from '../utils/pagination.js';
 import { medicineProfitStages, profitStages } from '../utils/profitAggregation.js';
-import { allocateBillStock, restoreReturnedBatches, saleExpiryStatus } from '../utils/batchInventory.js';
+import { allocateBillStock, restoreReturnedBatches, saleExpiryStatus, roundMoney } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
 import { saleDateFilter } from '../utils/saleDate.js';
 import Bill from '../models/Bill.js';
@@ -15,6 +15,7 @@ import {
   getDiscountedReturnRefund,
   getNetItemAmounts,
   getSalePrice,
+  getInstoreSalePrice,
 } from '../utils/billCalculations.js';
 import PDFDocument from 'pdfkit';
 import nodemailer from 'nodemailer';
@@ -257,20 +258,21 @@ export const createBill = async (req, res, next) => {
     if (isCustomerOrder && Number(discount || 0) !== 0) {
       return res.status(403).json({ message: 'Only pharmacy staff may apply discounts.' });
     }
-    const finalDiscount =
-      discount === undefined || discount === '' ? 0 : Number(discount);
+    subtotal = roundMoney(subtotal);
+    const requestedDiscount = discount === undefined || discount === '' ? 0 : Number(discount);
+    const finalDiscount = roundMoney(requestedDiscount);
     if (
       !Number.isFinite(finalDiscount) ||
-      finalDiscount < 0 ||
+      requestedDiscount < 0 ||
       finalDiscount > subtotal
     ) {
       res.status(400);
       return next(new Error('Discount must be between zero and the bill subtotal'));
     }
-    const total = Math.max(
+    const total = roundMoney(Math.max(
       0,
       subtotal - finalDiscount
-    );
+    ));
 
     let bill;
     const session = await mongoose.startSession();
@@ -1332,10 +1334,7 @@ export const createInstoreBill = async (
 
       let salePrice;
       try {
-        salePrice = getSalePrice(
-          item.salePrice,
-          medicine.price
-        );
+        salePrice = getInstoreSalePrice(item, medicine.price);
       } catch (error) {
         res.status(400);
         return next(error);
@@ -1389,21 +1388,22 @@ export const createInstoreBill = async (
       );
     }
 
-    const finalDiscount =
-      discount === undefined || discount === '' ? 0 : Number(discount);
+    subtotal = roundMoney(subtotal);
+    const requestedDiscount = discount === undefined || discount === '' ? 0 : Number(discount);
+    const finalDiscount = roundMoney(requestedDiscount);
     if (
       !Number.isFinite(finalDiscount) ||
-      finalDiscount < 0 ||
+      requestedDiscount < 0 ||
       finalDiscount > subtotal
     ) {
       res.status(400);
       return next(new Error('Discount must be between zero and the bill subtotal'));
     }
 
-    const total = Math.max(
+    const total = roundMoney(Math.max(
       0,
       subtotal - finalDiscount
-    );
+    ));
 
     let bill;
     const session = await mongoose.startSession();

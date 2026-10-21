@@ -1,3 +1,4 @@
+import SalesPeriodReport from '../components/SalesPeriodReport';
 import useScopedPage from '../hooks/useScopedPage';
 import { waitForJob } from '../utils/backgroundJobs';
 import AdminBillDeleteButton from '../components/AdminBillDeleteButton';
@@ -325,7 +326,7 @@ const StatCard = ({
     <button
       type="button"
       onClick={onClick}
-      className="group relative w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
+      className="group relative w-full rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
     >
       {hasNotification && (
         <span className="absolute right-4 top-4 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-bold text-white">
@@ -1047,7 +1048,7 @@ export default function SuperadminDashboard() {
       const job = await waitForJob((await api.post('/jobs/inventory-export')).data);
       const { data } = await api.get(`/jobs/${job.jobId}/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(data), link = document.createElement('a');
-      link.href = url; link.download = 'medicine_inventory.csv'; link.click(); URL.revokeObjectURL(url);
+      link.href = url; link.download = 'medicine_inventory.xlsx'; link.click(); URL.revokeObjectURL(url);
     } catch (error) { setMessage(error.message); } finally { setExporting(false); }
   };
 
@@ -1188,7 +1189,7 @@ export default function SuperadminDashboard() {
   if (initialLoading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-6 py-4 shadow-xs dark:border-slate-700 dark:bg-slate-900">
           <Loader2
             className="animate-spin text-blue-600"
             size={22}
@@ -1212,7 +1213,7 @@ export default function SuperadminDashboard() {
 
         {/* HEADER */}
 
-        <div className="section-banner flex flex-col gap-4 rounded-2xl p-6 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="section-banner flex flex-col gap-4 rounded-2xl p-6 shadow-xs md:flex-row md:items-center md:justify-between">
 
           <div>
             <div className="flex items-center gap-3">
@@ -1250,7 +1251,7 @@ export default function SuperadminDashboard() {
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
             >
               <Download size={18} />
-              {exporting ? 'Exporting…' : 'Export CSV for Excel'}
+              {exporting ? 'Exporting…' : 'Export Excel'}
             </button>
             <button
               type="button"
@@ -1290,6 +1291,7 @@ export default function SuperadminDashboard() {
         <MedicineImportIssues />
         <BackupRestorePanel />
         <DailyClosingReport compact />
+              <SalesPeriodReport />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 my-6">
           <StatCard
@@ -1423,7 +1425,7 @@ export default function SuperadminDashboard() {
                   'todaySales'
                 )
               }
-              className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
+              className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-xs transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
             >
 
               <div className="flex items-start justify-between">
@@ -1473,7 +1475,7 @@ export default function SuperadminDashboard() {
                   'monthlySales'
                 )
               }
-              className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
+              className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-xs transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900"
             >
 
               <div className="flex items-start justify-between">
@@ -1516,7 +1518,7 @@ export default function SuperadminDashboard() {
 
             </button>
 
-            <button type="button" onClick={() => setSelectedView('yearlySales')} className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => setSelectedView('yearlySales')} className="group rounded-2xl border border-slate-200 bg-white p-6 text-left shadow-xs transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-lg dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Yearly Sales · {new Date().getFullYear()}</p>
@@ -1540,7 +1542,7 @@ export default function SuperadminDashboard() {
             <button
               type="button"
               onClick={() => setSalesRankingModal('top')}
-              className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 dark:border-emerald-800 p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-emerald-400 hover:shadow-lg"
+              className="group rounded-2xl border border-emerald-200 bg-linear-to-br from-emerald-50 to-teal-50 dark:from-slate-900 dark:to-slate-800 dark:border-emerald-800 p-5 text-left shadow-xs transition hover:-translate-y-1 hover:border-emerald-400 hover:shadow-lg"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -1566,7 +1568,7 @@ export default function SuperadminDashboard() {
             <button
               type="button"
               onClick={() => setSalesRankingModal('least')}
-              className="group rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 dark:border-rose-800 p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-rose-400 hover:shadow-lg"
+              className="group rounded-2xl border border-rose-200 bg-linear-to-br from-rose-50 to-orange-50 dark:from-slate-900 dark:to-slate-800 dark:border-rose-800 p-5 text-left shadow-xs transition hover:-translate-y-1 hover:border-rose-400 hover:shadow-lg"
             >
               <div className="flex items-start justify-between">
                 <div>
@@ -1606,7 +1608,7 @@ export default function SuperadminDashboard() {
             <button
               type="button"
               onClick={() => { setProfitDateRange({ startDate: '', endDate: '' }); setIsProfitModalOpen(true); }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
             >
               <BarChart3 size={18} />
               View Profit Details Breakdown
@@ -1614,7 +1616,7 @@ export default function SuperadminDashboard() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-3">
-            <button type="button" onClick={() => openProfitDetails('daily')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('daily')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Today's Profit
               </p>
@@ -1624,7 +1626,7 @@ export default function SuperadminDashboard() {
               <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">View today’s profit details <ChevronRight size={14} /></span>
             </button>
 
-            <button type="button" onClick={() => openProfitDetails('monthly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('monthly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 This Month's Profit
               </p>
@@ -1634,7 +1636,7 @@ export default function SuperadminDashboard() {
               <span className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">View this month’s profit details <ChevronRight size={14} /></span>
             </button>
 
-            <button type="button" onClick={() => openProfitDetails('yearly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+            <button type="button" onClick={() => openProfitDetails('yearly')} className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-xs transition hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 This Year's Profit
               </p>
@@ -1831,7 +1833,7 @@ export default function SuperadminDashboard() {
               }
             />
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs dark:border-slate-700 dark:bg-slate-900">
 
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 Inventory Value
@@ -1860,7 +1862,7 @@ export default function SuperadminDashboard() {
 
         {/* USER MANAGEMENT TABLE */}
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
 
           <div className="border-b border-slate-200 p-5 dark:border-slate-700">
 
@@ -1892,7 +1894,7 @@ export default function SuperadminDashboard() {
                     )
                   }
                   placeholder="Search name, email, phone or role"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-hidden focus:border-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
 
               </div>
@@ -2149,7 +2151,7 @@ export default function SuperadminDashboard() {
 
         {/* EXPIRY TABLE */}
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900">
 
           <div className="border-b border-slate-200 p-5 dark:border-slate-700">
 
@@ -2715,7 +2717,7 @@ export default function SuperadminDashboard() {
                     <button
                       type="button"
                       onClick={() => setSelectedView('todaySales')}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-sm"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-xs"
                     >
                       <RotateCcw size={14} />
                       View All Bills to Process Return
@@ -3035,7 +3037,7 @@ export default function SuperadminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => setReturnModalBill(bill)}
-                                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-sm"
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700 shadow-xs"
                                 >
                                   <RotateCcw size={13} />
                                   Return / Refund
@@ -3763,10 +3765,10 @@ export default function SuperadminDashboard() {
 
       {/* MEDICINE SALES RANKING MODAL */}
       {salesRankingModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
 
-            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-rose-600 to-orange-600'}`}>
+            <div className={`px-5 py-4 flex items-center justify-between ${salesRankingModal === 'top' ? 'bg-linear-to-r from-emerald-600 to-teal-600' : 'bg-linear-to-r from-rose-600 to-orange-600'}`}>
               <div>
                 <div className="text-[10px] uppercase font-bold text-white/70 tracking-widest">Medicine Performance</div>
                 <h3 className="text-base font-extrabold text-white mt-0.5">
@@ -3799,14 +3801,14 @@ export default function SuperadminDashboard() {
                     {list.map((med, index) => (
                       <div
                         key={med.medicineId}
-                        className={`relative flex flex-col rounded-2xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
+                        className={`relative flex flex-col rounded-2xl border p-4 shadow-xs hover:shadow-md transition-shadow ${
                           salesRankingModal === 'top'
                             ? 'border-emerald-100 bg-white dark:border-emerald-900/30 dark:bg-slate-800'
                             : 'border-rose-100 bg-white dark:border-rose-900/30 dark:bg-slate-800'
                         }`}
                       >
                         {/* Rank Badge */}
-                        <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-xl shadow-sm flex items-center justify-center text-xs font-black ${
+                        <div className={`absolute -top-3 -left-3 w-8 h-8 rounded-xl shadow-xs flex items-center justify-center text-xs font-black ${
                           salesRankingModal === 'top'
                             ? index === 0 ? 'bg-yellow-400 text-yellow-900' : index === 1 ? 'bg-slate-200 text-slate-800' : index === 2 ? 'bg-amber-700 text-amber-50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300'
                             : 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300'
@@ -3859,7 +3861,7 @@ export default function SuperadminDashboard() {
 
       {/* Expiry Alerts Modal */}
       {isExpiryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsExpiryModalOpen(false)}
@@ -3874,7 +3876,7 @@ export default function SuperadminDashboard() {
 
       {/* Purchase Orders Modal */}
       {isPurchaseOrdersModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsPurchaseOrdersModalOpen(false)}
@@ -3889,7 +3891,7 @@ export default function SuperadminDashboard() {
 
       {/* Audit History Modal */}
       {isAuditHistoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-auto relative">
             <button
               onClick={() => setIsAuditHistoryModalOpen(false)}

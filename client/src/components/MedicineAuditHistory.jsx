@@ -88,11 +88,11 @@ function AuditRecord({ record }) {
                   {FIELD_LABELS[field] || field}
                 </span>
                 <div className="mt-0.5 flex items-center gap-1.5 font-mono">
-                  <span className="rounded bg-rose-100 px-1 py-0.5 text-rose-700 line-through dark:bg-rose-950/50 dark:text-rose-400">
+                  <span className="rounded-sm bg-rose-100 px-1 py-0.5 text-rose-700 line-through dark:bg-rose-950/50 dark:text-rose-400">
                     {fmtVal(record.previousValues?.[field])}
                   </span>
                   <span className="text-slate-400">→</span>
-                  <span className="rounded bg-emerald-100 px-1 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                  <span className="rounded-sm bg-emerald-100 px-1 py-0.5 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
                     {fmtVal(record.newValues?.[field])}
                   </span>
                 </div>
@@ -117,7 +117,7 @@ export default function MedicineAuditHistory() {
   if (!records.length && !isFetching) return null;
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
       <PageControls page={page} pages={data?.pages || 1} total={data?.total || 0} onChange={setPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 px-5 py-4 dark:border-slate-700 dark:bg-slate-800/40">

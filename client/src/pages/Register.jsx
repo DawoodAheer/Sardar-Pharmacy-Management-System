@@ -219,7 +219,7 @@ const Register = () => {
       {/* LEFT PANEL */}
       <div className="hidden md:flex md:w-[45%] flex-col justify-between bg-[#0C1628] p-12 relative overflow-hidden">
         {/* Grid */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-size-[40px_40px] pointer-events-none"></div>
 
         {/* Glow Orbs */}
         <div className="absolute w-64 h-64 -top-16 -left-16 bg-blue-600/20 rounded-full blur-[60px] pointer-events-none"></div>
@@ -228,7 +228,7 @@ const Register = () => {
 
         {/* Brand */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+          <div className="w-10 h-10 rounded-xl bg-linear-to-br from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
             <span className="text-xl font-bold text-white">⚕</span>
           </div>
 
@@ -253,7 +253,7 @@ const Register = () => {
           <h1 className="font-sans font-extrabold text-4xl lg:text-5xl leading-tight text-white tracking-tight">
             <span className="block">Your account,</span>
             <span className="block">your medicines,</span>
-            <span className="block bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-400">
+            <span className="block bg-clip-text text-transparent bg-linear-to-r from-blue-400 to-teal-400">
               all in one place.
             </span>
           </h1>
@@ -357,7 +357,7 @@ const Register = () => {
                         setFirstName
                       )
                     }
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                       errors.firstName
                         ? 'border-red-400'
                         : 'border-slate-200'
@@ -405,7 +405,7 @@ const Register = () => {
                         setLastName
                       )
                     }
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                       errors.lastName
                         ? 'border-red-400'
                         : 'border-slate-200'
@@ -450,7 +450,7 @@ const Register = () => {
                   onChange={(e) =>
                     handleInputChange('email', e.target.value, setEmail)
                   }
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                  className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                     errors.email ? 'border-red-400' : 'border-slate-200'
                   }`}
                 />
@@ -492,7 +492,7 @@ const Register = () => {
                   onChange={(e) =>
                     handleInputChange('phone', e.target.value, setPhone)
                   }
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                  className={`w-full pl-10 pr-4 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                     errors.phone ? 'border-red-400' : 'border-slate-200'
                   }`}
                 />
@@ -538,7 +538,7 @@ const Register = () => {
                       setPassword
                     )
                   }
-                  className={`w-full pl-10 pr-10 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                  className={`w-full pl-10 pr-10 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                     errors.password
                       ? 'border-red-400'
                       : 'border-slate-200'
@@ -643,7 +643,7 @@ const Register = () => {
                       setConfirmPassword
                     )
                   }
-                  className={`w-full pl-10 pr-10 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
+                  className={`w-full pl-10 pr-10 py-3 rounded-xl border bg-slate-50 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#1A56A0] focus:ring-2 focus:ring-blue-500/30 transition-all text-sm ${
                     errors.confirmPassword
                       ? 'border-red-400'
                       : 'border-slate-200'

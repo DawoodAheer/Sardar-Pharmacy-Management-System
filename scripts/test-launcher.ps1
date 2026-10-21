@@ -13,10 +13,30 @@ try {
     foreach ($directory in @('server/controllers','server/models','server/utils','server/routes','server/config','server/middleware','client/src','client/public')) {
         New-Item -ItemType Directory -Path (Join-Path $testRoot $directory) -Force | Out-Null
     }
+    New-Item -ItemType Directory -Path (Join-Path $testRoot 'client/vendor') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $testRoot 'client/vendor/dependency.tgz') -Value 'initial dependency'
     $harness = @'
 param([string]$Scenario, [string]$Fixture)
 $env:PHARMACY_PORT = '5190'
 $blocker = $null
+$rangeBlockers = @()
+if ($Scenario -eq 'port-range-conflict') {
+    foreach ($basePort in 57000..57100) {
+        try {
+            foreach ($port in $basePort..($basePort + 10)) {
+                $probe = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Any, $port)
+                $probe.Start()
+                $rangeBlockers += $probe
+            }
+            $env:PHARMACY_PORT = [string]$basePort
+            break
+        } catch {
+            foreach ($probe in $rangeBlockers) { $probe.Stop() }
+            $rangeBlockers = @()
+        }
+    }
+    if ($rangeBlockers.Count -ne 11) { throw 'Could not prepare an occupied port range.' }
+}
 if ($Scenario -eq 'port-conflict') {
     $blocker = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Any, 0)
     $blocker.Start()
@@ -40,6 +60,10 @@ function global:Invoke-RestMethod {
 }
 & (Join-Path $Fixture 'scripts/start-pharmacy.ps1') -NoOpen -NoShortcut
 $launcherExitCode = $LASTEXITCODE
+if ($rangeBlockers.Count) {
+    foreach ($probe in $rangeBlockers) { $probe.Stop() }
+    if ([int]$env:PHARMACY_PORT -ge $basePort -and [int]$env:PHARMACY_PORT -le ($basePort + 10)) { throw 'Launcher reused an occupied port range.' }
+}
 if ($blocker) {
     $blocker.Stop()
     if ($env:PHARMACY_PORT -eq $blockedPort) { throw 'Launcher reused an occupied port.' }
@@ -56,8 +80,15 @@ exit $launcherExitCode
     if ($LASTEXITCODE -ne 0) { throw 'Daily launch simulation failed.' }
     if ((Get-Content -LiteralPath (Join-Path $testRoot 'calls.txt') -Raw) -match '--build') { throw 'Unchanged daily launch rebuilt services.' }
     if ((Get-FileHash -LiteralPath (Join-Path $testRoot '.env')).Hash -ne $settingsHash) { throw 'Daily launch replaced installation secrets.' }
+    Set-Content -LiteralPath (Join-Path $testRoot 'client/vendor/dependency.tgz') -Value 'updated dependency'
+    Clear-Content -LiteralPath (Join-Path $testRoot 'calls.txt')
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'success' -Fixture $testRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Vendored dependency launch failed.' }
+    if ((Get-Content -LiteralPath (Join-Path $testRoot 'calls.txt') -Raw) -notmatch 'compose up.*--build') { throw 'Changed vendored dependency did not trigger a rebuild.' }
     & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'port-conflict' -Fixture $testRoot
     if ($LASTEXITCODE -ne 0) { throw 'Occupied-port fallback failed.' }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario 'port-range-conflict' -Fixture $testRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Occupied port-range fallback failed.' }
     foreach ($scenario in @('same-folder', 'mixed-folders')) {
         Clear-Content -LiteralPath (Join-Path $testRoot 'calls.txt')
         & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $testRoot 'harness.ps1') -Scenario $scenario -Fixture $testRoot

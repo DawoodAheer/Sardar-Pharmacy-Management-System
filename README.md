@@ -12,13 +12,15 @@ A local pharmacy application for Windows, with Docker, MongoDB, an Express API a
 
 Node.js, Git and a separate MongoDB installation are not required for this Docker setup. The shortcut opens an Edge/Chrome app window. Daily launches reuse unchanged images; changed source is rebuilt.
 
-The normal address is `http://localhost:5174`. If occupied, the launcher chooses a nearby free port and prints/opens that address. It reuses the running installation's port. MongoDB and the backend communicate inside Docker without reserving host ports 27017 or 5001. A separate development instance has a different database; use the desktop shortcut to avoid confusing the two.
+The normal address is `http://localhost:5174`. If occupied or reserved by Windows, the launcher tries nearby ports and separate fallback ranges (8080 and 3000), then prints/opens the selected address. It reuses the running installation's port. MongoDB and the backend communicate inside Docker without reserving host ports 27017 or 5001. A separate development instance has a different database; use the desktop shortcut to avoid confusing the two.
 
 When starting from a different ZIP folder, the launcher recreates this project's containers together so they all belong to the current installation folder. It retains the existing database volume. Keep uploaded files, backups and `.env` when moving/updating an installation.
 
 If Docker reports that its hypervisor is not running, use **Repair-Docker-Windows.bat**, accept the Windows Administrator prompt and restart Windows when instructed. The helper never automatically reboots or deletes data.
 
 ## Fresh installation and accounts
+
+**Counter billing:** New Bill accepts a pack sale price and tablets/units per pack, calculates the unit sale rate, shows stock before/after the sale, and supports audited physical-count corrections. See [counter billing instructions](docs/COUNTER-BILLING.md).
 
 A **fresh database volume** contains zero medicines and zero bills. An older installation's existing database is retained during updates.
 
@@ -44,11 +46,11 @@ The initial password is `Dawood@@5786`. Change initial passwords before business
 
 ## Excel expiry dates and units
 
-Rows needing correction stay in **Medicine Rows Needing Review**. Choose **Review rows** to open a scrollable list with 10 rows per page, then **Fix & Add** to open a separate correction dialog. Corrected unique medicines are added with an audit entry. An unchanged name/company duplicate is rejected without overwriting stock; discard a repeated row, or use Batch inventory for a genuine new delivery of an existing medicine.
+Rows needing correction stay in **Medicine Rows Needing Review**. Choose **Review rows** to open a scrollable list with 10 rows per page, then **Fix & Add** to open a separate correction dialog. Corrected unique medicines are added with an audit entry. A same-name delivery waits for Admin stock approval. Use Review stock addition to verify current + delivered = final units before approving; it retains one target medicine and records a new delivery batch.
 
 Template/export dates use **YYYY-MM-DD**, for example `2028-05-22`. Text dates also accept **DD/MM/YYYY**, for example `22/05/2028`. Actual Excel date cells retain their date even when displayed as MM/DD/YYYY. Plain text `03/04/2028` means **3 April**, not March 4.
 
-Purchase cost is per pack; units per pack determine the unit cost. Sale price and stock quantity are per sellable unit. Optional blanks default to one unit per pack, zero stock, sale price equal to unit cost, and no expiry/manufacturer/rack. Invalid supplied values are rejected.
+Purchase cost is per pack; units per pack determine the unit cost. The current template/export accepts sale price per pack; the application divides it by units per pack to store a per-unit rate. Stock quantity is entered in total sellable units. Legacy per-unit import headers remain supported. Optional blanks default to one unit per pack, zero stock, sale price equal to unit cost, and no expiry/manufacturer/rack. Invalid supplied values are rejected.
 
 ## Offline operation
 
@@ -112,3 +114,7 @@ Private `.env` files, database files, uploads, backups, logs, node_modules and g
 More guidance: [Windows start and update](WINDOWS-START-AND-UPDATE.md), [new-PC setup](docs/NEW-PC.md), [operations](docs/OPERATIONS.md).
 
 Inventory tables and the New Bill medicine catalog use bounded scrolling; inventory remains server-paginated. CSV export downloads a file without expanding the page. Every committed bill is saved and updates stock and financial reports.
+
+Inventory background exports now use .xlsx with the import-compatible pack-price headings and readable expiry dates. Staff Home dashboards include Sales history / Yearly Excel report with custom inclusive dates, database totals, monthly summaries, and a background export of all matching bills. See [Excel recovery and yearly sales](docs/EXCEL-RECOVERY-SALES.md) for recovery scope and refund-date rules.
+
+Duplicate medicine deliveries now wait for Admin stock approval. Review shows the current quantity, delivery units and resulting total; only one approved addition is recorded per request, with batch costs/expiry and audit history. See [Duplicate stock approval](docs/DUPLICATE-STOCK-APPROVAL.md).

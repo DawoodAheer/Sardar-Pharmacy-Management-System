@@ -25,8 +25,8 @@ const UdharManagement = lazy(() => import('./pages/UdharManagement'));
 const MobileScanner = lazy(() => import('./pages/MobileScanner'));
 
 const RouteFallback = () => (
-  <div className="flex min-h-[50vh] items-center justify-center bg-[var(--page-bg)] px-4">
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+  <div className="flex min-h-[50vh] items-center justify-center bg-(--page-bg) px-4">
+    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-xs dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
       <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal-200 border-t-teal-600" />
       Loading workspace...
     </div>
@@ -43,13 +43,13 @@ const BrowserNotificationProvider = ({ children }) => {
 const DashboardLayout = () => {
   return (
     <BrowserNotificationProvider>
-      <div className="flex min-h-screen flex-col bg-[var(--page-bg)] font-sans text-[var(--text-body)] transition-colors duration-200">
+      <div className="flex min-h-screen flex-col bg-(--page-bg) font-sans text-(--text-body) transition-colors duration-200">
         <Navbar />
 
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
 
-          <main className="flex-1 overflow-y-auto bg-[var(--page-bg)] pb-14 md:pb-0">
+          <main className="flex-1 overflow-y-auto bg-(--page-bg) pb-14 md:pb-0">
             <Outlet />
           </main>
         </div>

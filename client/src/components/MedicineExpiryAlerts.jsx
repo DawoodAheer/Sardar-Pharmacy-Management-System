@@ -84,7 +84,7 @@ export default function MedicineExpiryAlerts() {
   if (!total && !isFetching) return null;
 
   return (
-    <section className="rounded-2xl border border-amber-200 bg-white shadow-sm dark:border-amber-900/50 dark:bg-slate-900 overflow-hidden">
+    <section className="rounded-2xl border border-amber-200 bg-white shadow-xs dark:border-amber-900/50 dark:bg-slate-900 overflow-hidden">
       <PageControls page={page} pages={data?.pages || 1} total={total} onChange={setPage} />
       {/* Header */}
       <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50/70 px-5 py-4 dark:border-amber-900/40 dark:bg-amber-950/20">

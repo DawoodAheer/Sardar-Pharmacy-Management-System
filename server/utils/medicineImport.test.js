@@ -43,3 +43,19 @@ test('parses Excel serial dates and common pharmacy date formats', () => {
   assert.equal(parseMedicineExpiryDate(46923).toISOString().slice(0, 10), '2028-06-19');
   assert.equal(parseMedicineExpiryDate('46923').toISOString().slice(0, 10), '2028-06-19');
 });
+
+test('pack sale prices are divided once; only name and purchase cost are required', () => {
+ const minimal = normalizeMedicineImportRow({'Medicine name':'Minimal','Purchase cost per pack (PKR)':200,Manufacturer:'','Expiry date':'','Units per pack':'','Sale price per pack (PKR)':'','Stock quantity (units)':'','Rack / shelf location':''});
+ assert.deepEqual(minimal.errors,[]);
+ assert.equal(minimal.medicine.unitsPerPack,1); assert.equal(minimal.medicine.price,200); assert.equal(minimal.medicine.quantity,0); assert.equal(minimal.medicine.expiryDate,null);
+ const pack = normalizeMedicineImportRow({name:'Tablets',purchasePrice:200,unitsPerPack:10,'Sale price per pack (PKR)':300});
+ assert.deepEqual(pack.errors,[]); assert.equal(pack.medicine.price,30);
+ assert.equal(normalizeMedicineImportRow({name:'Precise',purchasePrice:200,unitsPerPack:20,packSalePrice:400.73}).medicine.price,20.0365);
+ const legacy = normalizeMedicineImportRow({name:'Old sheet',purchasePrice:200,unitsPerPack:10,'Sale price per unit (PKR)':30});
+ assert.deepEqual(legacy.errors,[]); assert.equal(legacy.medicine.price,30);
+ assert.equal(normalizeMedicineImportRow({name:'Zero sale',purchasePrice:200,unitsPerPack:10,packSalePrice:0}).medicine.price,0);
+ assert.ok(normalizeMedicineImportRow({name:'Both',purchasePrice:200,unitsPerPack:10,price:30,packSalePrice:300}).errors.length);
+ assert.ok(normalizeMedicineImportRow({name:'No purchase'}).errors.length);
+ assert.ok(normalizeMedicineImportRow({purchasePrice:200}).errors.length);
+ assert.ok(normalizeMedicineImportRow({name:'Bad price',purchasePrice:200,packSalePrice:'bad'}).errors.length);
+});

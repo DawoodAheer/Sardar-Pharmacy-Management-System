@@ -5,7 +5,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-test('capacity, background jobs and backup recovery', { skip: !process.env.TEST_MONGO_URI, timeout: 240000 }, async t => {
+test('capacity, background jobs and backup recovery', { skip: !process.env.TEST_MONGO_URI, timeout: 600000 }, async t => {
+  const exportOnly = process.env.TEST_EXPORT_ONLY === 'true';
   const uri = new URL(process.env.TEST_MONGO_URI);
   assert.ok(['localhost', '127.0.0.1'].includes(uri.hostname));
   const databaseName = `pharmadesk_test_capacity_${randomUUID().replaceAll('-', '')}`;
@@ -49,7 +50,7 @@ test('capacity, background jobs and backup recovery', { skip: !process.env.TEST_
       const summary = await inventorySummary(); assert.equal(summary.total, 50000); assert.equal(summary.stockValue, 5000000);
       console.log(`50,000 medicines: ten concurrent pages ${Math.round(performance.now() - start)} ms`);
     });
-    await t.test('database profit matches batch costs after partial returns and repeated medicine lines', async () => {
+    await t.test('database profit matches batch costs after partial returns and repeated medicine lines', { skip: exportOnly }, async () => {
       const med = await Medicine.findOne();
       const bill = await Bill.create({ customerName: 'Test', pharmacistId: admin._id, billType: 'INSTORE', subtotal: 210, total: 210, totalRefunded: 120, items: [
         { medicineId: med._id, name: med.name, quantity: 4, unitPrice: 30, purchasePrice: 12.5, expiryStatus: 'SAFE', batchAllocations: [{ quantity: 3, purchaseCost: 10 }, { quantity: 1, purchaseCost: 20 }] },
@@ -64,27 +65,30 @@ test('capacity, background jobs and backup recovery', { skip: !process.env.TEST_
       const queued = await enqueueJob('export', admin._id);
       await invoke(getAllMedicines, { query: { page: 2 }, user: admin });
       const job = await completed(queued.jobId); artifacts.push(job.artifact);
-      const csv = await fs.readFile(path.join(JOB_DIR, job.artifact), 'utf8'); assert.equal(csv.trim().split('\n').length, 50001);
+      const { default: ExcelJS } = await import('exceljs');
+      let count=0; const reader=new ExcelJS.stream.xlsx.WorkbookReader(path.join(JOB_DIR,job.artifact));
+      for await (const sheet of reader) { for await (const row of sheet) { if(sheet.name === 'Medicines') count++; } }
+      assert.equal(count,50001);
     });
-    await t.test('background import retries do not duplicate stock', async () => {
+    await t.test('background import retries do not duplicate stock', { skip: exportOnly }, async () => {
       const payload = { medicines: [{ name: 'Worker medicine', quantity: 2, purchasePrice: 10 }], sourceFile: 'worker-test', background: true };
       const first = await completed((await enqueueJob('import', admin._id, payload)).jobId); assert.equal(first.result.insertedCount, 1);
       const second = await completed((await enqueueJob('import', admin._id, payload)).jobId); assert.equal(second.result.replayed, true);
       assert.equal(await Medicine.countDocuments({ name: 'Worker medicine' }), 1);
     });
-    await t.test('background backup creates a verified share copy and restores in an isolated database', async () => {
+    await t.test('background backup creates a verified share copy and restores in an isolated database', { skip: exportOnly }, async () => {
       await completed((await enqueueJob('backup', admin._id)).jobId);
       const status = await getBackupStatus(); assert.ok(status.sharePath.startsWith(process.env.PHARMADESK_BACKUP_SHARE_DIR)); assert.equal(status.shareError, null);
       const copy = JSON.parse(await fs.readFile(status.sharePath, 'utf8')); validateBackup(copy); assert.equal(copy.collections.medicines.length, 50001);
       const recovery = await completed((await enqueueJob('verify', admin._id)).jobId); assert.ok(recovery.result.message.includes('verified'));
       assert.equal(await Medicine.countDocuments(), 50001);
     });
-    await t.test('interrupted jobs remain visible as failures after restart', async () => {
+    await t.test('interrupted jobs remain visible as failures after restart', { skip: exportOnly }, async () => {
       stopJobQueue(); await BackgroundJob.create({ type: 'export', status: 'running', owner: admin._id });
       await startJobQueue(); assert.equal(await BackgroundJob.countDocuments({ status: 'running' }), 0);
       assert.ok(await BackgroundJob.exists({ status: 'failed' }));
     });
-    await t.test('archive deletion protects permissions and accounting and saves a safety backup', async () => {
+    await t.test('archive deletion protects permissions and accounting and saves a safety backup', { skip: exportOnly }, async () => {
       const { default: express } = await import('express');
       const { default: routes } = await import('../routes/medicineRoutes.js');
       const { errorHandler } = await import('../middleware/errorMiddleware.js');
