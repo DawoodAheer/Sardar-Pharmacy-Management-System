@@ -44,6 +44,17 @@ try {
         if (-not (Test-DockerEngine)) { throw 'Docker Engine did not become ready. Check Docker Desktop / WSL setup.' }
     }
     Invoke-Docker -Arguments @('compose', 'version')
+    . (Join-Path $PSScriptRoot 'preserve-installation.ps1')
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $existingBackendJson = & docker inspect pharmadesk-backend 2>$null
+        $existingBackendExit = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $savedPreference }
+    if ($existingBackendExit -eq 0 -and $existingBackendJson) {
+        $existingBackend = ($existingBackendJson | ConvertFrom-Json)[0]
+        Preserve-PharmacyInstallation -ProjectDirectory $projectDirectory -Backend $existingBackend
+    }
     $preferredPort = 5174
     if ($env:PHARMACY_PORT) {
         if (-not [int]::TryParse($env:PHARMACY_PORT, [ref]$preferredPort) -or $preferredPort -lt 1024 -or $preferredPort -gt 65525) { throw 'PHARMACY_PORT must be a port between 1024 and 65525.' }
@@ -98,7 +109,7 @@ try {
     }
     Write-Host 'Preparing services. The first launch needs internet and can take several minutes.'
     $sourceFiles = @('docker-compose.yml', 'server/Dockerfile', 'server/package.json', 'server/package-lock.json', 'server/server.js', 'server/env-loader.js', 'client/Dockerfile', 'client/nginx.conf', 'client/package.json', 'client/package-lock.json', 'client/index.html', 'client/vite.config.js')
-    $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore', 'client/postcss.config.js') | Where-Object { Test-Path -LiteralPath $_ }
+    $sourceFiles += @('VERSION', '.dockerignore', 'server/.dockerignore', 'client/.dockerignore', 'client/postcss.config.js', 'docker-compose.override.yml') | Where-Object { Test-Path -LiteralPath $_ }
     $sourceDirectories = @('server/controllers','server/models','server/utils','server/routes','server/config','server/middleware','client/src','client/public')
     if (Test-Path -LiteralPath 'client/vendor') { $sourceDirectories += 'client/vendor' }
     $sourceFiles += Get-ChildItem -LiteralPath $sourceDirectories -Recurse -File | ForEach-Object { $_.FullName }

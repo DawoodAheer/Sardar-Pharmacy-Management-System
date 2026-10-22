@@ -1,0 +1,20 @@
+SARDAR MEDICAL STORE - EXTRACT AND START
+
+1. Extract this ZIP into a NEW folder on the SAME laptop.
+2. Open the extracted Sardar-Pharmacy-Management-System-main folder.
+3. Double-click Start-Sardar-Pharmacy.bat.
+
+Docker Desktop must be installed. The launcher can start Docker Desktop.
+Keep internet connected for the first rebuild and wait until Ready appears.
+The application opens after the database and API are ready.
+
+You do not need to copy or replace files in the previous installation.
+The launcher automatically reuses the existing Docker database, installation
+settings and data folders. Existing medicines, accounts and bills remain.
+KEEP the old installation folder: its uploads, backups and job files are reused.
+On a laptop with no existing installation, the app starts as a fresh installation.
+
+After startup, sign out/sign in if needed and retry the Excel import.
+For daily use, open the Sardar Medical Store desktop shortcut.
+If startup reports an error, keep its window and send the message for support.
+Never use Reset-Pharmacy-Data.bat to repair an import problem.

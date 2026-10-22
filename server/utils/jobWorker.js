@@ -17,9 +17,14 @@ try {
   job = await BackgroundJob.findById(process.argv[2]);
   if (!job || job.status !== 'running') throw new Error('Job is not running');
   if (job.owner) {
-    const owner = await User.findById(job.owner).select('role isActive accountStatus').lean();
+    // Match the API's hydrated User lookup: old accounts can predate isActive.
+    // A lean document omits schema defaults and incorrectly rejects those users.
+    const owner = await User.findById(job.owner).select('role isActive accountStatus');
     const roles = ['backup', 'verify', 'purge'].includes(job.type) ? ['superadmin'] : ['superadmin', 'pharmacist'];
-    if (!owner?.isActive || !roles.includes(owner.role) || (owner.role !== 'superadmin' && owner.accountStatus !== 'approved')) throw new Error('The account no longer has permission to run this job.');
+    if (!owner) throw new Error('The job owner account no longer exists. Sign in again.');
+    if (!owner.isActive) throw new Error('This account is inactive. Contact an Admin.');
+    if (!roles.includes(owner.role)) throw new Error('Your current role does not have permission to run this job. Contact an Admin.');
+    if (owner.role !== 'superadmin' && owner.accountStatus !== 'approved') throw new Error('This account is not approved. Contact an Admin.');
   }
   const payload = job.payloadFile ? JSON.parse(await fs.readFile(path.join(JOB_DIR, path.basename(job.payloadFile)), 'utf8')) : {};
   let result, artifact;

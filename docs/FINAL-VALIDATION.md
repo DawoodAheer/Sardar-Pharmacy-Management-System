@@ -1,5 +1,13 @@
 # Final release verification — 22 October 2026
 
+## Follow-up: legacy account background import repair
+
+- New extracted-folder launcher now automatically preserves the existing installation settings and five backend data mounts using a local ignored Compose override. No manual source replacement is required. The old installation folder must remain available. Fixture checks covered preservation, repeated application and unrelated-project refusal; the launcher regression suite passed. Docker Compose configuration validation against the actual installation confirmed unchanged data mount sources and MongoDB volume without changing running services.
+- Reproduced the other laptop's exact permission failure with an approved legacy Admin and Pharmacist lacking a stored `isActive` field: preview accepted 35 rows, but the old lean worker lookup rejected the job.
+- Changed the worker to use a hydrated User lookup matching API authentication. Inactive, pending, demoted and missing accounts remain denied. Error messages now distinguish those causes and the frontend displays background job errors and identifiers.
+- Enabled disposable-database regression: 4 tests passed, zero failures, covering both 35-row imports, replay protection and revoked permissions. Standard tests: 60 server plus 19 client assertions passed; 9 database-dependent tests were skipped in that standard run. Frontend strict lint and production build passed.
+- Repair helper fixture passed first application and repeated application, preserving a backup of the original source. The repair helper rebuilds through the existing launcher without resetting data. This verifies the local fix; installation and retry on the other laptop are still required.
+
 Status: no blocking failure found in the verified workflows. GitHub publishing was authorized by the user on 22 October 2026; verification history below records the earlier upload hold.
 
 - Current source passed 73 unit assertions, strict frontend lint and the production frontend build in the preceding recheck. No application code changed afterward; the launcher fixes were separately regression-tested again for this final release check.

@@ -1077,6 +1077,7 @@ const PharmacistDashboard = () => {
       onError: (err) => {
         setBulkError(
           err.response?.data?.message ||
+            err.message ||
             'Bulk import failed'
         );
       },

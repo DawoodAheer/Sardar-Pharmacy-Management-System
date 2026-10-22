@@ -20,6 +20,7 @@ client/.vite/
 client/node_modules/
 
 # Local env files
+docker-compose.override.yml
 .env.local
 .env.development.local
 .env.test.local

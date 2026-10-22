@@ -4,6 +4,7 @@ $testRoot = Join-Path $projectDirectory ('launcher-test-' + [Guid]::NewGuid().To
 try {
     New-Item -ItemType Directory -Path (Join-Path $testRoot 'scripts') | Out-Null
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start-pharmacy.ps1') -Destination (Join-Path $testRoot 'scripts/start-pharmacy.ps1')
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'preserve-installation.ps1') -Destination (Join-Path $testRoot 'scripts/preserve-installation.ps1')
     $entries = @('docker-compose.yml','server/Dockerfile','server/package.json','server/package-lock.json','server/server.js','server/env-loader.js','client/Dockerfile','client/nginx.conf','client/package.json','client/package-lock.json','client/index.html','client/vite.config.js')
     foreach ($entry in $entries) {
         $target = Join-Path $testRoot $entry

@@ -127,7 +127,7 @@ export default function MedicineImportIssues() {
         queryClient.invalidateQueries({ queryKey: ['superadminMedicines'] }),
       ]);
     },
-    onError: (e) => setMsg(e?.response?.data?.message || 'Import failed.'),
+    onError: (e) => setMsg(e?.response?.data?.message || e?.message || 'Import failed.'),
   });
 
   const discardMutation = useMutation({
