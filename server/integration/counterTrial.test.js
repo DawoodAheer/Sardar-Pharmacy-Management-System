@@ -40,12 +40,10 @@ test('counter trial using a copied real inventory medicine without live changes'
     assert.equal((await Medicine.findById(med._id)).quantity, original - 5 - units);
     await post(`/bills/${loose.bill._id}/return`, { returns: [{ medicineId: med._id, quantityReturned: 5, reason: 'Isolated trial' }] }, 200);
     assert.equal((await Medicine.findById(med._id)).quantity, original - units);
-    const pending = await post('/medicines', { name: med.name, purchasePrice: med.purchasePrice, unitsPerPack: units, quantity: 10, price: med.price, expiryDate: med.expiryDate }, 202);
-    assert.equal((await Medicine.findById(med._id)).quantity, original - units);
-    await post(`/medicines/import-issues/${pending.issueId}/approve-stock`, { medicineId: med._id, expectedQuantity: original - units }, 200);
+    const pending = await post('/medicines', { name: med.name, purchasePrice: med.purchasePrice, unitsPerPack: units, quantity: 10, price: med.price, expiryDate: med.expiryDate }, 201);
     assert.equal((await Medicine.findById(med._id)).quantity, original - units + 10);
     assert.equal(await Medicine.countDocuments(), 1);
-    console.log('COPIED-INVENTORY PASS: loose tablets, full pack, discount, refund and Admin duplicate approval; live records untouched.');
+    console.log('COPIED-INVENTORY PASS: loose tablets, full pack, discount, refund and automatic duplicate delivery; live records untouched.');
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     if (mongoose.connection.name === databaseName) await mongoose.connection.dropDatabase();

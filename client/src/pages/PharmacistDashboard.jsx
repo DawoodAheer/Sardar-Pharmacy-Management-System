@@ -943,7 +943,7 @@ const PharmacistDashboard = () => {
       },
 
       onSuccess: (result) => {
-        setMedicineNotice(result.approvalRequired ? result.message : 'Medicine saved.');
+        setMedicineNotice(result.stockAddition ? `Same medicine found: ${result.stockAddition.previousQuantity} + ${result.stockAddition.addedQuantity} = ${result.stockAddition.newQuantity} units.` : 'Medicine saved.');
         queryClient.invalidateQueries({queryKey:['medicineImportIssues']});
         queryClient.invalidateQueries({
           queryKey: ['medicines'],
@@ -973,7 +973,7 @@ const PharmacistDashboard = () => {
         const response =
           await api.put(
             `/medicines/${id}`,
-            updatedData
+            { ...updatedData, expectedQuantity: editingMedicine?.quantity }
           );
 
         return response.data;
@@ -1065,7 +1065,7 @@ const PharmacistDashboard = () => {
             data?.insertedCount || 0
           } medicines. Skipped ${
             data?.skippedCount || 0
-        }. Invalid rows are saved for Admin and Pharmacist review.`
+        }. Same-name deliveries added: ${data?.mergedCount || 0}. Invalid rows are saved for review.`
         );
 
         setBulkFile(null);
@@ -1133,7 +1133,7 @@ const PharmacistDashboard = () => {
 
 
     setPrice(
-      medicine?.price == null ? '' : medicine.price * (medicine.unitsPerPack || 1)
+      medicine?.price == null ? '' : Math.round((Number(medicine.price) * Number(medicine.unitsPerPack || 1)) * 100) / 100
     );
 
     setPurchasePrice(
@@ -5606,7 +5606,7 @@ const PharmacistDashboard = () => {
                   <p className="text-xs font-bold text-blue-900">Preview: {bulkPreviewResult.validCount} valid · {bulkPreviewResult.invalidCount} skipped / need correction · {bulkPreviewResult.totalRows} total</p>
                   <p className="mt-1 text-[10px] text-blue-800">Valid rows will be imported after confirmation. Invalid rows are saved for Admin and Pharmacist review.</p>
                   <div className="mt-2 space-y-1">
-                    {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/pack {Number.isFinite(row.medicine.price) && Number.isFinite(row.medicine.unitsPerPack) ? row.medicine.price * row.medicine.unitsPerPack : '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
+                    {bulkPreviewResult.rows.slice(0, 80).map((row) => <div key={row.rowNumber} className={`rounded-lg border p-2 text-[10px] ${row.errors.length ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}><strong>Row {row.rowNumber}: {row.medicine.name || 'Unnamed'}</strong><span className="ml-2">Purchase {Number.isFinite(row.medicine.purchasePrice) ? row.medicine.purchasePrice : '—'} · Units/pack {row.medicine.unitsPerPack || '—'} · Sale/pack {Number.isFinite(row.medicine.price) && Number.isFinite(row.medicine.unitsPerPack) ? row.medicine.price * row.medicine.unitsPerPack : '—'} · Sale/unit {Number.isFinite(row.medicine.price) ? row.medicine.price : '—'} · Stock {Number.isFinite(row.medicine.quantity) ? row.medicine.quantity : '—'} · Expiry {row.medicine.expiryDate ? new Date(row.medicine.expiryDate).toLocaleDateString('en-PK') : '—'}</span>{row.notice && <p className="font-semibold">{row.notice}</p>}{row.errors.length > 0 && <ul className="mt-1 list-inside list-disc">{row.errors.map((error, index) => <li key={index}>{error}</li>)}</ul>}</div>)}
                     {bulkPreviewResult.rows.length > 80 && <p className="text-[10px] text-slate-600">Showing first 80 rows. {bulkPreviewResult.rows.length - 80} more rows are included in the preview validation.</p>}
                   </div>
                 </div>

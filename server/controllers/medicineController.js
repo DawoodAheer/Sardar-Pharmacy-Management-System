@@ -4,7 +4,7 @@ import { MANUFACTURER_SORT, MEDICINE_COLLATION } from '../utils/medicineOrdering
 import { createHash } from 'node:crypto';
 import { enqueueJob } from '../utils/backgroundJobs.js';
 import MedicineImportRun from '../models/MedicineImportRun.js';
-import { ensureBatches, syncBatchTotals, allocateBatches, consumeStock, saleExpiryStatus } from '../utils/batchInventory.js';
+import { ensureBatches, syncBatchTotals, setCountedStock, appendDelivery, allocateBatches, consumeStock, saleExpiryStatus } from '../utils/batchInventory.js';
 import mongoose from 'mongoose';
 import Medicine from '../models/Medicine.js';
 import MedicineImportIssue from '../models/MedicineImportIssue.js';
@@ -160,13 +160,16 @@ export const createMedicine = async (req, res, next) => {
 
     await prepareInventoryLock();
     const session = await mongoose.startSession();
-    let medicine, pendingIssue;
+    let medicine, stockAddition;
     try {
       await session.withTransaction(async () => {
         await lockInventory(session);
         const duplicate=await findSameName(name,session);
         if(duplicate){
-          [pendingIssue]=await MedicineImportIssue.create([{sourceFile:'Manual entry',rowNumber:1,originalRow:req.body,normalizedRow:normalized.medicine,validationErrors:['Same medicine name exists. Admin approval is required to add delivery stock.'],createdBy:req.user._id}],{session});
+          const previousValues = snapshotMedicine(duplicate);
+          stockAddition = appendDelivery(duplicate, normalized.medicine);
+          medicine = await duplicate.save({ session });
+          await recordMedicineAudit({ medicine, action: 'stock_adjusted', previousValues, performedBy: req.user._id, reason: 'Same-name delivery added', session });
           return;
         }
         [medicine] = await Medicine.create([{
@@ -185,7 +188,6 @@ export const createMedicine = async (req, res, next) => {
       });
     } finally { await session.endSession(); }
 
-    if(pendingIssue)return res.status(202).json({approvalRequired:true,issueId:pendingIssue._id,message:'Same-name medicine found. Delivery stock is waiting for Admin approval; stock was not changed.'});
     const populatedMed = await Medicine.findById(medicine._id).populate('createdBy', 'name email');
     const medObj = populatedMed.toObject();
     medObj.expiryStatus = checkExpiryStatus(populatedMed.expiryDate);
@@ -195,7 +197,7 @@ export const createMedicine = async (req, res, next) => {
       console.error('[New Medicine Alert Error]:', err.message);
     });
 
-    res.status(201).json(medObj);
+    res.status(201).json({ ...medObj, stockAddition });
   } catch (error) {
     next(error);
   }
@@ -238,11 +240,14 @@ export const updateMedicine = async (req, res, next) => {
         if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) < 0)) { const error = new Error('Stock quantity must be a non-negative whole number of tablets or units'); error.statusCode = 400; throw error; }
         
 
-        if (medicine.batches?.length && ((quantity !== undefined && Number(quantity) !== medicine.quantity) ||
-          (expiryDate !== undefined && new Date(expiryDate).getTime() !== new Date(medicine.expiryDate).getTime()) ||
-          nextPurchasePrice !== medicine.purchasePrice || nextUnitsPerPack !== medicine.unitsPerPack)) {
-          const error = new Error('Use Batch inventory to change batch stock, expiry or purchase costs.'); error.statusCode = 400; throw error;
+        if (req.body.expectedQuantity !== undefined && Number(req.body.expectedQuantity) !== medicine.quantity) {
+          const error = new Error('Stock changed since this form opened. Refresh and retry.'); error.statusCode = 409; throw error;
         }
+        const requestedExpiry = expiryDate ? parseMedicineExpiryDate(expiryDate) : undefined;
+        if (expiryDate && !requestedExpiry) { const error = new Error('Invalid expiry date.'); error.statusCode = 400; throw error; }
+        const expiryChanged = expiryDate !== undefined && String(requestedExpiry || '') !== String(medicine.expiryDate || '');
+        const costChanged = nextPurchasePrice !== medicine.purchasePrice || nextUnitsPerPack !== medicine.unitsPerPack;
+        ensureBatches(medicine);
         const previousValues = snapshotMedicine(medicine);
         medicine.name = nextName;
         
@@ -250,15 +255,25 @@ export const updateMedicine = async (req, res, next) => {
         
         
         if (expiryDate !== undefined && String(expiryDate) !== String(medicine.expiryDate)) {
-          medicine.expiryDate = expiryDate;
+          medicine.expiryDate = requestedExpiry;
           medicine.expiryAlert10Sent = false; medicine.expiryAlert1Sent = false;
           medicine.expiryAlert180Sent = false; medicine.expiryAlertExpiredSent = false;
         }
-        medicine.quantity = quantity !== undefined ? Number(quantity) : medicine.quantity;
+        const countedQuantity = quantity !== undefined ? Number(quantity) : medicine.quantity;
         
         medicine.price = price !== undefined ? nextSalePrice : medicine.price;
         medicine.purchasePrice = nextPurchasePrice;
         medicine.unitsPerPack = nextUnitsPerPack;
+        for (const batch of medicine.batches) {
+          if (batch.quantity <= 0) continue;
+          if (costChanged) batch.purchaseCost = nextPurchasePrice / nextUnitsPerPack;
+          if (expiryChanged) {
+            batch.expiryDate = requestedExpiry;
+            batch.expiryAlert180Sent = false; batch.expiryAlert10Sent = false;
+            batch.expiryAlert1Sent = false; batch.expiryAlertExpiredSent = false;
+          }
+        }
+        setCountedStock(medicine, countedQuantity);
         
         
         medicine.rackLocation = rackLocation !== undefined ? rackLocation : medicine.rackLocation;
@@ -359,9 +374,8 @@ export const bulkImportMedicines = async (req, res, next) => {
     medicineArray.forEach((row, index) => {
       const { medicine, errors } = normalizeMedicineImportRow(row);
       const key = medicine.name.toLowerCase();
-      if (medicine.name && names.has(key)) errors.push('Same medicine name exists. Admin approval is required to add delivery stock.');
-      if (medicine.name && seen.has(key)) errors.push('Same medicine name is repeated in this file. Admin approval is required to add delivery stock.');
-      const details = { rowNumber: index + (sourceFile ? 2 : 1), medicine,
+      const duplicate = names.has(key) || seen.has(key);
+      const details = { duplicate, notice: duplicate ? 'Same-name medicine: stock will be added automatically.' : '', rowNumber: index + (sourceFile ? 2 : 1), medicine,
         originalRow: row && typeof row === 'object' ? row : { rawValue: row ?? null } };
       if (errors.length) invalidRows.push({ ...details, errors });
       else { seen.add(key); validRows.push(details); }
@@ -385,14 +399,31 @@ export const bulkImportMedicines = async (req, res, next) => {
         const previous = await MedicineImportRun.findById(runId).session(session).lean();
         if (previous) { result = { ...previous.result, replayed: true }; return; }
         const { validRows, invalidRows } = await classify(session);
-        const imported = validRows.length ? await Medicine.insertMany(validRows.map(({ medicine }) => ({ ...medicine, createdBy: req.user._id })), { session, ordered: true }) : [];
+        const inventory = await Medicine.find({ isDeleted: { $ne: true } }).session(session);
+        const byName = new Map(inventory.map(item => [item.name.trim().toLowerCase(), item]));
+        const newMedicines = [], changed = new Map(), stockAdditions = [];
+        for (const { medicine: incoming } of validRows) {
+          const key = incoming.name.trim().toLowerCase();
+          const existing = byName.get(key);
+          if (existing) {
+            const previousValues = snapshotMedicine(existing);
+            stockAdditions.push(appendDelivery(existing, incoming));
+            if (!existing.isNew) changed.set(String(existing._id), existing);
+            await recordMedicineAudit({ medicine: existing, action: 'stock_adjusted', previousValues, performedBy: req.user._id, reason: 'Same-name imported delivery added', session });
+          } else {
+            const doc = new Medicine({ ...incoming, createdBy: req.user._id });
+            newMedicines.push(doc); byName.set(key, doc);
+          }
+        }
+        const imported = newMedicines.length ? await Medicine.insertMany(newMedicines, { session, ordered: true }) : [];
+        for (const medicine of changed.values()) await medicine.save({ session });
         if (imported.length) await MedicineAudit.insertMany(imported.map(medicine => ({ medicineId: medicine._id,
           medicineName: medicine.name, action: 'bulk_imported', newValues: snapshotMedicine(medicine),
           changedFields: AUDITED_MEDICINE_FIELDS, performedBy: req.user._id })), { session, ordered: true });
         const issues = invalidRows.length ? await MedicineImportIssue.insertMany(invalidRows.map(issue => ({ sourceFile,
           rowNumber: issue.rowNumber, originalRow: issue.originalRow, normalizedRow: issue.medicine,
           validationErrors: issue.errors, createdBy: req.user._id })), { session, ordered: true }) : [];
-        result = { message: 'Import saved. Existing stock was not replaced.', importId: runId, insertedCount: imported.length,
+        result = { stockAdditions, mergedCount: stockAdditions.length, message: 'Import saved. Same-name delivery quantities added automatically.', importId: runId, insertedCount: imported.length,
           skippedCount: invalidRows.length, skippedDetails: invalidRows.slice(0, 100).map((row, index) => ({ rowNumber: row.rowNumber,
             name: row.medicine.name || 'Unknown medicine', reason: row.errors.join(' '), issueId: issues[index]._id })) };
         await MedicineImportRun.create([{ _id: runId, sourceFile, createdBy: req.user._id, result }], { session });
@@ -432,16 +463,16 @@ export const resolveMedicineImportIssue = async (req, res, next) => {
           error.statusCode = 404;
           throw error;
         }
-        const existing = await Medicine.find({ isDeleted: { $ne: true } })
-          .select('name manufacturer').session(session).lean();
-        const duplicate = existing.some(item => String(item.name).trim().toLowerCase() === medicine.name.toLowerCase());
-        if (duplicate) {
-          const error = new Error('This medicine name already exists. Use Admin stock approval for a delivery, or correct the name for a genuinely different medicine. Existing stock was not changed.');
-          error.statusCode = 409;
-          throw error;
+        const existing = await findSameName(medicine.name, session);
+        if (existing) {
+          const previousValues = snapshotMedicine(existing);
+          appendDelivery(existing, medicine);
+          created = await existing.save({ session });
+          await recordMedicineAudit({ medicine: created, action: 'stock_adjusted', previousValues, performedBy: req.user._id, reason: 'Corrected import delivery added', session });
+        } else {
+          [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
+          await recordMedicineAudit({ medicine: created, action: 'bulk_imported', changedFields: AUDITED_MEDICINE_FIELDS, performedBy: req.user._id, session });
         }
-        [created] = await Medicine.create([{ ...medicine, createdBy: req.user._id }], { session });
-        await recordMedicineAudit({ medicine: created, action: 'bulk_imported', changedFields: AUDITED_MEDICINE_FIELDS, performedBy: req.user._id, session });
         issue.status = 'resolved';
         issue.resolvedMedicine = created._id;
         issue.resolvedBy = req.user._id;

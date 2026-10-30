@@ -6,7 +6,7 @@ Open **Stock & accounts** from the Admin sidebar or the Pharmacist navigation, o
 
 Receive separate deliveries with a batch number, expiry, whole-unit quantity and purchase cost **per unit**, not per pack. Existing stock is retained as a legacy lot on its first stock transaction. Sales allocate the earliest unexpired lots and save the actual costs on the invoice. Returns restore the original lots. Expired lots remain visible and are excluded from sales; expiry notifications now evaluate each lot independently.
 
-For medicines with batches, use Batch inventory for receipts and Stock adjustment for inventory corrections. Editing the medicine's aggregate quantity, expiry or purchase cost is blocked once batches exist, so its lot history stays consistent. Stock additions through the old adjustment tool inherit the current medicine expiry and unit purchase cost; use batch receipts when those details differ. Remove expired stock using a subtract adjustment, or return the exact purchased lot to its supplier.
+For medicines with batches, use Batch inventory for receipts and Stock adjustment for inventory corrections. Editing the medicine directly from Edit Medicine updates aggregate quantity, purchase costs and expiry across active batches seamlessly. Stock additions through the old adjustment tool inherit the current medicine expiry and unit purchase cost; use batch receipts when those details differ. Remove expired stock using a subtract adjustment, or return the exact purchased lot to its supplier.
 
 ## Supplier accounts
 

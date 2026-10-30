@@ -1,4 +1,3 @@
-import DuplicateStockApproval from './DuplicateStockApproval';
 import { waitForJob } from '../utils/backgroundJobs';
 import PageControls from './PageControls';
 import { useState } from 'react';
@@ -16,7 +15,7 @@ const FIELDS = [
   ['expiryDate', 'Expiry date', 'date'],
   ['purchasePrice', 'Purchase price / pack', 'number'],
   ['unitsPerPack', 'Units per pack', 'number'],
-  ['price', 'Sale price / unit', 'number'],
+  ['packSalePrice', 'Sale price / pack', 'number'],
   ['quantity', 'Stock quantity (units)', 'number'],
   ['rackLocation', 'Rack / shelf', 'text'],
 ];
@@ -25,7 +24,7 @@ const OPTIONAL = [
   'manufacturer',
   'expiryDate',
   'unitsPerPack',
-  'price',
+  'packSalePrice',
   'quantity',
   'rackLocation',
 ];
@@ -149,7 +148,9 @@ export default function MedicineImportIssues() {
   if (data && page > Math.max(1, data.pages)) setPage(Math.max(1, data.pages));
 
   const beginFix = (issue) => {
-    setForm(importIssueForm(issue));
+    const initial = importIssueForm(issue);
+    const { price, ...fields } = initial;
+    setForm({ ...fields, packSalePrice: price === '' ? '' : Math.round((Number(price) * Number(initial.unitsPerPack || 1)) * 100) / 100 });
     resolveMutation.reset();
     setEditing(issue);
     setMsg('');
@@ -235,7 +236,7 @@ export default function MedicineImportIssues() {
     <section className="rounded-xl border border-amber-200 bg-amber-50 dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 p-4">
         <div className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
-          <AlertTriangle size={16} /> Medicine review / Admin stock approvals
+          <AlertTriangle size={16} /> Medicine review
           <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs dark:bg-amber-700 dark:text-amber-200">
             {data?.total || issues.length}
           </span>
@@ -298,7 +299,7 @@ export default function MedicineImportIssues() {
                   ))}
                 </ul>
               </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0"><DuplicateStockApproval issue={issue} onDone={setMsg} />
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => beginFix(issue)}
@@ -345,7 +346,7 @@ export default function MedicineImportIssues() {
               Cancel
             </button>
           </div>
-          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">For a different medicine, correct its name/company and validate. To add duplicate delivery stock to an existing medicine, use Review stock addition with Admin approval. Fix & Add is for a different, correctly named medicine.</p>
+          <p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Correct the row and save. A matching medicine name adds these units to existing stock automatically; a new name creates a medicine.</p>
           {resolveMutation.isError && <p role="alert" className="mb-3 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{msg}</p>}
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -362,7 +363,7 @@ export default function MedicineImportIssues() {
                     type === 'number'
                       ? ['unitsPerPack'].includes(key)
                         ? '1'
-                        : ['quantity', 'reorderLevel', 'price'].includes(key)
+                        : ['quantity', 'reorderLevel', 'packSalePrice'].includes(key)
                         ? '0'
                         : '0.01'
                       : undefined
@@ -371,7 +372,7 @@ export default function MedicineImportIssues() {
                     type === 'number'
                       ? ['unitsPerPack', 'quantity', 'reorderLevel'].includes(key)
                         ? '1'
-                        : '0.01'
+                        : 'any'
                       : undefined
                   }
                   value={form[key] ?? ''}

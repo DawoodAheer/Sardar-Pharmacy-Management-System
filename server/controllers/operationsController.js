@@ -8,7 +8,7 @@ import SaleReturn from '../models/SaleReturn.js';
 import Udhar from '../models/Udhar.js';
 import StockAdjustment from '../models/StockAdjustment.js';
 import { Supplier, SupplierInvoice, CashSession } from '../models/Operations.js';
-import { addBatch, ensureBatches, syncBatchTotals, inventoryError, roundMoney } from '../utils/batchInventory.js';
+import { addBatch, setCountedStock, ensureBatches, syncBatchTotals, inventoryError, roundMoney } from '../utils/batchInventory.js';
 import { recordMedicineAudit, snapshotMedicine } from '../utils/medicineAudit.js';
 import { getLocalDateRange } from '../utils/dateRange.js';
 
@@ -73,9 +73,16 @@ export const receiveBatch = async (req, res, next) => {
       const medicine = await Medicine.findOne({ _id: req.params.id, isDeleted: { $ne: true } }).session(session);
       if (!medicine) throw inventoryError('Medicine not found.', 404);
       const before = snapshotMedicine(medicine);
-      addBatch(medicine, req.body);
+      if (req.body.mode === 'SET') {
+        if (Number(req.body.expectedQuantity) !== medicine.quantity) throw inventoryError('Stock changed. Refresh and count again.', 409);
+        if (req.body.quantity === '' || req.body.quantity === undefined) throw inventoryError('Enter counted stock.');
+        setCountedStock(medicine, Number(req.body.quantity));
+      } else {
+        if (req.body.mode && req.body.mode !== 'ADD') throw inventoryError('Invalid stock mode.');
+        addBatch(medicine, req.body);
+      }
       await medicine.save({ session });
-      await auditStock(medicine, before, 'Batch received', req.user, session);
+      await auditStock(medicine, before, req.body.mode === 'SET' ? 'Physical stock count corrected' : 'Batch received', req.user, session);
       return medicine;
     });
     res.status(201).json({ message: 'Batch received.', medicine: result });

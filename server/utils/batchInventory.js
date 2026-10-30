@@ -58,16 +58,15 @@ export function allocateBatches(medicine, quantity, { allowExpired = false } = {
 export function addBatch(medicine, input) {
   ensureBatches(medicine);
   const quantity = Number(input.quantity);
-  const cost = Number(input.purchaseCost);
+  const cost = input.purchaseCost === undefined || input.purchaseCost === '' ? medicine.purchasePrice / (medicine.unitsPerPack || 1) : Number(input.purchaseCost);
   const expiry = input.expiryDate ? new Date(input.expiryDate) : null;
   if (!Number.isInteger(quantity) || quantity < 1 || !Number.isFinite(cost) || cost < 0) {
     throw inventoryError('Batch quantity must be positive whole units and cost must be a non-negative number.');
   }
-  if (!expiry || Number.isNaN(expiry.getTime()) || checkExpiryStatus(expiry) === 'EXPIRED') {
+  if (expiry && (Number.isNaN(expiry.getTime()) || checkExpiryStatus(expiry) === 'EXPIRED')) {
     throw inventoryError('A valid, unexpired batch expiry date is required.');
   }
-  const number = String(input.batchNumber || '').trim();
-  if (!number) throw inventoryError('Batch number is required.');
+  const number = String(input.batchNumber || '').trim() || `RECEIPT-${new mongoose.Types.ObjectId()}`;
   if (medicine.batches.some(batch => batch.batchNumber === number)) throw inventoryError('This batch number already exists for the medicine.', 409);
   medicine.batches.push({ _id: new mongoose.Types.ObjectId(), batchNumber: number,
     quantity, purchaseCost: roundMoney(cost), expiryDate: expiry, supplierId: input.supplierId || null });
@@ -120,4 +119,25 @@ export function restoreReturnedBatches(medicine, items, quantity, alreadyReturne
   }
   if (remaining) throw inventoryError('Return batch allocation does not match the original sale.', 409);
   syncBatchTotals(medicine);
+}
+
+// Reconcile a physical count without deleting lots referenced by past sales/returns.
+export function setCountedStock(medicine, quantity) {
+  if (!Number.isSafeInteger(quantity) || quantity < 0) throw inventoryError('Stock must be non-negative whole units.');
+  ensureBatches(medicine);
+  const before = medicine.quantity;
+  if (quantity < before) allocateBatches(medicine, before - quantity, { allowExpired: true });
+  if (quantity > before) medicine.batches.push({ batchNumber: `COUNT-${new mongoose.Types.ObjectId()}`,
+    quantity: quantity - before, purchaseCost: medicine.purchasePrice / (medicine.unitsPerPack || 1), expiryDate: medicine.expiryDate });
+  syncBatchTotals(medicine);
+}
+
+export function appendDelivery(medicine, incoming) {
+  const before = medicine.quantity;
+  if (!Number.isSafeInteger(before + incoming.quantity)) throw inventoryError('Resulting stock is too large.');
+  ensureBatches(medicine);
+  if (incoming.quantity > 0) medicine.batches.push({ batchNumber: `DELIVERY-${new mongoose.Types.ObjectId()}`,
+    quantity: incoming.quantity, purchaseCost: incoming.purchasePrice / incoming.unitsPerPack, expiryDate: incoming.expiryDate || null });
+  syncBatchTotals(medicine);
+  return { name: medicine.name, previousQuantity: before, addedQuantity: incoming.quantity, newQuantity: medicine.quantity };
 }

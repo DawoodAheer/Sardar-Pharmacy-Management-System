@@ -37,7 +37,7 @@ function BatchInventory() {
   const { data, error, isFetching } = useQuery({ queryKey: ['operations', 'batches', debounced, page],
     queryFn: async () => (await api.get('/operations/batches', { params: { search: debounced, page, limit: 25 } })).data });
   const { mutation, message } = useAction();
-  const [form, setForm] = useState({ batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' });
+  const [form, setForm] = useState({ mode: 'ADD', batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' });
   return <div className="space-y-5"><Panel title="Batch inventory">
     <Field label="Find a medicine or manufacturer" type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} />
     <p className="my-3 text-sm text-slate-500">Sorted by manufacturer A–Z, then medicine name. Sales use the earliest unexpired batch. Purchase cost is per tablet or sellable unit.</p>
@@ -47,14 +47,16 @@ function BatchInventory() {
       {(data?.medicines || []).map(medicine => <tr className="border-t align-top" key={medicine._id}><td className="p-2"><p className="text-xs text-slate-500">{medicine.manufacturer || 'Manufacturer unspecified'}</p><strong>{medicine.name}</strong>{medicine.batches.map(batch => <p key={batch._id}>{batch.batchNumber}</p>)}</td>
         <td className="pt-7">{medicine.batches.map(batch => <p key={batch._id} className={batch.expiryDate && new Date(batch.expiryDate) < new Date(new Date().setHours(0, 0, 0, 0)) ? 'text-red-600' : ''}>{dateText(batch.expiryDate)}</p>)}</td>
         <td className="pt-7">{medicine.batches.map(batch => <p key={batch._id}>{batch.quantity}</p>)}</td><td className="pt-7">{medicine.batches.map(batch => <p key={batch._id}>{money(batch.purchaseCost)}</p>)}</td>
-        <td className="p-2"><button className={buttonStyle} onClick={() => { setSelected(medicine); setForm({ batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' }); }}>Receive batch</button></td></tr>)}
+        <td className="p-2"><button className={buttonStyle} onClick={() => { setSelected(medicine); setForm({ mode: 'ADD', batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' }); }}>Receive / correct stock</button></td></tr>)}
     </tbody></table></div>
     <PageControls page={page} pages={data?.pages || 1} total={data?.total} onChange={setPage} />
-  </Panel>{selected && <Panel title={`Receive stock: ${selected.name}`}><form className="grid gap-4 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); mutation.mutate({ url: `/operations/batches/${selected._id}`, data: form }, { onSuccess: () => setSelected(null) }); }}>
-    <Field label="Batch number" required value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} />
-    <Field label="Expiry date" required type="date" min={today()} value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
-    <Field label="Quantity in units" required type="number" min="1" step="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
-    <Field label="Purchase cost per unit (PKR)" required type="number" min="0" step="0.01" value={form.purchaseCost} onChange={e => setForm({ ...form, purchaseCost: e.target.value })} />
+  </Panel>{selected && <Panel title={`Receive stock: ${selected.name}`}><form className="grid gap-4 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); mutation.mutate({ url: `/operations/batches/${selected._id}`, data: { ...form, expectedQuantity: selected.quantity } }, { onSuccess: () => setSelected(null) }); }}>
+    <label className="text-sm">Stock action<select className={inputStyle} value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value, quantity: '' })}><option value="ADD">Add received stock</option><option value="SET">Set total counted stock (increase or decrease)</option></select></label>
+    <p>Current stock: {selected.quantity} units. After saving: {form.quantity === '' ? '—' : form.mode === 'SET' ? Number(form.quantity) : selected.quantity + Number(form.quantity)} units.</p>
+    {form.mode === 'ADD' && <><Field label="Batch number (optional)" value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} />
+    <Field label="Expiry date (optional)" type="date" min={today()} value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
+    <Field label="Purchase cost per unit (optional; defaults to medicine cost)" type="number" min="0" step="any" value={form.purchaseCost} onChange={e => setForm({ ...form, purchaseCost: e.target.value })} /></>}
+    <Field label={form.mode === 'SET' ? 'Total counted stock (units)' : 'Received quantity (units)'} required type="number" min={form.mode === 'SET' ? '0' : '1'} step="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
     <button disabled={mutation.isPending} className={buttonStyle}>Save batch</button><button type="button" onClick={() => setSelected(null)}>Cancel</button>
   </form></Panel>}</div>;
 }
