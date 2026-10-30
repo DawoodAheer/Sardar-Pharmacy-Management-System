@@ -207,3 +207,12 @@ const stopServer = () => {
 };
 process.once('SIGTERM', stopServer);
 process.once('SIGINT', stopServer);
+
+
+// Global crash protection for offline continuity
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH PREVENTION] Uncaught exception:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRASH PREVENTION] Unhandled rejection:', reason?.message || reason);
+});
