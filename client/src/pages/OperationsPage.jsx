@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../utils/api';
@@ -50,15 +51,47 @@ function BatchInventory() {
         <td className="p-2"><button className={buttonStyle} onClick={() => { setSelected(medicine); setForm({ mode: 'ADD', batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' }); }}>Receive / correct stock</button></td></tr>)}
     </tbody></table></div>
     <PageControls page={page} pages={data?.pages || 1} total={data?.total} onChange={setPage} />
-  </Panel>{selected && <Panel title={`Receive stock: ${selected.name}`}><form className="grid gap-4 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); mutation.mutate({ url: `/operations/batches/${selected._id}`, data: { ...form, expectedQuantity: selected.quantity } }, { onSuccess: () => setSelected(null) }); }}>
-    <label className="text-sm">Stock action<select className={inputStyle} value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value, quantity: '' })}><option value="ADD">Add received stock</option><option value="SET">Set total counted stock (increase or decrease)</option></select></label>
-    <p>Current stock: {selected.quantity} units. After saving: {form.quantity === '' ? '—' : form.mode === 'SET' ? Number(form.quantity) : selected.quantity + Number(form.quantity)} units.</p>
-    {form.mode === 'ADD' && <><Field label="Batch number (optional)" value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} />
-    <Field label="Expiry date (optional)" type="date" min={today()} value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
-    <Field label="Purchase cost per unit (optional; defaults to medicine cost)" type="number" min="0" step="any" value={form.purchaseCost} onChange={e => setForm({ ...form, purchaseCost: e.target.value })} /></>}
-    <Field label={form.mode === 'SET' ? 'Total counted stock (units)' : 'Received quantity (units)'} required type="number" min={form.mode === 'SET' ? '0' : '1'} step="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
-    <button disabled={mutation.isPending} className={buttonStyle}>Save batch</button><button type="button" onClick={() => setSelected(null)}>Cancel</button>
-  </form></Panel>}</div>;
+  </Panel>{selected && createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900 border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b mb-4">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white">Receive / correct stock: {selected.name}</h2>
+          <button type="button" onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg font-bold">✕</button>
+        </div>
+        <form className="space-y-4" onSubmit={event => { event.preventDefault(); mutation.mutate({ url: `/operations/batches/${selected._id}`, data: { ...form, expectedQuantity: selected.quantity } }, { onSuccess: () => setSelected(null) }); }}>
+          <div>
+            <label className="block text-xs font-semibold mb-1 text-slate-700 dark:text-slate-300">Stock action</label>
+            <select className={inputStyle} value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value, quantity: '' })}>
+              <option value="ADD">Add received stock</option>
+              <option value="SET">Set total counted stock (increase or decrease)</option>
+            </select>
+          </div>
+          <div className="rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 p-3 text-xs text-teal-900 dark:text-teal-200">
+            Current stock: <strong>{selected.quantity}</strong> units. After saving: <strong>{form.quantity === '' ? '—' : form.mode === 'SET' ? Number(form.quantity) : selected.quantity + Number(form.quantity)}</strong> units.
+          </div>
+          {form.mode === 'ADD' && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Batch number (optional)" value={form.batchNumber} onChange={e => setForm({ ...form, batchNumber: e.target.value })} />
+              <Field label="Expiry date (optional)" type="date" min={today()} value={form.expiryDate} onChange={e => setForm({ ...form, expiryDate: e.target.value })} />
+              <div className="sm:col-span-2">
+                <Field label="Purchase cost per unit (optional; defaults to medicine cost)" type="number" min="0" step="any" value={form.purchaseCost} onChange={e => setForm({ ...form, purchaseCost: e.target.value })} />
+              </div>
+            </div>
+          )}
+          <div>
+            <Field label={form.mode === 'SET' ? 'Total counted stock (units)' : 'Received quantity (units)'} required type="number" min={form.mode === 'SET' ? '0' : '1'} step="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t">
+            <button type="button" onClick={() => setSelected(null)} className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200">Cancel</button>
+            <button disabled={mutation.isPending} className="px-5 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-xs font-bold text-white shadow-xs disabled:opacity-50">
+              {mutation.isPending ? 'Saving…' : 'Save stock'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  )}</div>;
 }
 
 const blankLine = () => ({ medicineId: '', batchNumber: '', quantity: '', purchaseCost: '', expiryDate: '' });
