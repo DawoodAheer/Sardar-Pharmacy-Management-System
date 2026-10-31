@@ -3,1851 +3,1525 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0"/>
-<title>Sardar Medical Store | Sardar Ali Ahsan - Girote Ada</title>
-<meta name="description" content="Sardar Medical Store, Girote Ada Shop No. 05 near MCB bank. Owned by Sardar Ali Ahsan. Genuine medicines, free BP check, expert consultation. Call 03056091354."/>
+<title>Sardar Medical Store | سردار میڈیکل سٹور - Girote Ada, Khushab</title>
+<meta name="description" content="Sardar Medical Store (سردار میڈیکل سٹور) - اصلی اور معیاری ادویات کا مرکز. Shop No. 05, Girote Ada near MCB Bank, District Khushab. Owner: Sardar Ali Ahsan. Phone: 0305-6091354."/>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;0,800;0,900;1,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <style>
-/* ===================== DESIGN TOKENS ===================== */
+/* ===================== DESIGN SYSTEM (ROYAL BLUE & MEDICAL GREEN) ===================== */
 :root {
-  --primary: #00e676;
-  --primary-dark: #00b359;
-  --primary-glow: rgba(0, 230, 118, 0.45);
-  --cyan: #00e5ff;
-  --blue: #1976d2;
-  --blue-glow: rgba(25, 118, 210, 0.4);
-  --gold: #ffc107;
-  --dark-bg: #030712;
-  --dark-card: rgba(15, 23, 42, 0.75);
-  --dark-card-hover: rgba(22, 34, 60, 0.85);
-  --card-border: rgba(0, 230, 118, 0.18);
-  --card-border-hover: rgba(0, 230, 118, 0.6);
-  --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
-  --radius-sm: 10px;
-  --radius-md: 18px;
-  --radius-lg: 26px;
+  --primary-blue: #0b2545;
+  --secondary-blue: #134074;
+  --accent-green: #00b359;
+  --accent-green-hover: #009647;
+  --accent-cyan: #00c4cc;
+  --accent-gold: #ffb703;
+  --bg-light: #f8fafc;
+  --bg-surface: #ffffff;
+  --card-border: #e2e8f0;
+  --text-dark: #0f172a;
+  --text-muted: #64748b;
+  --shadow-sm: 0 4px 6px -1px rgba(0,0,0,0.06);
+  --shadow-md: 0 12px 28px -6px rgba(11,37,69,0.12);
+  --shadow-lg: 0 24px 48px -12px rgba(11,37,69,0.18);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
   --radius-full: 9999px;
-  --shadow-card: 0 20px 45px -10px rgba(0, 0, 0, 0.7);
-  --shadow-glow: 0 0 30px rgba(0, 230, 118, 0.25);
 }
 
-/* ===================== BASE RESET ===================== */
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
 }
 html {
   scroll-behavior: smooth;
   font-size: 16px;
-  background-color: var(--dark-bg);
 }
 body {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  background-color: var(--dark-bg);
-  color: var(--text-main);
-  overflow-x: hidden;
+  background-color: var(--bg-light);
+  color: var(--text-dark);
   line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.urdu-font {
+  font-family: 'Noto Nastaliq Urdu', serif;
+  line-height: 1.9;
 }
 
-/* ===================== CUSTOM MOUSE CURSOR (DESKTOP ONLY) ===================== */
-@media (hover: hover) and (pointer: fine) {
-  body { cursor: default; }
-  #cursor-dot {
-    position: fixed; top: 0; left: 0;
-    width: 8px; height: 8px;
-    background: var(--primary);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 100000;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 10px var(--primary);
-    transition: transform 0.05s ease;
-  }
-  #cursor-ring {
-    position: fixed; top: 0; left: 0;
-    width: 34px; height: 34px;
-    border: 1.5px solid var(--primary-glow);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 99999;
-    transform: translate(-50%, -50%);
-    transition: transform 0.14s ease-out, width 0.2s, height 0.2s, border-color 0.2s;
-  }
-  body:has(a:hover) #cursor-ring,
-  body:has(button:hover) #cursor-ring {
-    width: 50px; height: 50px;
-    border-color: var(--cyan);
-    background: rgba(0, 229, 255, 0.05);
-  }
-}
-@media (hover: none) or (pointer: coarse) {
-  #cursor-dot, #cursor-ring { display: none !important; }
-}
-
-/* ===================== 3D BACKGROUND CANVAS ===================== */
-#webgl-bg {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* ===================== SCROLL PROGRESS BAR ===================== */
-#progress-bar {
-  position: fixed;
-  top: 0; left: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary), var(--cyan), var(--gold));
-  z-index: 9999;
-  width: 0%;
-  transition: width 0.1s linear;
-}
-
-/* ===================== TOP ANNOUNCEMENT BAR ===================== */
-.top-bar {
-  background: linear-gradient(90deg, #062b1a, #0b1a3a, #062b1a);
-  border-bottom: 1px solid rgba(0, 230, 118, 0.2);
-  padding: 8px 20px;
+/* ===================== TOP CONTACT STRIP ===================== */
+.top-contact-bar {
+  background: var(--primary-blue);
+  color: #fff;
+  padding: 10px 40px;
   font-size: 13px;
-  text-align: center;
-  position: relative;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.top-bar-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-main);
-}
-.top-bar-item i { color: var(--primary); }
-.top-bar-item strong { color: var(--gold); }
-.top-badge {
-  background: var(--primary);
-  color: #000;
-  font-weight: 800;
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  text-transform: uppercase;
-}
-
-/* ===================== NAVBAR ===================== */
-nav {
-  position: sticky;
-  top: 0;
-  width: 100%;
-  z-index: 5000;
-  padding: 16px 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(3, 7, 18, 0.85);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.3s ease;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-bottom: 2px solid var(--accent-green);
 }
-nav.scrolled {
-  padding: 12px 50px;
-  background: rgba(3, 7, 18, 0.95);
-  border-bottom-color: var(--card-border);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+.top-info-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
+.top-info-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #cbd5e1;
+}
+.top-info-item i { color: var(--accent-green); }
+.top-info-item strong { color: #fff; }
+.top-info-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.top-link-btn {
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s;
+}
+.top-link-btn:hover { color: var(--accent-green); }
 
-.brand-wrap {
+/* ===================== HEADER & NAVIGATION ===================== */
+header {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+}
+.navbar-wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 14px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand-identity {
   display: flex;
   align-items: center;
   gap: 14px;
   text-decoration: none;
 }
-.brand-logo-3d {
-  width: 48px; height: 48px;
-  background: linear-gradient(135deg, var(--primary), var(--blue));
+.brand-logo-emblem {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--secondary-blue), var(--primary-blue));
   border-radius: 14px;
+  border: 2px solid var(--accent-green);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 0 25px var(--primary-glow);
-  animation: logoBreath 3s ease-in-out infinite alternate;
+  box-shadow: 0 6px 16px rgba(0,179,89,0.25);
+  color: #fff;
+  font-weight: 900;
 }
-@keyframes logoBreath {
-  0% { transform: scale(1); box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); }
-  100% { transform: scale(1.05); box-shadow: 0 0 35px rgba(0, 230, 118, 0.65); }
-}
-.brand-text h1 {
-  font-size: 18px;
+.brand-logo-emblem span { font-size: 20px; line-height: 1; }
+.brand-logo-emblem small { font-size: 9px; letter-spacing: 1px; color: var(--accent-green); font-weight: 800; }
+
+.brand-text-block h1 {
+  font-size: 20px;
   font-weight: 800;
-  letter-spacing: -0.3px;
-  background: linear-gradient(120deg, #fff 40%, var(--primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.2;
+  color: var(--primary-blue);
+  line-height: 1.1;
+  letter-spacing: -0.5px;
 }
-.brand-text span {
-  font-size: 11px;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
+.brand-text-block .urdu-sub {
+  font-size: 14px;
+  color: var(--accent-green);
+  font-weight: 700;
+  display: block;
 }
 
-.nav-menu {
+.nav-links-list {
   display: flex;
-  gap: 30px;
+  gap: 28px;
   list-style: none;
 }
-.nav-menu a {
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 600;
+.nav-links-list a {
   text-decoration: none;
+  color: #334155;
+  font-weight: 600;
+  font-size: 14px;
   transition: color 0.25s;
   position: relative;
   padding: 6px 0;
 }
-.nav-menu a::after {
+.nav-links-list a::after {
   content: '';
   position: absolute;
   bottom: 0; left: 0;
   width: 0; height: 2px;
-  background: var(--primary);
+  background: var(--accent-green);
   border-radius: 2px;
   transition: width 0.25s;
 }
-.nav-menu a:hover { color: #fff; }
-.nav-menu a:hover::after { width: 100%; }
+.nav-links-list a:hover { color: var(--accent-green); }
+.nav-links-list a:hover::after { width: 100%; }
 
-.nav-cta-group {
+.nav-cta-box {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.btn-nav-call {
+.btn-nav-wa {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border-radius: var(--radius-full);
-  font-size: 13px;
+  background: #25D366;
+  color: #fff;
   font-weight: 700;
+  font-size: 13px;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
   text-decoration: none;
-  background: rgba(0, 230, 118, 0.1);
-  color: var(--primary);
-  border: 1.5px solid rgba(0, 230, 118, 0.35);
-  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(37,211,102,0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
-.btn-nav-call:hover {
-  background: rgba(0, 230, 118, 0.22);
-  border-color: var(--primary);
+.btn-nav-wa:hover {
   transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(37,211,102,0.45);
 }
-.btn-nav-email {
+.btn-nav-call-direct {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 22px;
-  border-radius: var(--radius-full);
+  background: var(--primary-blue);
+  color: #fff;
+  font-weight: 700;
   font-size: 13px;
-  font-weight: 800;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
   text-decoration: none;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #030712;
-  box-shadow: 0 4px 20px var(--primary-glow);
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
-.btn-nav-email:hover {
+.btn-nav-call-direct:hover {
+  background: var(--secondary-blue);
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 230, 118, 0.6);
 }
 
-/* ===================== HERO SECTION ===================== */
-#hero {
+/* ===================== HERO SHOWCASE WITH REAL STORE PHOTO ===================== */
+.hero-section {
+  background: linear-gradient(135deg, #0b2545 0%, #134074 60%, #08203d 100%);
+  color: #fff;
+  padding: 60px 30px 80px;
   position: relative;
-  z-index: 1;
-  min-height: 92vh;
-  display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  align-items: center;
-  gap: 50px;
-  padding: 60px 60px 80px;
   overflow: hidden;
 }
-
-.hero-glow-blob {
+.hero-section::before {
+  content: '';
   position: absolute;
-  width: 600px; height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(0, 230, 118, 0.12), transparent 70%);
-  top: 20%; left: -100px;
+  inset: 0;
+  background: radial-gradient(circle at 80% 30%, rgba(0,179,89,0.15), transparent 60%);
   pointer-events: none;
-  filter: blur(50px);
 }
-
-.hero-content {
+.hero-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 50px;
+  align-items: center;
   position: relative;
   z-index: 2;
 }
 
-.hero-badge-pill {
+.hero-pill-tag {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  background: rgba(0, 230, 118, 0.1);
-  border: 1px solid rgba(0, 230, 118, 0.35);
+  background: rgba(0, 179, 89, 0.18);
+  border: 1px solid rgba(0, 179, 89, 0.4);
+  padding: 6px 16px;
   border-radius: var(--radius-full);
-  padding: 7px 18px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--primary);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 24px;
+  color: #4ade80;
+  margin-bottom: 20px;
 }
-.hero-badge-pill .pulse-dot {
-  width: 8px; height: 8px;
-  background: var(--primary);
-  border-radius: 50%;
-  box-shadow: 0 0 10px var(--primary);
-  animation: pulseDot 1.5s infinite;
-}
-@keyframes pulseDot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
-.hero-heading {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(42px, 5.2vw, 76px);
+.hero-title-main {
+  font-size: clamp(34px, 4vw, 52px);
   font-weight: 900;
-  line-height: 1.08;
-  margin-bottom: 22px;
-  color: #fff;
+  line-height: 1.15;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
 }
-.hero-heading .gradient-word {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--cyan) 50%, var(--gold) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-style: italic;
+.hero-title-main span {
+  color: var(--accent-green);
 }
-
-.hero-description {
-  font-size: 17px;
+.hero-urdu-tagline {
+  font-size: 24px;
+  color: var(--accent-gold);
+  margin-bottom: 20px;
+  display: block;
+}
+.hero-body-text {
+  font-size: 16px;
   line-height: 1.8;
-  color: var(--text-muted);
+  color: #cbd5e1;
+  margin-bottom: 30px;
   max-width: 580px;
-  margin-bottom: 36px;
 }
-.hero-description strong {
-  color: var(--text-main);
-}
-
-.hero-actions {
+.hero-action-buttons {
   display: flex;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
-  margin-bottom: 45px;
+  margin-bottom: 35px;
 }
-.btn-primary-3d {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 36px;
-  border-radius: var(--radius-full);
-  font-size: 15px;
-  font-weight: 800;
-  text-decoration: none;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+.btn-hero-primary {
+  padding: 15px 32px;
+  background: var(--accent-green);
   color: #030712;
-  box-shadow: 0 10px 35px var(--primary-glow);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.btn-primary-3d:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 16px 45px rgba(0, 230, 118, 0.55);
-}
-.btn-secondary-3d {
+  font-weight: 800;
+  font-size: 15px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 32px;
-  border-radius: var(--radius-full);
-  font-size: 15px;
-  font-weight: 700;
-  text-decoration: none;
-  background: rgba(255, 255, 255, 0.04);
-  color: #fff;
-  border: 1.5px solid rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(10px);
-  transition: all 0.3s;
+  box-shadow: 0 10px 25px rgba(0,179,89,0.35);
+  transition: all 0.25s;
 }
-.btn-secondary-3d:hover {
-  background: rgba(0, 230, 118, 0.1);
-  border-color: var(--primary);
-  color: var(--primary);
+.btn-hero-primary:hover {
+  background: #00d268;
+  transform: translateY(-3px);
+  box-shadow: 0 15px 30px rgba(0,179,89,0.5);
+}
+.btn-hero-secondary {
+  padding: 15px 28px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  backdrop-filter: blur(10px);
+  transition: all 0.25s;
+}
+.btn-hero-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: #fff;
   transform: translateY(-3px);
 }
 
-.hero-stats-row {
+.hero-stats-banner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 30px;
-  max-width: 580px;
+  gap: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 25px;
 }
-.stat-box .stat-num {
-  font-size: 32px;
+.h-stat h4 {
+  font-size: 26px;
   font-weight: 900;
   color: #fff;
-  line-height: 1;
 }
-.stat-box .stat-num span { color: var(--primary); }
-.stat-box .stat-lbl {
+.h-stat h4 span { color: var(--accent-green); }
+.h-stat p {
   font-size: 12px;
-  color: var(--text-dim);
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-top: 6px;
 }
 
-/* ===================== HERO RIGHT 3D DISPLAY ===================== */
-.hero-visual-col {
+/* REAL STORE PHOTO CARD */
+.store-photo-card {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 520px;
-}
-.hero-orbit-stage {
-  position: relative;
-  width: 420px; height: 420px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.orbit-ring-3d {
-  position: absolute;
-  border-radius: 50%;
-  border: 1.5px dashed rgba(0, 230, 118, 0.25);
-  animation: orbitRotate 22s linear infinite;
-}
-.ring-outer { width: 420px; height: 420px; }
-.ring-inner { width: 300px; height: 300px; animation-direction: reverse; animation-duration: 16s; border-color: rgba(0, 229, 255, 0.2); }
-@keyframes orbitRotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.orbit-node {
-  position: absolute;
-  width: 56px; height: 56px;
-  background: rgba(15, 23, 42, 0.95);
-  border: 1.5px solid var(--primary);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 0 25px var(--primary-glow);
-}
-.node-top { top: -28px; left: calc(50% - 28px); }
-.node-right { right: -28px; top: calc(50% - 28px); }
-.node-bottom { bottom: -28px; left: calc(50% - 28px); }
-.node-left { left: -28px; top: calc(50% - 28px); }
-
-.hero-center-crystal {
-  width: 170px; height: 170px;
-  border-radius: 40px;
-  background: linear-gradient(135deg, rgba(0, 230, 118, 0.35), rgba(25, 118, 210, 0.45));
-  border: 2px solid var(--primary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 60px rgba(0, 230, 118, 0.35), inset 0 0 30px rgba(0, 230, 118, 0.2);
-  backdrop-filter: blur(15px);
-  animation: crystalFloat 5s ease-in-out infinite;
-  text-align: center;
-  z-index: 5;
-}
-@keyframes crystalFloat {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-16px) rotate(3deg); }
-}
-.hero-center-crystal .crystal-icon { font-size: 52px; }
-.hero-center-crystal .crystal-label {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #fff;
-  margin-top: 4px;
-}
-
-.floating-glass-pill {
-  position: absolute;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid var(--card-border);
-  backdrop-filter: blur(20px);
-  border-radius: var(--radius-md);
-  padding: 12px 18px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  box-shadow: var(--shadow-card);
-  z-index: 10;
-  animation: floatPill 5s ease-in-out infinite;
-}
-.pill-1 { top: 20px; right: 0; animation-delay: 0s; }
-.pill-2 { bottom: 40px; left: -20px; animation-delay: 2s; }
-@keyframes floatPill {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
-}
-.pill-icon-box {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-.pill-1 .pill-icon-box { background: rgba(0, 230, 118, 0.18); }
-.pill-2 .pill-icon-box { background: rgba(0, 229, 255, 0.18); }
-.pill-text h5 { font-size: 13px; font-weight: 800; color: #fff; }
-.pill-text p { font-size: 11px; color: var(--text-muted); }
-
-/* ===================== OWNER SPOTLIGHT SECTION ===================== */
-#owner-spotlight {
-  position: relative;
-  z-index: 2;
-  padding: 80px 60px;
-}
-.owner-card-heroic {
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(7, 28, 48, 0.75));
-  border: 1.5px solid rgba(0, 230, 118, 0.35);
+  background: #ffffff;
+  padding: 10px;
   border-radius: var(--radius-lg);
-  padding: 48px;
-  backdrop-filter: blur(25px);
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), var(--shadow-glow);
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 50px;
-  align-items: center;
-  position: relative;
+  box-shadow: var(--shadow-lg);
+  border: 3px solid var(--accent-green);
+  transition: transform 0.3s;
+}
+.store-photo-card:hover {
+  transform: translateY(-6px);
+}
+.store-photo-wrap {
+  width: 100%;
+  height: 380px;
+  border-radius: 14px;
   overflow: hidden;
-}
-.owner-card-heroic::before {
-  content: '';
-  position: absolute;
-  top: -120px; right: -120px;
-  width: 350px; height: 350px;
-  background: radial-gradient(circle, rgba(0, 230, 118, 0.12), transparent 70%);
-  pointer-events: none;
-}
-.owner-avatar-zone {
   position: relative;
 }
-.owner-avatar-ring-3d {
-  width: 190px; height: 190px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--cyan), var(--gold));
-  padding: 4px;
-  box-shadow: 0 0 50px var(--primary-glow);
-  animation: avatarRingRotate 10s linear infinite;
+.store-photo-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
-@keyframes avatarRingRotate {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-.owner-avatar-center {
-  width: 100%; height: 100%;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0f172a, #062b1a);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 78px;
-}
-.owner-verified-badge {
+.photo-live-badge {
   position: absolute;
-  bottom: 8px; right: 8px;
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: #030712;
-  border: 4px solid var(--dark-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.5);
-}
-
-.owner-detail-zone h4 {
+  top: 16px; right: 16px;
+  background: rgba(11, 37, 69, 0.92);
+  color: #fff;
+  border: 1px solid var(--accent-green);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  color: var(--primary);
-  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(8px);
 }
-.owner-detail-zone h2 {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(32px, 3.5vw, 46px);
-  font-weight: 900;
+.badge-dot-live {
+  width: 8px; height: 8px;
+  background: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #22c55e;
+}
+.store-photo-footer {
+  padding: 14px 10px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.spf-text h5 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary-blue);
+}
+.spf-text p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.verified-store-tag {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+/* ===================== OWNER SECTION: SARDAR ALI AHSAN ===================== */
+.owner-section-wrapper {
+  max-width: 1280px;
+  margin: -40px auto 60px;
+  padding: 0 30px;
+  position: relative;
+  z-index: 10;
+}
+.owner-banner-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-md);
+  padding: 36px 44px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 36px;
+  align-items: center;
+}
+.owner-avatar-frame {
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--secondary-blue), var(--accent-green));
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.owner-avatar-inner {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+}
+.owner-v-check {
+  position: absolute;
+  bottom: 0; right: 0;
+  background: var(--accent-green);
   color: #fff;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.owner-content-block h4 {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent-green);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.owner-content-block h2 {
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--primary-blue);
   line-height: 1.15;
   margin-bottom: 8px;
 }
-.owner-tagline {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--cyan);
-  margin-bottom: 18px;
-}
-.owner-bio {
-  font-size: 16px;
-  color: var(--text-muted);
-  line-height: 1.8;
-  margin-bottom: 26px;
-  max-width: 750px;
-}
-.owner-quick-connect {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-.btn-owner-contact {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 24px;
-  border-radius: var(--radius-full);
+.owner-content-block p {
   font-size: 14px;
-  font-weight: 700;
+  color: var(--text-muted);
+  max-width: 620px;
+}
+.owner-cta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 200px;
+}
+.btn-owner-call {
+  background: var(--primary-blue);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 20px;
+  border-radius: var(--radius-full);
   text-decoration: none;
-  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
 }
-.boc-email {
-  background: rgba(0, 230, 118, 0.12);
-  border: 1.5px solid var(--primary);
-  color: var(--primary);
+.btn-owner-call:hover {
+  background: var(--secondary-blue);
 }
-.boc-email:hover {
-  background: var(--primary);
-  color: #030712;
-  box-shadow: 0 6px 20px var(--primary-glow);
-  transform: translateY(-2px);
-}
-.boc-call {
-  background: rgba(0, 229, 255, 0.12);
-  border: 1.5px solid var(--cyan);
-  color: var(--cyan);
-}
-.boc-call:hover {
-  background: var(--cyan);
-  color: #030712;
-  box-shadow: 0 6px 20px rgba(0, 229, 255, 0.4);
-  transform: translateY(-2px);
-}
-.boc-wa {
-  background: rgba(37, 211, 102, 0.15);
-  border: 1.5px solid #25D366;
-  color: #25D366;
-}
-.boc-wa:hover {
+.btn-owner-wa {
   background: #25D366;
   color: #fff;
-  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.5);
-  transform: translateY(-2px);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 20px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.btn-owner-wa:hover {
+  background: #1eb956;
 }
 
 /* ===================== SERVICES SECTION ===================== */
-#services {
-  position: relative;
-  z-index: 2;
-  padding: 90px 60px;
+.services-section {
+  max-width: 1280px;
+  margin: 0 auto 80px;
+  padding: 0 30px;
 }
-.section-header-center {
+.section-headline-center {
   text-align: center;
-  max-width: 680px;
-  margin: 0 auto 60px;
+  max-width: 700px;
+  margin: 0 auto 50px;
 }
-.section-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(0, 230, 118, 0.1);
-  border: 1px solid rgba(0, 230, 118, 0.3);
-  border-radius: var(--radius-full);
-  padding: 6px 18px;
+.sub-tag-badge {
+  display: inline-block;
+  background: #e6f9f0;
+  color: #059669;
+  font-weight: 800;
   font-size: 12px;
-  font-weight: 700;
-  color: var(--primary);
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  margin-bottom: 16px;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  margin-bottom: 12px;
 }
-.section-title {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(32px, 3.8vw, 54px);
+.main-section-title {
+  font-size: clamp(28px, 3.2vw, 42px);
   font-weight: 900;
-  color: #fff;
-  line-height: 1.15;
-  margin-bottom: 16px;
+  color: var(--primary-blue);
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
 }
-.section-title span {
-  background: linear-gradient(135deg, var(--primary), var(--cyan));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.section-desc {
-  font-size: 16px;
+.section-sub-copy {
+  font-size: 15px;
   color: var(--text-muted);
-  line-height: 1.8;
 }
 
-.services-3d-grid {
+.services-grid-layout {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
   gap: 26px;
 }
-.service-box-3d {
-  background: var(--dark-card);
-  border: 1.5px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  padding: 34px 28px;
-  position: relative;
-  overflow: hidden;
+.srv-card-box {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  padding: 30px 26px;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: var(--shadow-card);
-  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+  position: relative;
 }
-.service-box-3d:hover {
-  transform: translateY(-10px);
-  border-color: var(--card-border-hover);
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), var(--shadow-glow);
-  background: var(--dark-card-hover);
+.srv-card-box:hover {
+  transform: translateY(-8px);
+  box-shadow: var(--shadow-md);
+  border-color: #00b359;
 }
-.service-box-3d .badge-top {
+.srv-badge-free {
   position: absolute;
-  top: 18px; right: 18px;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
+  top: 20px; right: 20px;
+  background: #dcfce7;
+  color: #15803d;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
 }
-.badge-free { background: rgba(0, 230, 118, 0.2); color: var(--primary); border: 1px solid var(--primary); }
-.badge-popular { background: rgba(255, 193, 7, 0.2); color: var(--gold); border: 1px solid var(--gold); }
-.badge-regular { background: rgba(0, 229, 255, 0.2); color: var(--cyan); border: 1px solid var(--cyan); }
-
-.srv-icon-bubble {
-  width: 72px; height: 72px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(25, 118, 210, 0.15));
-  border: 1.5px solid var(--card-border);
+.srv-icon-disc {
+  width: 64px; height: 64px;
+  border-radius: 16px;
+  background: #eff6ff;
+  color: var(--secondary-blue);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
-  margin-bottom: 22px;
-  transition: transform 0.3s;
+  font-size: 30px;
+  margin-bottom: 20px;
+  transition: all 0.3s;
 }
-.service-box-3d:hover .srv-icon-bubble {
-  transform: scale(1.15) rotate(6deg);
-  border-color: var(--primary);
-  box-shadow: 0 0 25px var(--primary-glow);
-}
-.service-box-3d h3 {
-  font-size: 20px;
-  font-weight: 800;
+.srv-card-box:hover .srv-icon-disc {
+  background: var(--accent-green);
   color: #fff;
+  transform: scale(1.1);
+}
+.srv-card-box h3 {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--primary-blue);
   margin-bottom: 10px;
 }
-.service-box-3d p {
+.srv-card-box p {
   font-size: 14px;
   color: var(--text-muted);
   line-height: 1.7;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
 }
-.btn-service-view {
+.btn-open-service-modal {
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 20px;
-  border-radius: var(--radius-md);
+  padding: 11px 18px;
+  background: #f8fafc;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
   font-size: 13px;
-  font-weight: 800;
-  color: var(--primary);
-  background: rgba(0, 230, 118, 0.08);
-  border: 1.5px solid rgba(0, 230, 118, 0.3);
+  color: var(--primary-blue);
   cursor: pointer;
-  transition: all 0.3s;
-  font-family: inherit;
+  transition: all 0.25s;
 }
-.btn-service-view:hover {
-  background: var(--primary);
-  color: #030712;
-  box-shadow: 0 6px 20px var(--primary-glow);
+.btn-open-service-modal:hover {
+  background: var(--accent-green);
+  color: #fff;
+  border-color: var(--accent-green);
 }
 
-/* ===================== VISIBLE ON-PAGE LIVE CHAT SECTION ===================== */
-#visible-chat-section {
-  position: relative;
-  z-index: 2;
-  padding: 80px 60px;
-  background: linear-gradient(180deg, transparent 0%, rgba(6, 15, 30, 0.8) 50%, transparent 100%);
+/* ===================== LOCATION SECTION: EXACT KHUSHAB GIROTE ADA ===================== */
+.location-section {
+  background: #f1f5f9;
+  padding: 80px 30px;
 }
-.chat-container-card {
-  max-width: 900px;
+.location-container {
+  max-width: 1280px;
   margin: 0 auto;
-  background: var(--dark-card);
-  border: 2px solid var(--primary);
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 40px;
+  align-items: center;
+}
+.location-info-card {
+  background: #ffffff;
+  padding: 40px;
   border-radius: var(--radius-lg);
-  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.8), 0 0 40px rgba(0, 230, 118, 0.2);
-  backdrop-filter: blur(25px);
-  overflow: hidden;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-md);
 }
-.chat-card-topbar {
-  background: linear-gradient(90deg, #091d30, #0c2b20);
-  border-bottom: 1px solid var(--card-border);
-  padding: 18px 26px;
-  display: flex;
+.loc-badge-tag {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  margin-bottom: 16px;
 }
-.chat-assistant-info {
+.location-info-card h2 {
+  font-size: 32px;
+  font-weight: 900;
+  color: var(--primary-blue);
+  line-height: 1.2;
+  margin-bottom: 14px;
+}
+.location-address-list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 16px;
+  margin: 24px 0 30px;
+}
+.loc-point-item {
+  display: flex;
+  align-items: flex-start;
   gap: 14px;
 }
-.chat-assistant-avatar {
-  width: 44px; height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary), var(--blue));
+.loc-icon-bubble {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: #e6f9f0;
+  color: #00b359;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  position: relative;
-}
-.online-indicator-dot {
-  position: absolute;
-  top: -2px; right: -2px;
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  background: var(--primary);
-  border: 2px solid var(--dark-bg);
-}
-.chat-assistant-meta h4 {
-  font-size: 15px;
-  font-weight: 800;
-  color: #fff;
-}
-.chat-assistant-meta span {
-  font-size: 12px;
-  color: var(--primary);
-}
-.chat-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.btn-chat-action {
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.25s;
-}
-.btn-chat-action:hover {
-  background: var(--primary);
-  color: #030712;
-  border-color: var(--primary);
-}
-
-.chat-conversation-area {
-  height: 380px;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: rgba(3, 7, 18, 0.6);
-}
-.chat-message-bubble {
-  max-width: 80%;
-  padding: 14px 20px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.6;
-  position: relative;
-  animation: fadeInMsg 0.3s ease;
-}
-@keyframes fadeInMsg {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.msg-bot {
-  align-self: flex-start;
-  background: rgba(22, 34, 60, 0.85);
-  border: 1px solid var(--card-border);
-  color: var(--text-main);
-  border-bottom-left-radius: 4px;
-}
-.msg-bot .bot-name-label {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--primary);
-  margin-bottom: 4px;
-  text-transform: uppercase;
-}
-.msg-user {
-  align-self: flex-end;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #030712;
-  font-weight: 600;
-  border-bottom-right-radius: 4px;
-}
-
-.chat-quick-suggestions {
-  padding: 14px 24px;
-  background: rgba(15, 23, 42, 0.5);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-.chat-chip {
-  padding: 7px 14px;
-  background: rgba(0, 230, 118, 0.08);
-  border: 1px solid rgba(0, 230, 118, 0.25);
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--primary);
-  cursor: pointer;
-  transition: all 0.25s;
+  font-size: 18px;
   flex-shrink: 0;
 }
-.chat-chip:hover {
-  background: var(--primary);
-  color: #030712;
-}
-
-.chat-input-bar {
-  padding: 16px 24px;
-  background: var(--dark-card);
-  border-top: 1px solid var(--card-border);
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.chat-input-field {
-  flex: 1;
-  background: rgba(3, 7, 18, 0.8);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-full);
-  padding: 14px 22px;
-  font-size: 14px;
-  color: #fff;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.25s;
-}
-.chat-input-field:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 15px rgba(0, 230, 118, 0.2);
-}
-.btn-chat-send {
-  width: 50px; height: 50px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  border: none;
-  color: #030712;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-  box-shadow: 0 4px 15px var(--primary-glow);
-}
-.btn-chat-send:hover {
-  transform: scale(1.08);
-  box-shadow: 0 8px 25px rgba(0, 230, 118, 0.6);
-}
-
-/* ===================== CONTACT & LOCATION SECTION ===================== */
-#contact {
-  position: relative;
-  z-index: 2;
-  padding: 90px 60px;
-}
-.contact-hero-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr;
-  gap: 50px;
-  align-items: start;
-}
-.contact-info-cards-col {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.contact-tile {
-  background: var(--dark-card);
-  border: 1.5px solid var(--card-border);
-  border-radius: var(--radius-md);
-  padding: 22px 26px;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  text-decoration: none;
-  color: #fff;
-  transition: all 0.3s;
-  backdrop-filter: blur(20px);
-}
-.contact-tile:hover {
-  background: var(--dark-card-hover);
-  border-color: var(--primary);
-  transform: translateX(8px);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4), var(--shadow-glow);
-}
-.tile-icon-box {
-  width: 56px; height: 56px;
-  min-width: 56px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--primary), var(--blue));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  box-shadow: 0 0 20px var(--primary-glow);
-}
-.tile-content h5 {
-  font-size: 11px;
-  color: var(--primary);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 4px;
-}
-.tile-content p {
-  font-size: 16px;
-  font-weight: 700;
-  word-break: break-word;
-}
-
-.map-card-container {
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1.5px solid var(--card-border);
-  background: linear-gradient(135deg, #091a2e, #062b1a);
-  padding: 30px;
-  text-align: center;
-  position: relative;
-  box-shadow: var(--shadow-card);
-}
-.map-pin-pulse {
-  font-size: 46px;
-  display: inline-block;
-  animation: mapPinJump 2s infinite ease-in-out;
-}
-@keyframes mapPinJump {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-12px); }
-}
-.map-card-container h4 {
-  font-size: 18px;
+.loc-text h5 {
+  font-size: 15px;
   font-weight: 800;
-  color: #fff;
-  margin: 12px 0 6px;
+  color: var(--text-dark);
 }
-.map-card-container p {
+.loc-text p {
   font-size: 13px;
   color: var(--text-muted);
-  margin-bottom: 18px;
 }
-.btn-open-maps {
+.loc-action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn-open-gmaps {
+  background: #ea4335;
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 24px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 22px;
-  border-radius: var(--radius-full);
-  background: var(--primary);
-  color: #030712;
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-  transition: all 0.3s;
+  box-shadow: 0 4px 14px rgba(234,67,53,0.3);
+  transition: all 0.2s;
 }
-.btn-open-maps:hover {
+.btn-open-gmaps:hover {
+  background: #d93025;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px var(--primary-glow);
+}
+.btn-call-direction {
+  background: var(--primary-blue);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 22px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.btn-call-direction:hover {
+  background: var(--secondary-blue);
 }
 
-.inquiry-form-card {
-  background: var(--dark-card);
-  border: 1.5px solid var(--card-border);
+.map-embed-wrapper {
+  background: #ffffff;
+  padding: 12px;
   border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  height: 420px;
+}
+.map-embed-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  border-radius: 14px;
+  border: 0;
+}
+
+/* ===================== DIRECT EMAIL & INQUIRY FORM ===================== */
+.contact-form-section {
+  max-width: 1000px;
+  margin: 80px auto;
+  padding: 0 30px;
+}
+.contact-card-surface {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
   padding: 44px;
-  backdrop-filter: blur(25px);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-lg);
 }
-.inquiry-form-card h3 {
-  font-family: 'Playfair Display', serif;
+.contact-card-surface h2 {
   font-size: 28px;
-  color: #fff;
-  margin-bottom: 8px;
+  font-weight: 900;
+  color: var(--primary-blue);
+  margin-bottom: 6px;
 }
-.inquiry-form-card > p {
+.contact-card-surface > p {
   font-size: 14px;
   color: var(--text-muted);
-  margin-bottom: 28px;
+  margin-bottom: 30px;
 }
-.form-grid-2 {
+.form-two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 20px;
 }
-.form-group-item {
+.form-input-box {
   margin-bottom: 18px;
 }
-.form-group-item label {
+.form-input-box label {
   display: block;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
+  color: #334155;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
-.form-group-item input,
-.form-group-item select,
-.form-group-item textarea {
+.form-input-box input,
+.form-input-box select,
+.form-input-box textarea {
   width: 100%;
-  background: rgba(3, 7, 18, 0.7);
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  padding: 13px 16px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
   border-radius: var(--radius-sm);
-  padding: 14px 18px;
   font-size: 14px;
-  color: #fff;
+  color: var(--text-dark);
   font-family: inherit;
   outline: none;
-  transition: border-color 0.25s;
+  transition: border-color 0.2s;
 }
-.form-group-item input:focus,
-.form-group-item select:focus,
-.form-group-item textarea:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 15px rgba(0, 230, 118, 0.18);
+.form-input-box input:focus,
+.form-input-box select:focus,
+.form-input-box textarea:focus {
+  border-color: var(--accent-green);
+  background: #fff;
 }
-.form-group-item select option {
-  background: #0f172a;
-  color: #fff;
-}
-.form-group-item textarea {
+.form-input-box textarea {
   height: 120px;
   resize: none;
 }
-.btn-submit-inquiry {
+.btn-send-email-direct {
   width: 100%;
-  padding: 16px;
-  border-radius: var(--radius-md);
+  padding: 15px;
+  background: var(--primary-blue);
+  color: #fff;
   border: none;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #030712;
+  border-radius: var(--radius-sm);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  font-family: inherit;
-  box-shadow: 0 10px 30px var(--primary-glow);
-  transition: all 0.3s;
+  transition: background 0.2s, transform 0.2s;
 }
-.btn-submit-inquiry:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 15px 40px rgba(0, 230, 118, 0.6);
+.btn-send-email-direct:hover {
+  background: var(--secondary-blue);
+  transform: translateY(-2px);
 }
 
-/* ===================== SERVICE DETAIL MODAL (3D POPUP) ===================== */
-#service-modal-overlay {
+/* ===================== FLOATING SMART AI PHARMACY CHATBOT ===================== */
+.chat-dock-trigger {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, var(--secondary-blue), var(--primary-blue));
+  color: #fff;
+  border: 2px solid var(--accent-green);
+  padding: 12px 22px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 10px 30px rgba(11,37,69,0.35);
+  cursor: pointer;
+  transition: transform 0.25s, box-shadow 0.25s;
+}
+.chat-dock-trigger:hover {
+  transform: scale(1.05);
+  box-shadow: 0 14px 40px rgba(11,37,69,0.5);
+}
+.chat-dock-trigger .icon-part {
+  font-size: 20px;
+  color: var(--accent-green);
+}
+.chat-dock-trigger .text-part {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.chat-dock-trigger .text-part small {
+  display: block;
+  font-size: 10px;
+  color: #4ade80;
+}
+
+/* SMART CHAT MODAL WINDOW */
+.chat-window-modal {
+  position: fixed;
+  bottom: 90px;
+  right: 28px;
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  height: 520px;
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 25px 60px rgba(11,37,69,0.25);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.chat-window-modal.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+.chat-modal-header {
+  background: var(--primary-blue);
+  color: #fff;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cmh-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cmh-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  color: #030712;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+.cmh-text h4 {
+  font-size: 14px;
+  font-weight: 800;
+}
+.cmh-text span {
+  font-size: 11px;
+  color: #4ade80;
+}
+.btn-close-chat {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.chat-messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8fafc;
+}
+.chat-bubble {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  animation: popIn 0.25s ease;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.cb-bot {
+  align-self: flex-start;
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid var(--card-border);
+  border-bottom-left-radius: 3px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+.cb-user {
+  align-self: flex-end;
+  background: var(--accent-green);
+  color: #030712;
+  font-weight: 600;
+  border-bottom-right-radius: 3px;
+}
+
+.chat-quick-pill-row {
+  padding: 8px 14px;
+  background: #ffffff;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.quick-pill-btn {
+  padding: 5px 10px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary-blue);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.quick-pill-btn:hover {
+  background: var(--accent-green);
+  color: #fff;
+  border-color: var(--accent-green);
+}
+
+.chat-input-row {
+  padding: 12px 14px;
+  background: #ffffff;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  gap: 8px;
+}
+.chat-input-field {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  outline: none;
+  font-family: inherit;
+}
+.chat-input-field:focus {
+  border-color: var(--accent-green);
+}
+.btn-send-chat {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: var(--primary-blue);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.btn-send-chat:hover {
+  background: var(--accent-green);
+}
+
+/* ===================== SERVICE DETAIL MODAL ===================== */
+.service-popup-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(15px);
-  z-index: 10000;
+  background: rgba(11,37,69,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 10001;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.3s;
 }
-#service-modal-overlay.active {
+.service-popup-backdrop.active {
   opacity: 1;
   visibility: visible;
 }
-.modal-content-3d {
-  background: linear-gradient(135deg, #0f172a, #071f30);
-  border: 2px solid var(--primary);
+.service-popup-box {
+  background: #ffffff;
   border-radius: var(--radius-lg);
-  max-width: 650px;
+  max-width: 580px;
   width: 100%;
-  padding: 40px;
+  padding: 36px;
+  box-shadow: var(--shadow-lg);
   position: relative;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 60px var(--primary-glow);
-  transform: scale(0.85) translateY(30px);
-  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   max-height: 88vh;
   overflow-y: auto;
+  transform: scale(0.9);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-#service-modal-overlay.active .modal-content-3d {
-  transform: scale(1) translateY(0);
+.service-popup-backdrop.active .service-popup-box {
+  transform: scale(1);
 }
-.modal-close-trigger {
+.btn-close-sp {
   position: absolute;
-  top: 20px; right: 20px;
-  width: 40px; height: 40px;
+  top: 18px; right: 18px;
+  width: 36px; height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
-  font-size: 18px;
+  background: #f1f5f9;
+  border: none;
+  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s;
 }
-.modal-close-trigger:hover {
-  background: #ef4444;
-  border-color: #ef4444;
-  transform: rotate(90deg);
+.sp-icon-header {
+  font-size: 42px;
+  margin-bottom: 14px;
 }
-.modal-hero-badge {
-  font-size: 50px;
-  margin-bottom: 16px;
-  display: inline-block;
-}
-.modal-title-text {
-  font-family: 'Playfair Display', serif;
-  font-size: 30px;
-  font-weight: 900;
-  color: #fff;
-  margin-bottom: 8px;
-}
-.modal-badge-label {
-  font-size: 12px;
+.sp-cat-tag {
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 2px;
+  color: var(--accent-green);
   text-transform: uppercase;
-  color: var(--primary);
-  margin-bottom: 18px;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
 }
-.modal-explanation {
-  font-size: 15px;
+.sp-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--primary-blue);
+  margin-bottom: 12px;
+}
+.sp-desc {
+  font-size: 14px;
   color: var(--text-muted);
-  line-height: 1.8;
-  margin-bottom: 26px;
+  line-height: 1.7;
+  margin-bottom: 24px;
 }
-.modal-feature-checklist {
+.sp-features-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 30px;
+  gap: 10px;
+  margin-bottom: 28px;
 }
-.modal-checklist-item {
+.sp-feat-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: rgba(0, 230, 118, 0.06);
-  border: 1px solid rgba(0, 230, 118, 0.2);
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid var(--card-border);
+  padding: 10px 14px;
   border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
 }
-.modal-checklist-item i { color: var(--primary); }
-.modal-buttons-row {
+.sp-feat-item i { color: var(--accent-green); }
+.sp-cta-row {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
 }
-.btn-modal-action-1 {
-  padding: 14px 28px;
-  border-radius: var(--radius-full);
-  background: var(--primary);
-  color: #030712;
-  font-size: 14px;
-  font-weight: 800;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s;
-}
-.btn-modal-action-1:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px var(--primary-glow);
-}
-.btn-modal-action-2 {
-  padding: 14px 28px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
+.sp-btn-call {
+  padding: 12px 24px;
+  background: var(--primary-blue);
   color: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  border-radius: var(--radius-full);
   text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.3s;
 }
-.btn-modal-action-2:hover {
-  background: rgba(0, 230, 118, 0.15);
-  border-color: var(--primary);
-  color: var(--primary);
+.sp-btn-wa {
+  padding: 12px 24px;
+  background: #25D366;
+  color: #fff;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ===================== FOOTER ===================== */
 footer {
-  position: relative;
-  z-index: 2;
-  background: #02040a;
-  border-top: 1px solid rgba(0, 230, 118, 0.2);
-  padding: 70px 60px 30px;
+  background: var(--primary-blue);
+  color: #fff;
+  padding: 60px 30px 24px;
+  border-top: 4px solid var(--accent-green);
 }
-.footer-grid-top {
+.footer-container {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.footer-top-grid {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1.2fr;
   gap: 40px;
-  margin-bottom: 50px;
+  margin-bottom: 40px;
 }
-.footer-brand-bio {
-  font-size: 14px;
-  color: var(--text-muted);
+.footer-brand-col h3 {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.footer-brand-col .urdu-tag {
+  font-size: 16px;
+  color: var(--accent-green);
+  display: block;
+  margin-bottom: 14px;
+}
+.footer-brand-col p {
+  font-size: 13px;
+  color: #cbd5e1;
   line-height: 1.8;
-  margin: 16px 0 22px;
   max-width: 320px;
-}
-.footer-social-row {
-  display: flex;
-  gap: 12px;
-}
-.footer-social-icon {
-  width: 42px; height: 42px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 17px;
-  text-decoration: none;
-  transition: all 0.3s;
-}
-.footer-social-icon:hover {
-  background: var(--primary);
-  color: #030712;
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px var(--primary-glow);
 }
 .footer-col-nav h5 {
   font-size: 13px;
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--primary);
-  margin-bottom: 20px;
+  color: var(--accent-green);
+  margin-bottom: 18px;
 }
 .footer-col-nav ul {
   list-style: none;
 }
 .footer-col-nav ul li {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .footer-col-nav ul li a {
-  color: var(--text-muted);
-  font-size: 14px;
+  color: #cbd5e1;
+  font-size: 13px;
   text-decoration: none;
-  transition: color 0.25s;
+  transition: color 0.2s;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 .footer-col-nav ul li a:hover {
   color: #fff;
 }
-.footer-col-nav ul li a i {
-  font-size: 10px;
-  color: var(--primary);
-}
-.footer-bottom-bar {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 26px;
+.footer-bottom-strip {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
+  font-size: 12px;
+  color: #94a3b8;
 }
-.footer-bottom-bar p {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.footer-bottom-bar span {
-  color: var(--primary);
-  font-weight: 700;
+.footer-bottom-strip strong {
+  color: var(--accent-green);
 }
 
-/* ===================== FLOATING CHAT & WHATSAPP BUTTONS ===================== */
-.floating-actions-dock {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 8000;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.btn-float-action {
-  width: 58px; height: 58px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  text-decoration: none;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.btn-float-action:hover {
-  transform: scale(1.12);
-}
-.float-wa-btn {
-  background: #25D366;
-  color: #fff;
-  box-shadow: 0 8px 30px rgba(37, 211, 102, 0.5);
-  animation: pulseWaBtn 3s infinite;
-}
-@keyframes pulseWaBtn {
-  0%, 100% { box-shadow: 0 8px 25px rgba(37, 211, 102, 0.5); }
-  50% { box-shadow: 0 8px 45px rgba(37, 211, 102, 0.8), 0 0 0 12px rgba(37, 211, 102, 0.12); }
-}
-.float-chat-btn {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: #030712;
-  box-shadow: 0 8px 30px var(--primary-glow);
-  position: relative;
-}
-.chat-unread-badge {
-  position: absolute;
-  top: -4px; right: -4px;
-  background: #ef4444;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-  padding: 3px 7px;
-  border-radius: 20px;
-  border: 2px solid var(--dark-bg);
-}
-
-/* ===================== MOBILE BOTTOM QUICK BAR ===================== */
-.mobile-bottom-bar {
-  display: none;
-  position: fixed;
-  bottom: 0; left: 0; right: 0;
-  background: rgba(3, 7, 18, 0.96);
-  border-top: 1px solid var(--card-border);
-  backdrop-filter: blur(20px);
-  z-index: 7000;
-  padding: 10px 16px;
-  justify-content: space-around;
-  align-items: center;
-}
-.mbb-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-decoration: none;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  transition: color 0.2s;
-}
-.mbb-item i { font-size: 18px; }
-.mbb-item.active, .mbb-item:hover { color: var(--primary); }
-
-/* ===================== RESPONSIVE BREAKPOINTS ===================== */
-@media (max-width: 1080px) {
-  #hero { grid-template-columns: 1fr; padding: 50px 30px; gap: 40px; }
-  .hero-visual-col { display: none; }
-  .owner-card-heroic { grid-template-columns: 1fr; text-align: center; padding: 36px 24px; }
-  .owner-avatar-zone { display: flex; justify-content: center; }
-  .owner-quick-connect { justify-content: center; }
-  .contact-hero-grid { grid-template-columns: 1fr; }
-  .footer-grid-top { grid-template-columns: 1fr 1fr; gap: 30px; }
+/* ===================== RESPONSIVE STYLES ===================== */
+@media (max-width: 1024px) {
+  .hero-container { grid-template-columns: 1fr; }
+  .store-photo-card { max-width: 500px; margin: 0 auto; }
+  .owner-banner-card { grid-template-columns: 1fr; text-align: center; }
+  .owner-avatar-frame { margin: 0 auto; }
+  .owner-cta-col { flex-direction: row; justify-content: center; }
+  .location-container { grid-template-columns: 1fr; }
+  .footer-top-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 768px) {
-  nav { padding: 14px 20px; }
-  nav.scrolled { padding: 12px 20px; }
-  .nav-menu { display: none; }
-  .btn-nav-call { display: none; }
-  #hero { padding: 40px 20px; }
-  #owner-spotlight, #services, #visible-chat-section, #contact, footer { padding: 60px 20px; }
-  .hero-heading { font-size: 38px; }
-  .hero-actions { flex-direction: column; }
-  .btn-primary-3d, .btn-secondary-3d { width: 100%; justify-content: center; }
-  .hero-stats-row { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
-  .stat-box .stat-num { font-size: 24px; }
-  .form-grid-2 { grid-template-columns: 1fr; }
-  .modal-feature-checklist { grid-template-columns: 1fr; }
-  .footer-grid-top { grid-template-columns: 1fr; }
-  .floating-actions-dock { bottom: 75px; right: 20px; }
-  .mobile-bottom-bar { display: flex; }
-  body { padding-bottom: 60px; }
+  .top-contact-bar { justify-content: center; text-align: center; }
+  .top-info-left, .top-info-right { justify-content: center; }
+  .nav-links-list { display: none; }
+  .hero-section { padding: 40px 20px 60px; }
+  .store-photo-wrap { height: 260px; }
+  .owner-section-wrapper { padding: 0 16px; margin-top: -20px; }
+  .owner-banner-card { padding: 26px 20px; }
+  .owner-cta-col { flex-direction: column; }
+  .services-section { padding: 0 16px; }
+  .location-section { padding: 50px 16px; }
+  .location-info-card { padding: 24px 20px; }
+  .contact-form-section { padding: 0 16px; margin: 50px auto; }
+  .contact-card-surface { padding: 26px 20px; }
+  .form-two-col { grid-template-columns: 1fr; }
+  .footer-top-grid { grid-template-columns: 1fr; }
+  footer { padding: 40px 20px 20px; }
+  .chat-dock-trigger { bottom: 20px; right: 20px; padding: 10px 18px; }
 }
 </style>
 </head>
 <body>
 
-<!-- MOUSE CURSOR -->
-<div id="cursor-dot"></div>
-<div id="cursor-ring"></div>
-
-<!-- SCROLL PROGRESS -->
-<div id="progress-bar"></div>
-
-<!-- 3D WEBGL CANVAS BACKGROUND -->
-<canvas id="webgl-bg"></canvas>
-
-<!-- TOP ANNOUNCEMENT BAR -->
-<div class="top-bar">
-  <div class="top-bar-item">
-    <span class="top-badge">Verified</span>
-    <span>Owner: <strong>Sardar Ali Ahsan</strong></span>
+<!-- ===================== TOP CONTACT BAR ===================== -->
+<div class="top-contact-bar">
+  <div class="top-info-left">
+    <div class="top-info-item">
+      <i class="fas fa-map-marker-alt"></i>
+      <span><strong>لوکیشن:</strong> گروٹ اڈا نزد ایم سی بی بینک، ضلع خوشاب (Girote Ada, Khushab)</span>
+    </div>
+    <div class="top-info-item">
+      <i class="fas fa-user-check"></i>
+      <span><strong>آنر:</strong> سردار علی احسن (Sardar Ali Ahsan)</span>
+    </div>
   </div>
-  <div class="top-bar-item">
-    <i class="fas fa-map-marker-alt"></i>
-    <span>Shop No. 05, Girote Ada (Near MCB Bank)</span>
-  </div>
-  <div class="top-bar-item">
-    <i class="fas fa-clock"></i>
-    <span>Open 7 Days: 8:00 AM - 10:00 PM</span>
+  <div class="top-info-right">
+    <a href="tel:03056091354" class="top-link-btn">
+      <i class="fas fa-phone-alt"></i> 0305-6091354
+    </a>
+    <a href="mailto:SardarMedicalstore@gmail.com" class="top-link-btn">
+      <i class="fas fa-envelope"></i> SardarMedicalstore@gmail.com
+    </a>
   </div>
 </div>
 
-<!-- ===================== NAVBAR ===================== -->
-<nav id="main-nav">
-  <a href="#hero" class="brand-wrap">
-    <div class="brand-logo-3d">⚕️</div>
-    <div class="brand-text">
-      <h1>Sardar Medical Store</h1>
-      <span>Your Trusted Health Partner</span>
-    </div>
-  </a>
-
-  <ul class="nav-menu">
-    <li><a href="#hero">Home</a></li>
-    <li><a href="#owner-spotlight">Owner</a></li>
-    <li><a href="#services">Services</a></li>
-    <li><a href="#visible-chat-section">Live Chat</a></li>
-    <li><a href="#contact">Contact</a></li>
-  </ul>
-
-  <div class="nav-cta-group">
-    <a href="tel:03056091354" class="btn-nav-call">
-      <i class="fas fa-phone-alt"></i> 0305-6091354
+<!-- ===================== MAIN HEADER / NAVIGATION ===================== -->
+<header>
+  <div class="navbar-wrap">
+    <a href="#home" class="brand-identity">
+      <div class="brand-logo-emblem">
+        <span>SS</span>
+        <small>MEDICAL</small>
+      </div>
+      <div class="brand-text-block">
+        <h1>SARDAR MEDICAL STORE</h1>
+        <span class="urdu-sub urdu-font">سردار میڈیکل سٹور</span>
+      </div>
     </a>
-    <a href="mailto:SardarMedicalstore@gmail.com?subject=Inquiry%20from%20Website" class="btn-nav-email">
-      <i class="fas fa-envelope"></i> Email Us
-    </a>
-  </div>
-</nav>
 
-<!-- ===================== HERO SECTION ===================== -->
-<section id="hero">
-  <div class="hero-glow-blob"></div>
+    <ul class="nav-links-list">
+      <li><a href="#home">ہوم (Home)</a></li>
+      <li><a href="#owner">آنر (Owner)</a></li>
+      <li><a href="#services">خدمات (Services)</a></li>
+      <li><a href="#location">لوکیشن خوشاب (Location)</a></li>
+      <li><a href="#contact">رابطہ (Contact)</a></li>
+    </ul>
 
-  <div class="hero-content">
-    <div class="hero-badge-pill">
-      <div class="pulse-dot"></div>
-      <span>Trusted Pharmacy · Girote Ada</span>
-    </div>
-
-    <h2 class="hero-heading">
-      Genuine Medicine,<br/>
-      <span class="gradient-word">Expert Care.</span>
-    </h2>
-
-    <p class="hero-description">
-      Welcome to <strong>Sardar Medical Store</strong>, owned and managed by <strong>Sardar Ali Ahsan</strong>. Located at Shop No. 05, Girote Ada near MCB Bank. We provide 100% authentic medicines, free health checks, and professional healthcare assistance for you and your family.
-    </p>
-
-    <div class="hero-actions">
-      <a href="#services" class="btn-primary-3d">
-        <i class="fas fa-stethoscope"></i> Explore Services
+    <div class="nav-cta-box">
+      <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Medical%20Store%2C%20Girote%20Ada" target="_blank" class="btn-nav-wa">
+        <i class="fab fa-whatsapp"></i> واٹس ایپ (WhatsApp)
       </a>
-      <a href="#visible-chat-section" class="btn-secondary-3d">
-        <i class="fas fa-comments"></i> Live Chat with Us
+      <a href="tel:03056091354" class="btn-nav-call-direct">
+        <i class="fas fa-phone-alt"></i> کال کریں
       </a>
     </div>
-
-    <div class="hero-stats-row">
-      <div class="stat-box">
-        <div class="stat-num" data-target="5000">5,000<span>+</span></div>
-        <div class="stat-lbl">Families Served</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num" data-target="1000">1,000<span>+</span></div>
-        <div class="stat-lbl">Medicines Stocked</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">100<span>%</span></div>
-        <div class="stat-lbl">Genuine Products</div>
-      </div>
-    </div>
   </div>
+</header>
 
-  <div class="hero-visual-col">
-    <div class="hero-orbit-stage">
-      <div class="orbit-ring-3d ring-outer">
-        <div class="orbit-node node-top">💊</div>
-        <div class="orbit-node node-right">🩺</div>
-        <div class="orbit-node node-bottom">💉</div>
-        <div class="orbit-node node-left">🩸</div>
-      </div>
-      <div class="orbit-ring-3d ring-inner"></div>
-
-      <div class="hero-center-crystal">
-        <div class="crystal-icon">⚕️</div>
-        <div class="crystal-label">Sardar Medical</div>
+<!-- ===================== HERO SECTION WITH REAL SHOP PHOTO ===================== -->
+<section id="home" class="hero-section">
+  <div class="hero-container">
+    <div>
+      <div class="hero-pill-tag">
+        <i class="fas fa-check-circle"></i>
+        <span>گروٹ اڈا، ضلع خوشاب کا معتبر میڈیکل سٹور</span>
       </div>
 
-      <div class="floating-glass-pill pill-1">
-        <div class="pill-icon-box">✅</div>
-        <div class="pill-text">
-          <h5>100% Authentic</h5>
-          <p>Certified Supplier Medicines</p>
-        </div>
-      </div>
+      <h2 class="hero-titleMain hero-title-main">
+        Sardar Medical Store<br/>
+        <span>اصلی اور معیاری ادویات</span>
+      </h2>
+      <span class="hero-urdu-tagline urdu-font">اصلی اور معیاری ادویات کا واحد اور بااعتماد مرکز</span>
 
-      <div class="floating-glass-pill pill-2">
-        <div class="pill-icon-box">🩺</div>
-        <div class="pill-text">
-          <h5>Free Health Check</h5>
-          <p>BP & Sugar Monitoring</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ===================== OWNER SPOTLIGHT SECTION ===================== -->
-<section id="owner-spotlight">
-  <div class="owner-card-heroic">
-    <div class="owner-avatar-zone">
-      <div class="owner-avatar-ring-3d">
-        <div class="owner-avatar-center">👨‍⚕️</div>
-      </div>
-      <div class="owner-verified-badge" title="Verified Store Owner">✓</div>
-    </div>
-
-    <div class="owner-detail-zone">
-      <h4>Store Owner & Founder</h4>
-      <h2>Sardar Ali Ahsan</h2>
-      <div class="owner-tagline">
-        <i class="fas fa-heartbeat"></i> "Committed to the Health and Wellbeing of Girote Ada"
-      </div>
-      <p class="owner-bio">
-        Welcome to Sardar Medical Store! My goal is to ensure that every patient and family in Girote Ada and surrounding communities receives 100% authentic medications, transparent and honest advice, and compassionate care. Feel free to contact me directly for special medicine requests, emergency prescriptions, or health guidance.
+      <p class="hero-body-text">
+        سردار میڈیکل سٹور، گروٹ اڈا (ضلع خوشاب) نزد ایم سی بی بینک پر واقع ہے۔ ہمارے پاس ہر قسم کی مستند، اصلی اور تصدیق شدہ ادویات دستیاب ہیں، ساتھ ہی مفت بلڈ پریشر چیک اپ اور پیشہ ورانہ رہنمائی فراہم کی جاتی ہے۔
       </p>
 
-      <div class="owner-quick-connect">
-        <a href="mailto:SardarMedicalstore@gmail.com?subject=Message%20for%20Sardar%20Ali%20Ahsan" class="btn-owner-contact boc-email">
-          <i class="fas fa-envelope"></i> SardarMedicalstore@gmail.com
+      <div class="hero-action-buttons">
+        <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Ali%20Ahsan%20Sahab" target="_blank" class="btn-hero-primary">
+          <i class="fab fa-whatsapp"></i> نسخہ واٹس ایپ کریں (Send Prescription)
         </a>
-        <a href="tel:03056091354" class="btn-owner-contact boc-call">
-          <i class="fas fa-phone-alt"></i> 0305-6091354
+        <a href="#location" class="btn-hero-secondary">
+          <i class="fas fa-map-marker-alt"></i> نقشہ اور لوکیشن دیکھیں
         </a>
-        <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Ali%20Ahsan%20Sahab" target="_blank" class="btn-owner-contact boc-wa">
-          <i class="fab fa-whatsapp"></i> Chat on WhatsApp
-        </a>
+      </div>
+
+      <div class="hero-stats-banner">
+        <div class="h-stat">
+          <h4>100<span>%</span></h4>
+          <p>اصلی ادویات (Genuine)</p>
+        </div>
+        <div class="h-stat">
+          <h4>مفت</h4>
+          <p>بلڈ پریشر چیک اپ</p>
+        </div>
+        <div class="h-stat">
+          <h4>7<span> دن</span></h4>
+          <p>صبح 8 تا رات 10 بجے</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Real Shopfront Photo -->
+    <div>
+      <div class="store-photo-card">
+        <div class="store-photo-wrap">
+          <img src="sardar-store.jpg" alt="Sardar Medical Store Girote Ada Khushab - Shopfront Photo"/>
+          <div class="photo-live-badge">
+            <div class="badge-dot-live"></div>
+            <span>اصل دکان (Original Storefront)</span>
+          </div>
+        </div>
+        <div class="store-photo-footer">
+          <div class="spf-text">
+            <h5>سردار میڈیکل سٹور (Girote Ada)</h5>
+            <p>شاپ نمبر 05 نزد ایم سی بی بینک، خوشاب</p>
+          </div>
+          <span class="verified-store-tag">تصدیق شدہ سٹور ✓</span>
+        </div>
       </div>
     </div>
   </div>
 </section>
+
+<!-- ===================== OWNER SECTION: SARDAR ALI AHSAN ===================== -->
+<div id="owner" class="owner-section-wrapper">
+  <div class="owner-banner-card">
+    <div class="owner-avatar-frame">
+      <div class="owner-avatar-inner">👨‍⚕️</div>
+      <div class="owner-v-check"><i class="fas fa-check"></i></div>
+    </div>
+
+    <div class="owner-content-block">
+      <h4>سٹور آنر و بانی (Store Owner & Founder)</h4>
+      <h2>سردار علی احسن (Sardar Ali Ahsan)</h2>
+      <p>
+        "ہمارا عزم ہے کہ گروٹ اڈا، خوشاب اور قریبی علاقوں کے ہر بھائی، بہن اور بزرگ کو 100 فیصد اصل ادویات، مناسب قیمت اور مکمل خلوص کے ساتھ ادویاتی رہنمائی فراہم کی جائے۔ آپ کسی بھی وقت براہ راست مجھ سے رابطہ کر سکتے ہیں۔"
+      </p>
+    </div>
+
+    <div class="owner-cta-col">
+      <a href="tel:03056091354" class="btn-owner-call">
+        <i class="fas fa-phone-alt"></i> ڈائریکٹ کال: 0305-6091354
+      </a>
+      <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Ali%20Ahsan%20Sahab" target="_blank" class="btn-owner-wa">
+        <i class="fab fa-whatsapp"></i> آنر کو واٹس ایپ کریں
+      </a>
+    </div>
+  </div>
+</div>
 
 <!-- ===================== SERVICES SECTION ===================== -->
-<section id="services">
-  <div class="section-header-center">
-    <div class="section-tag"><i class="fas fa-briefcase-medical"></i> Healthcare Solutions</div>
-    <h2 class="section-title">Our <span>Premium Services</span></h2>
-    <p class="section-desc">Click any service to view comprehensive information, benefits, and instant booking options.</p>
+<section id="services" class="services-section">
+  <div class="section-headline-center">
+    <span class="sub-tag-badge">ہماری سہولیات (Our Services)</span>
+    <h2 class="main-section-title">عوام کی صحت و تندرستی کے لیے خدمات</h2>
+    <p class="section-sub-copy">سردار میڈیکل سٹور پر فراہم کی جانے والی معیاری ادویاتی سہولیات کی تفصیل دیکھنے کے لیے کسی بھی سروس پر کلک کریں۔</p>
   </div>
 
-  <div class="services-3d-grid">
+  <div class="services-grid-layout">
 
-    <!-- Service 1 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-popular">🔥 High Demand</span>
+    <!-- Card 1 -->
+    <div class="srv-card-box">
       <div>
-        <div class="srv-icon-bubble">💊</div>
-        <h3>Prescription Medications</h3>
-        <p>Complete inventory of branded and top-tier generic medicines verified for authenticity and proper storage.</p>
+        <div class="srv-icon-disc">💊</div>
+        <h3>اصلی و رجسٹرڈ ادویات</h3>
+        <p>مستند ملٹی نیشنل اور قومی کمپنیوں کی 100 فیصد تصدیق شدہ ادویات، جو درست درجہ حرارت پر رکھی جاتی ہیں۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('prescription')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('prescription')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
 
-    <!-- Service 2 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-free">✅ 100% Free</span>
+    <!-- Card 2 -->
+    <div class="srv-card-box">
+      <span class="srv-badge-free">مفت سہولت</span>
       <div>
-        <div class="srv-icon-bubble">🩺</div>
-        <h3>Pharmacist Consultation</h3>
-        <p>Expert pharmaceutical advice for common health issues, dosage guidance, and potential drug interaction checks.</p>
+        <div class="srv-icon-disc">🩸</div>
+        <h3>بلڈ پریشر و شوگر چیک اپ</h3>
+        <p>جدید ڈیجیٹل آلات کے ذریعے بغیر کسی فیس کے فوری اور درست بلڈ پریشر اور شوگر ٹیسٹ کی سہولت۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('consultation')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('bp')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
 
-    <!-- Service 3 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-free">✅ Free Checkup</span>
+    <!-- Card 3 -->
+    <div class="srv-card-box">
+      <span class="srv-badge-free">مفت مشورہ</span>
       <div>
-        <div class="srv-icon-bubble">🩸</div>
-        <h3>BP & Blood Sugar Test</h3>
-        <p>Instant digital blood pressure readings and blood glucose screening at no cost, with immediate results.</p>
+        <div class="srv-icon-disc">🩺</div>
+        <h3>مفت فارماسسٹ مشاورت</h3>
+        <p>ادویات کے استعمال، خوراک کے اوقات اور مضر اثرات سے بچاؤ کے بارے میں ماہرانہ اور مخلصانہ رہنمائی۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('bp')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('consultation')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
 
-    <!-- Service 4 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-regular">💉 Professional</span>
+    <!-- Card 4 -->
+    <div class="srv-card-box">
       <div>
-        <div class="srv-icon-bubble">💉</div>
-        <h3>Injection & Dressing</h3>
-        <p>Hygienic, certified injection administration and sterile dressing in a sanitized, comfortable environment.</p>
+        <div class="srv-icon-disc">💉</div>
+        <h3>انجیکشن و پٹی کی سہولت</h3>
+        <p>ڈاکٹر کے نسخے کے مطابق صفائی اور جراثیم کش ماحول میں انجیکشن لگانے اور مرہم پٹی کی مکمل سہولت۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('injection')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('injection')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
 
-    <!-- Service 5 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-regular">👶 Family Care</span>
+    <!-- Card 5 -->
+    <div class="srv-card-box">
       <div>
-        <div class="srv-icon-bubble">🍼</div>
-        <h3>Mother & Baby Care</h3>
-        <p>Infant nutrition, diapers, formula foods, baby hygiene products, and essential maternal vitamins.</p>
+        <div class="srv-icon-disc">🍼</div>
+        <h3>ماں اور بچوں کی نگہداشت</h3>
+        <p>بچوں کے فارمولا دودھ، ڈائپرز، فیڈرز، گرائپ واٹر، پیٹ درد کے ڈراپس اور زچہ بچہ وٹامنز کی مکمل رینج۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('baby')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('baby')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
 
-    <!-- Service 6 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-regular">🌿 Wellness</span>
+    <!-- Card 6 -->
+    <div class="srv-card-box">
       <div>
-        <div class="srv-icon-bubble">🌿</div>
-        <h3>Herbal & Supplements</h3>
-        <p>Vitamins, calcium, fish oil, immune boosters, and authentic natural wellness supplements.</p>
+        <div class="srv-icon-disc">🩹</div>
+        <h3>ابتدائی طبی امداد (First Aid)</h3>
+        <p>پائیودین، بینڈیجز، کاٹن، برنول، ہنگامی فرسٹ ایڈ کٹس اور جراثیم کش سامان 24 گھنٹے دستیاب۔</p>
       </div>
-      <button class="btn-service-view" onclick="openServiceModal('herbal')">
-        <span>View Full Details</span>
-        <i class="fas fa-arrow-right"></i>
-      </button>
-    </div>
-
-    <!-- Service 7 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-popular">🌡️ Equipment</span>
-      <div>
-        <div class="srv-icon-bubble">🌡️</div>
-        <h3>Diagnostic Equipment</h3>
-        <p>Digital thermometers, BP monitors, nebulizers, glucometers, and replacement testing strips.</p>
-      </div>
-      <button class="btn-service-view" onclick="openServiceModal('devices')">
-        <span>View Full Details</span>
-        <i class="fas fa-arrow-right"></i>
-      </button>
-    </div>
-
-    <!-- Service 8 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-regular">🧴 Personal</span>
-      <div>
-        <div class="srv-icon-bubble">🧴</div>
-        <h3>Derma & Skincare</h3>
-        <p>Dermatologist-recommended skin treatments, medicated soaps, sunblocks, and moisturizers.</p>
-      </div>
-      <button class="btn-service-view" onclick="openServiceModal('skin')">
-        <span>View Full Details</span>
-        <i class="fas fa-arrow-right"></i>
-      </button>
-    </div>
-
-    <!-- Service 9 -->
-    <div class="service-box-3d">
-      <span class="badge-top badge-popular">🚑 24/7 Ready</span>
-      <div>
-        <div class="srv-icon-bubble">🩹</div>
-        <h3>First Aid & Emergency</h3>
-        <p>Antiseptic lotions, bandages, sterile cotton, burn creams, and ready-to-use first aid boxes.</p>
-      </div>
-      <button class="btn-service-view" onclick="openServiceModal('firstaid')">
-        <span>View Full Details</span>
+      <button class="btn-open-service-modal" onclick="showServiceDetail('firstaid')">
+        <span>مکمل تفصیل دیکھیں</span>
         <i class="fas fa-arrow-right"></i>
       </button>
     </div>
@@ -1855,632 +1529,466 @@ footer {
   </div>
 </section>
 
-<!-- ===================== VISIBLE ON-PAGE LIVE CHAT SECTION ===================== -->
-<section id="visible-chat-section">
-  <div class="section-header-center">
-    <div class="section-tag"><i class="fas fa-comment-dots"></i> Visible Live Chat</div>
-    <h2 class="section-title">Ask Our <span>Health Assistant</span></h2>
-    <p class="section-desc">Type your medicine questions, ask about prices, or order prescriptions right here in the chat!</p>
+<!-- ===================== EXACT LOCATION SECTION (GIROTE KHUSHAB) ===================== -->
+<section id="location" class="location-section">
+  <div class="location-container">
+    <div class="location-info-card">
+      <span class="loc-badge-tag"><i class="fas fa-map-pin"></i> درست لوکیشن (Exact Location)</span>
+      <h2>سردار میڈیکل سٹور، گروٹ اڈا (ضلع خوشاب)</h2>
+      <p style="color:#64748b; font-size:14px; margin-bottom: 20px;">
+        ہماری دکان پنجاب کے ضلع خوشاب میں واقع گروٹ اڈا کے مین بازار میں ایم سی بی بینک (MCB Bank) کے بالکل ساتھ شاپ نمبر 05 پر موجود ہے۔
+      </p>
+
+      <div class="location-address-list">
+        <div class="loc-point-item">
+          <div class="loc-icon-bubble"><i class="fas fa-store"></i></div>
+          <div class="loc-text">
+            <h5>دکان کا پتہ (Address)</h5>
+            <p>شاپ نمبر 05، گروٹ اڈا، نزد ایم سی بی بینک، ضلع خوشاب، پنجاب</p>
+          </div>
+        </div>
+
+        <div class="loc-point-item">
+          <div class="loc-icon-bubble"><i class="fas fa-university"></i></div>
+          <div class="loc-text">
+            <h5>خاص نشانی (Landmark)</h5>
+            <p>ایم سی بی بینک گروٹ برانچ کے بالکل قریب</p>
+          </div>
+        </div>
+
+        <div class="loc-point-item">
+          <div class="loc-icon-bubble"><i class="fas fa-phone-volume"></i></div>
+          <div class="loc-text">
+            <h5>پتہ معلوم کرنے کے لیے فون</h5>
+            <p>0305-6091354 (سردار علی احسن)</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="loc-action-buttons">
+        <a href="https://www.google.com/maps/search/?api=1&query=MCB+Bank+Girote+Khushab+Punjab" target="_blank" class="btn-open-gmaps">
+          <i class="fas fa-directions"></i> گوگل میپس پر راستہ دیکھیں
+        </a>
+        <a href="tel:03056091354" class="btn-call-direction">
+          <i class="fas fa-phone-alt"></i> کال کر کے پتہ پوچھیں
+        </a>
+      </div>
+    </div>
+
+    <!-- Live Google Map Embed Centered at MCB Bank Girote, Khushab -->
+    <div class="map-embed-wrapper">
+      <iframe 
+        title="Google Map Location of Girote Khushab near MCB Bank"
+        src="https://maps.google.com/maps?q=MCB+Bank+Girote+Khushab+Punjab&t=&z=15&ie=UTF8&iwloc=&output=embed" 
+        loading="lazy" 
+        allowfullscreen>
+      </iframe>
+    </div>
   </div>
+</section>
 
-  <div class="chat-container-card">
-    <div class="chat-card-topbar">
-      <div class="chat-assistant-info">
-        <div class="chat-assistant-avatar">
-          ⚕️
-          <div class="online-indicator-dot"></div>
+<!-- ===================== DIRECT EMAIL & INQUIRY FORM ===================== -->
+<section id="contact" class="contact-form-section">
+  <div class="contact-card-surface">
+    <h2>ہمیں براہ راست پیغام یا نسخہ بھیجیں</h2>
+    <p>فارم فل کر کے بٹن دبائیں، آپ کے موبائل یا کمپیوٹر کا جی میل (Gmail) فوری اوپن ہو جائے گا اور ہمیں ای میل موصول ہو جائے گی۔</p>
+
+    <form onsubmit="handleCustomerFormSubmit(event)">
+      <div class="form-two-col">
+        <div class="form-input-box">
+          <label>آپ کا نام (Your Name)</label>
+          <input type="text" id="cust-name" placeholder="مثلاً: محمد داؤد" required/>
         </div>
-        <div class="chat-assistant-meta">
-          <h4>Sardar Medical Assistant</h4>
-          <span>🟢 Active Online · Owner: Sardar Ali Ahsan</span>
+        <div class="form-input-box">
+          <label>فون نمبر (Phone Number)</label>
+          <input type="tel" id="cust-phone" placeholder="0300-1234567" required/>
         </div>
       </div>
 
-      <div class="chat-top-actions">
-        <a href="https://wa.me/923056091354" target="_blank" class="btn-chat-action">
-          <i class="fab fa-whatsapp"></i> WhatsApp Chat
-        </a>
-        <a href="tel:03056091354" class="btn-chat-action">
-          <i class="fas fa-phone-alt"></i> Call
-        </a>
+      <div class="form-input-box">
+        <label>آپ کی ای میل (Email - اگر دستیاب ہو)</label>
+        <input type="email" id="cust-email" placeholder="yourname@gmail.com"/>
       </div>
-    </div>
 
-    <div class="chat-conversation-area" id="chat-stream">
-      <div class="chat-message-bubble msg-bot">
-        <div class="bot-name-label">Sardar Medical Store · Girote Ada</div>
-        Assalam-o-Alaikum! Welcome to Sardar Medical Store. I am your online pharmacy assistant. How can we help you today? You can ask about medicine stock, free BP checkup, or send a prescription!
+      <div class="form-input-box">
+        <label>موضوع / مطلوبہ دوا کا نام (Medicine / Inquiry Topic)</label>
+        <input type="text" id="cust-subject" placeholder="مثلاً: پیناڈول، شوگر کی دوائی، یا بی پی چیک اپ" required/>
       </div>
-    </div>
 
-    <div class="chat-quick-suggestions">
-      <button class="chat-chip" onclick="quickSend('Is Panadol / Paracetamol available?')">💊 Panadol in Stock?</button>
-      <button class="chat-chip" onclick="quickSend('How can I get free BP / Sugar checkup?')">🩸 Free BP Checkup</button>
-      <button class="chat-chip" onclick="quickSend('How do I send my doctor prescription?')">📋 Send Prescription</button>
-      <button class="chat-chip" onclick="quickSend('What are your store timings and location?')">📍 Timings & Location</button>
-      <button class="chat-chip" onclick="quickSend('I want to speak with Sardar Ali Ahsan')">👨‍⚕️ Talk to Owner</button>
-    </div>
+      <div class="form-input-box">
+        <label>تفصیل یا نسخہ (Message Details)</label>
+        <textarea id="cust-message" placeholder="ادویات کے نام، مقدار یا جو بھی سوال آپ پوچھنا چاہیں یہاں لکھیں..." required></textarea>
+      </div>
 
-    <form class="chat-input-bar" onsubmit="handleUserChatSubmit(event)">
-      <input type="text" id="chat-text-input" class="chat-input-field" placeholder="Type your medicine query or message here..." autocomplete="off"/>
-      <button type="submit" class="btn-chat-send" title="Send Message">
-        <i class="fas fa-paper-plane"></i>
+      <button type="submit" class="btn-send-email-direct">
+        <i class="fas fa-paper-plane"></i> SardarMedicalstore@gmail.com پر ای میل بھیجیں
       </button>
     </form>
   </div>
 </section>
 
-<!-- ===================== CONTACT & LOCATION SECTION ===================== -->
-<section id="contact">
-  <div class="section-header-center">
-    <div class="section-tag"><i class="fas fa-headset"></i> Immediate Support</div>
-    <h2 class="section-title">Get In <span>Touch With Us</span></h2>
-    <p class="section-desc">Reach out directly via phone, WhatsApp, email, or visit us at Girote Ada.</p>
+<!-- ===================== SERVICE DETAIL MODAL ===================== -->
+<div id="service-popup" class="service-popup-backdrop" onclick="handleServicePopupOutside(event)">
+  <div class="service-popup-box">
+    <button class="btn-close-sp" onclick="closeServiceDetail()"><i class="fas fa-times"></i></button>
+    <div class="sp-icon-header" id="sp-icon">💊</div>
+    <div class="sp-cat-tag" id="sp-category">سروس کیٹیگری</div>
+    <h3 class="sp-title" id="sp-title">سروس کا عنوان</h3>
+    <p class="sp-desc" id="sp-desc">تفصیل</p>
+
+    <div class="sp-features-grid" id="sp-features">
+      <!-- Injected by JS -->
+    </div>
+
+    <div class="sp-cta-row">
+      <a href="tel:03056091354" class="sp-btn-call">
+        <i class="fas fa-phone-alt"></i> کال کریں: 0305-6091354
+      </a>
+      <a href="https://wa.me/923056091354" target="_blank" class="sp-btn-wa">
+        <i class="fab fa-whatsapp"></i> واٹس ایپ پر پوچھیں
+      </a>
+    </div>
   </div>
+</div>
 
-  <div class="contact-hero-grid">
-    <div class="contact-info-cards-col">
+<!-- ===================== FLOATING SMART AI CHATBOT WIDGET ===================== -->
+<!-- Dock Trigger -->
+<div class="chat-dock-trigger" onclick="toggleChatWindow()">
+  <div class="icon-part"><i class="fas fa-robot"></i></div>
+  <div class="text-part">
+    <span>میڈیکل اسسٹنٹ (AI Chat)</span>
+    <small>ہر سوال کا فوری جواب دیں</small>
+  </div>
+</div>
 
-      <a href="mailto:SardarMedicalstore@gmail.com?subject=Medicine%20Inquiry%20from%20Website" class="contact-tile">
-        <div class="tile-icon-box">📧</div>
-        <div class="tile-content">
-          <h5>Direct Email (Taps open Gmail)</h5>
-          <p>SardarMedicalstore@gmail.com</p>
-        </div>
-      </a>
-
-      <a href="tel:03056091354" class="contact-tile">
-        <div class="tile-icon-box" style="background: linear-gradient(135deg, var(--cyan), var(--blue));">📞</div>
-        <div class="tile-content">
-          <h5>Direct Phone Call</h5>
-          <p>0305-6091354</p>
-        </div>
-      </a>
-
-      <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Medical%20Store" target="_blank" class="contact-tile">
-        <div class="tile-icon-box" style="background: linear-gradient(135deg, #25D366, #128C7E);">💬</div>
-        <div class="tile-content">
-          <h5>WhatsApp Chat & Prescription</h5>
-          <p>0305-6091354</p>
-        </div>
-      </a>
-
-      <div class="map-card-container">
-        <div class="map-pin-pulse">📍</div>
-        <h4>Sardar Medical Store</h4>
-        <p>Shop No. 05, Girote Ada · Near MCB Bank</p>
-        <a href="https://maps.google.com/?q=Girote+Ada+MCB+Bank" target="_blank" class="btn-open-maps">
-          <i class="fas fa-directions"></i> Get Directions on Google Maps
-        </a>
+<!-- Chat Window -->
+<div class="chat-window-modal" id="chat-window">
+  <div class="chat-modal-header">
+    <div class="cmh-info">
+      <div class="cmh-avatar">⚕️</div>
+      <div class="cmh-text">
+        <h4>سردار میڈیکل اسسٹنٹ</h4>
+        <span>🟢 آن لائن · ہر دوا اور بیماری کی رہنمائی</span>
       </div>
-
     </div>
+    <button class="btn-close-chat" onclick="toggleChatWindow()"><i class="fas fa-times"></i></button>
+  </div>
 
-    <!-- Inquiry Form -->
-    <div class="inquiry-form-card">
-      <h3>Send Us a Direct Message</h3>
-      <p>Fill out the form below to immediately email Sardar Medical Store.</p>
-
-      <form onsubmit="handleInquiryFormSubmit(event)">
-        <div class="form-grid-2">
-          <div class="form-group-item">
-            <label>Full Name</label>
-            <input type="text" id="form-name" placeholder="e.g. Muhammad Dawood" required/>
-          </div>
-          <div class="form-group-item">
-            <label>Phone Number</label>
-            <input type="tel" id="form-phone" placeholder="0300-1234567" required/>
-          </div>
-        </div>
-
-        <div class="form-group-item">
-          <label>Email Address</label>
-          <input type="email" id="form-email" placeholder="yourname@gmail.com"/>
-        </div>
-
-        <div class="form-group-item">
-          <label>Inquiry Topic / Service</label>
-          <select id="form-service">
-            <option>General Medicine Inquiry</option>
-            <option>Check Medicine Availability</option>
-            <option>Prescription Delivery</option>
-            <option>Free BP & Sugar Test</option>
-            <option>Consult with Sardar Ali Ahsan</option>
-            <option>Medical Equipment Order</option>
-          </select>
-        </div>
-
-        <div class="form-group-item">
-          <label>Your Message / Medicine Details</label>
-          <textarea id="form-message" placeholder="Please mention medicine names, milligrams, or your specific question..." required></textarea>
-        </div>
-
-        <button type="submit" class="btn-submit-inquiry">
-          <i class="fas fa-paper-plane"></i> Send to SardarMedicalstore@gmail.com
-        </button>
-      </form>
+  <div class="chat-messages-container" id="chat-messages">
+    <div class="chat-bubble cb-bot">
+      السلام علیکم! میں سردار میڈیکل سٹور کا سمارٹ اسسٹنٹ ہوں۔ آپ مجھ سے کسی بھی دوائی، بیماری (بخار، درد، کھانسی، معدہ، بی پی، شوگر)، قیمت یا نسخے کے بارے میں جو مرضی سوال پوچھیں!
     </div>
   </div>
-</section>
 
-<!-- ===================== SERVICE DETAIL 3D MODAL ===================== -->
-<div id="service-modal-overlay" onclick="handleModalOverlayClick(event)">
-  <div class="modal-content-3d">
-    <button class="modal-close-trigger" onclick="closeServiceModal()">
-      <i class="fas fa-times"></i>
-    </button>
-    <div class="modal-hero-badge" id="modal-icon">💊</div>
-    <div class="modal-badge-label" id="modal-category">CATEGORY</div>
-    <h2 class="modal-title-text" id="modal-title">Service Title</h2>
-    <p class="modal-explanation" id="modal-description">Full service description will appear here.</p>
-
-    <div class="modal-feature-checklist" id="modal-features-list">
-      <!-- Injected via JavaScript -->
-    </div>
-
-    <div class="modal-buttons-row">
-      <a href="tel:03056091354" class="btn-modal-action-1">
-        <i class="fas fa-phone-alt"></i> Call Store (03056091354)
-      </a>
-      <a href="mailto:SardarMedicalstore@gmail.com?subject=Service%20Inquiry" class="btn-modal-action-2" id="modal-email-btn">
-        <i class="fas fa-envelope"></i> Send Email
-      </a>
-      <a href="https://wa.me/923056091354" target="_blank" class="btn-modal-action-2">
-        <i class="fab fa-whatsapp"></i> WhatsApp
-      </a>
-    </div>
+  <div class="chat-quick-pill-row">
+    <button class="quick-pill-btn" onclick="sendChatPredefined('بخار کی دوائی')">🌡️ بخار / پیناڈول</button>
+    <button class="quick-pill-btn" onclick="sendChatPredefined('معدے کی تیزابیت')">🔥 معدہ / گیس</button>
+    <button class="quick-pill-btn" onclick="sendChatPredefined('مفت بلڈ پریشر چیک')">🩸 بی پی چیک اپ</button>
+    <button class="quick-pill-btn" onclick="sendChatPredefined('نسخہ کیسے بھیجوں؟')">📋 نسخہ بھیجیں</button>
+    <button class="quick-pill-btn" onclick="sendChatPredefined('دکان کا پتہ اور ٹائمنگ')">📍 لوکیشن و وقت</button>
   </div>
-</div>
 
-<!-- ===================== FLOATING ACTIONS DOCK ===================== -->
-<div class="floating-actions-dock">
-  <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Sardar%20Medical%20Store" target="_blank" class="btn-float-action float-wa-btn" title="Chat on WhatsApp">
-    <i class="fab fa-whatsapp"></i>
-  </a>
-  <a href="#visible-chat-section" class="btn-float-action float-chat-btn" title="Open Live Chat">
-    <i class="fas fa-comment-medical"></i>
-    <div class="chat-unread-badge">1</div>
-  </a>
-</div>
-
-<!-- ===================== MOBILE BOTTOM QUICK BAR ===================== -->
-<div class="mobile-bottom-bar">
-  <a href="#hero" class="mbb-item active"><i class="fas fa-home"></i><span>Home</span></a>
-  <a href="#services" class="mbb-item"><i class="fas fa-stethoscope"></i><span>Services</span></a>
-  <a href="#visible-chat-section" class="mbb-item"><i class="fas fa-comments"></i><span>Chat</span></a>
-  <a href="tel:03056091354" class="mbb-item"><i class="fas fa-phone-alt"></i><span>Call</span></a>
-  <a href="https://wa.me/923056091354" class="mbb-item"><i class="fab fa-whatsapp"></i><span>WhatsApp</span></a>
+  <form class="chat-input-row" onsubmit="handleChatSubmit(event)">
+    <input type="text" id="chat-input-txt" class="chat-input-field" placeholder="اپنا سوال اردو یا انگلش میں لکھیں..." autocomplete="off"/>
+    <button type="submit" class="btn-send-chat" title="Send"><i class="fas fa-paper-plane"></i></button>
+  </form>
 </div>
 
 <!-- ===================== FOOTER ===================== -->
 <footer>
-  <div class="footer-grid-top">
-    <div>
-      <div class="brand-wrap">
-        <div class="brand-logo-3d" style="width:40px; height:40px; font-size:20px;">⚕️</div>
-        <div class="brand-text">
-          <h1 style="font-size:16px;">Sardar Medical Store</h1>
-          <span>Girote Ada</span>
-        </div>
+  <div class="footer-container">
+    <div class="footer-top-grid">
+      <div class="footer-brand-col">
+        <h3>SARDAR MEDICAL STORE</h3>
+        <span class="urdu-tag urdu-font">سردار میڈیکل سٹور</span>
+        <p>
+          گروٹ اڈا (ضلع خوشاب) نزد ایم سی بی بینک پر واقع اصل اور معیاری ادویات کا واحد قابلِ اعتماد مرکز۔ سٹور آنر: <strong>سردار علی احسن</strong>۔
+        </p>
       </div>
-      <p class="footer-brand-bio">
-        Owned and operated by <strong>Sardar Ali Ahsan</strong>. Providing authentic pharmaceuticals, health monitoring, and expert consultation to Girote Ada community.
-      </p>
-      <div class="footer-social-row">
-        <a href="mailto:SardarMedicalstore@gmail.com" class="footer-social-icon"><i class="fas fa-envelope"></i></a>
-        <a href="tel:03056091354" class="footer-social-icon"><i class="fas fa-phone-alt"></i></a>
-        <a href="https://wa.me/923056091354" target="_blank" class="footer-social-icon"><i class="fab fa-whatsapp"></i></a>
+
+      <div class="footer-col-nav">
+        <h5>اہم لنکس (Links)</h5>
+        <ul>
+          <li><a href="#home">ہوم پیج (Home)</a></li>
+          <li><a href="#owner">آنر تفصیل (Owner Info)</a></li>
+          <li><a href="#services">تمام سہولیات (Services)</a></li>
+          <li><a href="#location">خوشاب لوکیشن (Location)</a></li>
+          <li><a href="#contact">رابطہ فارم (Contact)</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col-nav">
+        <h5>سہولیات (Services)</h5>
+        <ul>
+          <li><a href="#services">رجسٹرڈ ادویات</a></li>
+          <li><a href="#services">مفت بی پی و شوگر چیک</a></li>
+          <li><a href="#services">فارماسسٹ مشورہ</a></li>
+          <li><a href="#services">بچوں کا سامان و خوراک</a></li>
+          <li><a href="#services">ایمرجنسی فرسٹ ایڈ</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col-nav">
+        <h5>رابطہ کی تفصیل</h5>
+        <ul>
+          <li><a href="tel:03056091354"><i class="fas fa-phone-alt"></i> 0305-6091354</a></li>
+          <li><a href="https://wa.me/923056091354" target="_blank"><i class="fab fa-whatsapp"></i> 0305-6091354 (واٹس ایپ)</a></li>
+          <li><a href="mailto:SardarMedicalstore@gmail.com"><i class="fas fa-envelope"></i> SardarMedicalstore@gmail.com</a></li>
+          <li><a href="#location"><i class="fas fa-map-marker-alt"></i> شاپ 05، گروٹ اڈا، خوشاب</a></li>
+        </ul>
       </div>
     </div>
 
-    <div class="footer-col-nav">
-      <h5>Quick Links</h5>
-      <ul>
-        <li><a href="#hero"><i class="fas fa-chevron-right"></i> Home</a></li>
-        <li><a href="#owner-spotlight"><i class="fas fa-chevron-right"></i> Store Owner</a></li>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> All Services</a></li>
-        <li><a href="#visible-chat-section"><i class="fas fa-chevron-right"></i> Live Chat</a></li>
-        <li><a href="#contact"><i class="fas fa-chevron-right"></i> Contact Us</a></li>
-      </ul>
+    <div class="footer-bottom-strip">
+      <p>© 2024-2026 سردار میڈیکل سٹور (Sardar Medical Store). جملہ حقوق محفوظ ہیں۔</p>
+      <p>آنر: <strong>سردار علی احسن (Sardar Ali Ahsan)</strong> | گروٹ اڈا نزد ایم سی بی بینک، ضلع خوشاب</p>
     </div>
-
-    <div class="footer-col-nav">
-      <h5>Key Services</h5>
-      <ul>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> Genuine Medicines</a></li>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> Free BP Screening</a></li>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> Free Blood Sugar Test</a></li>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> Baby Nutrition & Care</a></li>
-        <li><a href="#services"><i class="fas fa-chevron-right"></i> First Aid Equipment</a></li>
-      </ul>
-    </div>
-
-    <div class="footer-col-nav">
-      <h5>Contact Details</h5>
-      <ul>
-        <li><a href="mailto:SardarMedicalstore@gmail.com"><i class="fas fa-envelope"></i> SardarMedicalstore@gmail.com</a></li>
-        <li><a href="tel:03056091354"><i class="fas fa-phone-alt"></i> 0305-6091354</a></li>
-        <li><a href="#contact"><i class="fas fa-map-marker-alt"></i> Shop No. 05, Girote Ada</a></li>
-        <li><a href="#contact"><i class="fas fa-landmark"></i> Near MCB Bank</a></li>
-        <li><a href="#owner-spotlight"><i class="fas fa-user-tie"></i> Owner: Sardar Ali Ahsan</a></li>
-      </ul>
-    </div>
-  </div>
-
-  <div class="footer-bottom-bar">
-    <p>© 2024-2026 <span>Sardar Medical Store</span>. All rights reserved.</p>
-    <p>Owner: <span>Sardar Ali Ahsan</span> · Girote Ada, Shop No 05 Near MCB Bank</p>
   </div>
 </footer>
 
-<!-- ===================== JAVASCRIPT ===================== -->
+<!-- ===================== SCRIPTS ===================== -->
 <script>
-// ===================== MOUSE CURSOR PHYSICS =====================
-const cursorDot = document.getElementById('cursor-dot');
-const cursorRing = document.getElementById('cursor-ring');
-let mouseX = 0, mouseY = 0;
-let ringX = 0, ringY = 0;
-
-if (cursorDot && cursorRing) {
-  window.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
-    cursorDot.style.left = mouseX + 'px';
-    cursorDot.style.top = mouseY + 'px';
-  });
-
-  function renderCursorRing() {
-    ringX += (mouseX - ringX) * 0.15;
-    ringY += (mouseY - ringY) * 0.15;
-    cursorRing.style.left = ringX + 'px';
-    cursorRing.style.top = ringY + 'px';
-    requestAnimationFrame(renderCursorRing);
-  }
-  renderCursorRing();
-}
-
-// ===================== SCROLL PROGRESS BAR =====================
-window.addEventListener('scroll', () => {
-  const scrolled = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight)) * 100;
-  const pb = document.getElementById('progress-bar');
-  if (pb) pb.style.width = scrolled + '%';
-
-  const nav = document.getElementById('main-nav');
-  if (nav) {
-    if (window.scrollY > 40) {
-      nav.classList.add('scrolled');
-    } else {
-      nav.classList.remove('scrolled');
-    }
-  }
-});
-
-// ===================== THREE.JS 3D BACKGROUND =====================
-(function initThreeBackground() {
-  const canvas = document.getElementById('webgl-bg');
-  if (!canvas) return;
-
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.z = 6;
-
-  // Starfield particles
-  const count = 1200;
-  const geom = new THREE.BufferGeometry();
-  const positions = new Float32Array(count * 3);
-  for (let i = 0; i < count * 3; i++) {
-    positions[i] = (Math.random() - 0.5) * 22;
-  }
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const mat = new THREE.PointsMaterial({
-    color: 0x00e676,
-    size: 0.035,
-    transparent: true,
-    opacity: 0.55
-  });
-  const starField = new THREE.Points(geom, mat);
-  scene.add(starField);
-
-  // Wireframe Torus ring
-  const torusGeom = new THREE.TorusGeometry(3.5, 0.02, 16, 100);
-  const torusMat = new THREE.MeshBasicMaterial({ color: 0x00e676, wireframe: true, transparent: true, opacity: 0.08 });
-  const torus = new THREE.Mesh(torusGeom, torusMat);
-  torus.rotation.x = Math.PI / 3;
-  scene.add(torus);
-
-  // Wireframe Icosahedron
-  const icoGeom = new THREE.IcosahedronGeometry(2, 1);
-  const icoMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true, transparent: true, opacity: 0.06 });
-  const ico = new THREE.Mesh(icoGeom, icoMat);
-  ico.position.set(2.5, -0.5, 0);
-  scene.add(ico);
-
-  let targetX = 0, targetY = 0;
-  window.addEventListener('mousemove', (e) => {
-    targetX = (e.clientX / window.innerWidth - 0.5) * 0.4;
-    targetY = (e.clientY / window.innerHeight - 0.5) * 0.4;
-  });
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
-
-  let clock = 0;
-  function animate() {
-    requestAnimationFrame(animate);
-    clock += 0.003;
-    starField.rotation.y = clock * 0.08;
-    torus.rotation.z = clock * 0.15;
-    ico.rotation.x = clock * 0.2;
-    ico.rotation.y = clock * 0.25;
-
-    camera.position.x += (targetX - camera.position.x) * 0.03;
-    camera.position.y += (-targetY - camera.position.y) * 0.03;
-    camera.lookAt(scene.position);
-
-    renderer.render(scene, camera);
-  }
-  animate();
-})();
-
-// ===================== SERVICE MODAL SYSTEM =====================
-const serviceDatabase = {
+// ===================== SERVICES DATABASE =====================
+const servicesInfo = {
   prescription: {
     icon: '💊',
-    category: 'AUTHENTIC PHARMACEUTICALS',
-    title: 'Prescription & Generic Medicines',
-    desc: 'At Sardar Medical Store, we source 100% genuine pharmaceuticals directly from licensed distributors and certified manufacturers. Our experienced team under Sardar Ali Ahsan strictly verifies every prescription to ensure correct dosage, purity, and patient safety.',
-    features: [
-      'Authentic Branded Medicines',
-      'Affordable High-Grade Generics',
-      'Temperature Controlled Storage',
-      'Prescription Verification Check',
-      'Expiry Date Guarantee',
-      'Clear Usage & Dosage Instructions'
-    ]
-  },
-  consultation: {
-    icon: '🩺',
-    category: 'FREE PATIENT SUPPORT',
-    title: 'Pharmacist Medical Consultation',
-    desc: 'Receive free, personalized pharmaceutical counseling for everyday health conditions, seasonal flu, fever, allergies, and pediatric medications. We take the time to answer your questions and guide you on when to visit specialized physicians.',
-    features: [
-      '100% Free Consultation Service',
-      'Drug Interaction Checks',
-      'Advice on Side Effect Avoidance',
-      'Food & Medication Timing Guidance',
-      'Chronic Illness Medicine Scheduling',
-      'Direct Physician Referral Support'
+    cat: 'مستند اور اصلی ادویات (GENUINE MEDICINES)',
+    title: 'اصلی و رجسٹرڈ ادویات (All Prescribed Medicines)',
+    desc: 'سردار میڈیکل سٹور پر تمام ڈاکٹرز کی تجویز کردہ ملکی و غیر ملکی کمپنیوں کی ادویات 100 فیصد گارنٹی کے ساتھ دستیاب ہیں۔ تمام ادویات کو باقاعدہ درجہ حرارت اور مینوفیکچرر کی ہدایات کے مطابق سٹور کیا جاتا ہے۔',
+    feats: [
+      '100% اصلی و رجسٹرڈ برانڈز',
+      'مناسب اور کنٹرولڈ قیمتیں',
+      'ایکسپائری کی مکمل تسلی',
+      'درست ڈوز کی رہنمائی'
     ]
   },
   bp: {
     icon: '🩸',
-    category: 'COMMUNITY HEALTH SCREENING',
-    title: 'Free Blood Pressure & Blood Sugar Screening',
-    desc: 'Regular cardiovascular and diabetes screening is vital. Visit our store anytime during opening hours for free, accurate blood pressure checks and rapid digital glucose testing administered by trained staff.',
-    features: [
-      'Completely Free BP Checkups',
-      'Instant Accurate Digital Readings',
-      'Blood Sugar (Glucose) Testing',
-      'Personal Record Card Maintained',
-      'Dietary & Lifestyle Advice',
-      'Immediate Physician Escalation'
+    cat: 'مفت عوامی سہولت (FREE SCREENING)',
+    title: 'مفت بلڈ پریشر و شوگر ٹیسٹ (Free BP & Sugar Test)',
+    desc: 'ہمارے سٹور پر روزانہ بلا معاوضہ بلڈ پریشر چیک کیا جاتا ہے اور شوگر کے مریضوں کے لیے فوری گلوکومیٹر ٹیسٹ کی سہولت موجود ہے۔ باقاعدہ بی پی چیک کروانا آپ کے دل اور صحت کے لیے بے حد ضروری ہے۔',
+    feats: [
+      '100% مفت بلڈ پریشر چیک',
+      'فوری ڈیجیٹل درست ریڈنگ',
+      'شوگر (گلوکوز) کی جانچ',
+      'ضرورت پڑنے پر ڈاکٹر سے رجوع کا مشورہ'
+    ]
+  },
+  consultation: {
+    icon: '🩺',
+    cat: 'طبی مشورہ (FREE CONSULTATION)',
+    title: 'فارماسسٹ سے مفت طبی رہنمائی (Pharmacist Advice)',
+    desc: 'موسمی بخار، نزلہ زکام، الرجی، کھانسی یا پیٹ کے درد کی صورت میں درست دوائی اور احتیاطی تدابیر کے متعلق ہمارے تجربہ کار سٹاف سے بلا جھجھک مفت رہنمائی حاصل کریں۔',
+    feats: [
+      'دوائی کھانے کے درست اوقات',
+      'کھانے کے ساتھ یا بعد کی ہدایات',
+      'سائیڈ ایفیکٹس سے بچاؤ',
+      'بچوں کی دوائی کی درست مقدار'
     ]
   },
   injection: {
     icon: '💉',
-    category: 'CERTIFIED CLINICAL PROCEDURE',
-    title: 'Injection & Sterile Wound Dressing',
-    desc: 'We provide safe, certified administration of doctor-prescribed intramuscular and intravenous injections, as well as aseptic wound cleaning and sterile bandage dressings with maximum hygiene standards.',
-    features: [
-      '100% Sterile Single-Use Syringes',
-      'Pain-Minimized Technique',
-      'Antiseptic Wound Sterilization',
-      'Burn & Cut Emergency Dressing',
-      'Tetanus (TT) Vaccinations',
-      'Clean & Disinfected Environment'
+    cat: 'طبی خدمات (INJECTIONS & DRESSING)',
+    title: 'انجیکشن اور جراثیم کش پٹی (Injection & Dressing)',
+    desc: 'ڈاکٹر کے نسخے کے مطابق کینولہ، ڈرپ، آئی ایم یا آئی وی انجیکشن لگانے اور زخموں کی جراثیم کش صفائی اور پٹی کی سہولت صاف ستھرے ماحول میں دی جاتی ہے۔',
+    feats: [
+      'نئی اور ڈسپوزایبل سرنج کا استعمال',
+      'تکلیف کے بغیر انجیکشن کا تجربہ',
+      'زخم کی اینٹی سیپٹک مرہم پٹی',
+      'ٹیٹنس (TT) کا حفاظتی ٹیکہ'
     ]
   },
   baby: {
     icon: '🍼',
-    category: 'MATERNAL & INFANT CARE',
-    title: 'Mother & Baby Health Essentials',
-    desc: 'From newborn infant formula to diapers, pediatric drops, and maternal prenatal supplements, Sardar Medical Store carries trusted brands to support mothers and growing infants with highest care.',
-    features: [
-      'Infant Nutrition & Formula Milk',
-      'High Quality Diaper Brands',
-      'Teething & Colic Pain Drops',
-      'Maternal Calcium & Iron Vitamins',
-      'Baby Skincare & Medicated Lotions',
-      'Feeding Bottles & Sterilizers'
-    ]
-  },
-  herbal: {
-    icon: '🌿',
-    category: 'NATURAL WELLNESS',
-    title: 'Herbal Remedies & Dietary Supplements',
-    desc: 'Boost your natural immunity, stamina, and joint health with our certified selection of multivitamins, Omega-3 fish oils, herbal syrups, and dietary supplements sourced from approved health brands.',
-    features: [
-      'Immunity Boosting Formulations',
-      'Multivitamins for Men, Women & Kids',
-      'Herbal Cough & Digestive Syrups',
-      'Calcium & Vitamin D3 for Bones',
-      'Pure Fish Oil (Omega-3)',
-      'Certified Halal & Safe Formulations'
-    ]
-  },
-  devices: {
-    icon: '🌡️',
-    category: 'HOME MONITORING',
-    title: 'Medical Devices & Equipment',
-    desc: 'Equip your home with accurate diagnostic instruments. We provide digital BP machines, glucometers, nebulizers for respiratory patients, pulse oximeters, and replacement accessories with operational guidance.',
-    features: [
-      'Digital Arm Blood Pressure Units',
-      'Glucometer Kits & Test Strips',
-      'Pulse Oximeters & Digital Thermometers',
-      'Pediatric & Adult Nebulizers',
-      'Steam Inhalers & Vaporizers',
-      'Full Warranty & Guidance Provided'
-    ]
-  },
-  skin: {
-    icon: '🧴',
-    category: 'DERMATOLOGY CARE',
-    title: 'Medicated Skin & Personal Care',
-    desc: 'Target acne, skin allergies, fungal infections, dryness, and sun damage with dermatologist-recommended medicated creams, cleansers, therapeutic soaps, and sunscreens.',
-    features: [
-      'Doctor Recommended Acne Treatments',
-      'SPF 50+ Broad Spectrum Sunblocks',
-      'Medicated Shampoos & Soaps',
-      'Antiseptic & Anti-itch Ointments',
-      'Intense Moisturizing Creams',
-      'Safe for Sensitive Skin Types'
+    cat: 'فیملی کیئر (BABY & MOTHER CARE)',
+    title: 'ماں اور بچوں کی نگہداشت (Infant & Maternal)',
+    desc: 'نوزائیدہ بچوں کے لیے معیاری فارمولا دودھ (Lactogen, Meiji وغیرہ)، پیمپرز، وائپس، فیڈر، بچوں کے پیٹ درد و دانت نکلنے کے ڈراپس اور ماؤں کے لیے فولک ایسڈ اور کیلشیم سپلیمنٹس موجود ہیں۔',
+    feats: [
+      'تمام نمبرز کے مستند ڈائپرز',
+      'بچوں کے فارمولا فوڈز',
+      'کولک (پیٹ درد) کے ڈراپس',
+      'ماؤں کے لیے وٹامنز و آئرن'
     ]
   },
   firstaid: {
     icon: '🩹',
-    category: 'EMERGENCY SUPPLIES',
-    title: 'First Aid & Emergency Medical Supplies',
-    desc: 'Be prepared for emergencies at home, in vehicles, or at workplaces. We stock complete emergency first aid boxes, medical adhesive tapes, sterile gauze, burn sprays, and trauma bandages.',
-    features: [
-      'Complete Household First Aid Kits',
-      'Pyodine & Antiseptic Liquids',
-      'Elastic Bandages & Gauze Rolls',
-      'Burn Relief Creams & Sprays',
-      'Adhesive Bandages (All Sizes)',
-      'Surgical Cotton & Medical Tapes'
+    cat: 'ہنگامی طبی امداد (FIRST AID)',
+    title: 'ابتدائی طبی امداد و سامان (First Aid Essentials)',
+    desc: 'گھر، گاڑی، دکان یا سکول کے لیے فرسٹ ایڈ باکس، پائیودین، برنول، گرم پٹیاں، سرجیکل کاٹن اور درد سے نجات کی دوائیں ہر وقت باآسانی دستیاب ہیں۔',
+    feats: [
+      'مکمل تیار فرسٹ ایڈ باکس',
+      'پائیودین و سیولون محلول',
+      'جلنے اور کٹنے کی مرہم',
+      'ایمرجنسی ادویات ہر وقت موجود'
     ]
   }
 };
 
-function openServiceModal(key) {
-  const data = serviceDatabase[key];
-  if (!data) return;
+function showServiceDetail(key) {
+  const d = servicesInfo[key];
+  if (!d) return;
 
-  document.getElementById('modal-icon').textContent = data.icon;
-  document.getElementById('modal-category').textContent = data.category;
-  document.getElementById('modal-title').textContent = data.title;
-  document.getElementById('modal-description').textContent = data.desc;
+  document.getElementById('sp-icon').textContent = d.icon;
+  document.getElementById('sp-category').textContent = d.cat;
+  document.getElementById('sp-title').textContent = d.title;
+  document.getElementById('sp-desc').textContent = d.desc;
 
-  const featuresList = document.getElementById('modal-features-list');
-  featuresList.innerHTML = data.features.map(f => `
-    <div class="modal-checklist-item">
-      <i class="fas fa-check-circle"></i>
-      <span>${f}</span>
-    </div>
+  const fBox = document.getElementById('sp-features');
+  fBox.innerHTML = d.feats.map(f => `
+    <div class="sp-feat-item"><i class="fas fa-check-circle"></i> ${f}</div>
   `).join('');
 
-  document.getElementById('modal-email-btn').href = `mailto:SardarMedicalstore@gmail.com?subject=Inquiry%20regarding%20${encodeURIComponent(data.title)}`;
-
-  const overlay = document.getElementById('service-modal-overlay');
-  overlay.classList.add('active');
+  document.getElementById('service-popup').classList.add('active');
   document.body.style.overflow = 'hidden';
 }
 
-function closeServiceModal() {
-  const overlay = document.getElementById('service-modal-overlay');
-  overlay.classList.remove('active');
+function closeServiceDetail() {
+  document.getElementById('service-popup').classList.remove('active');
   document.body.style.overflow = '';
 }
 
-function handleModalOverlayClick(e) {
-  if (e.target.id === 'service-modal-overlay') {
-    closeServiceModal();
-  }
-}
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeServiceModal();
-});
-
-// ===================== VISIBLE LIVE CHAT BOT ENGINE =====================
-const stream = document.getElementById('chat-stream');
-
-function appendMessage(text, isUser = false) {
-  const bubble = document.createElement('div');
-  bubble.className = `chat-message-bubble ${isUser ? 'msg-user' : 'msg-bot'}`;
-
-  if (!isUser) {
-    const label = document.createElement('div');
-    label.className = 'bot-name-label';
-    label.textContent = 'Sardar Medical Assistant';
-    bubble.appendChild(label);
-  }
-
-  const textNode = document.createElement('div');
-  textNode.innerHTML = text;
-  bubble.appendChild(textNode);
-
-  stream.appendChild(bubble);
-  stream.scrollTop = stream.scrollHeight;
+function handleServicePopupOutside(e) {
+  if (e.target.id === 'service-popup') closeServiceDetail();
 }
 
-function quickSend(question) {
-  appendMessage(question, true);
-  processBotReply(question);
-}
-
-function handleUserChatSubmit(e) {
+// ===================== DIRECT EMAIL FORM HANDLER =====================
+function handleCustomerFormSubmit(e) {
   e.preventDefault();
-  const input = document.getElementById('chat-text-input');
-  const message = input.value.trim();
-  if (!message) return;
+  const name = document.getElementById('cust-name').value.trim();
+  const phone = document.getElementById('cust-phone').value.trim();
+  const email = document.getElementById('cust-email').value.trim() || 'Not provided';
+  const subject = document.getElementById('cust-subject').value.trim();
+  const msg = document.getElementById('cust-message').value.trim();
 
-  appendMessage(message, true);
-  input.value = '';
-  processBotReply(message);
-}
-
-function processBotReply(userInput) {
-  const lower = userInput.toLowerCase();
-
-  setTimeout(() => {
-    let reply = '';
-
-    if (lower.includes('panadol') || lower.includes('paracetamol') || lower.includes('stock') || lower.includes('medicine')) {
-      reply = `Yes, Panadol, Paracetamol, and all primary fever & pain relief medicines are <strong>fully in stock</strong> at Sardar Medical Store! For immediate prescription reservation, <a href="https://wa.me/923056091354?text=Checking%20medicine%20stock" target="_blank" style="color:var(--primary); font-weight:700;">WhatsApp us directly at 0305-6091354</a>.`;
-    } else if (lower.includes('bp') || lower.includes('blood pressure') || lower.includes('sugar') || lower.includes('test')) {
-      reply = `Blood Pressure checks and digital blood sugar screenings are <strong>100% FREE</strong> at our store! Simply walk in to Shop No. 05, Girote Ada near MCB Bank, and our staff will assist you right away.`;
-    } else if (lower.includes('prescription') || lower.includes('doctor') || lower.includes('order')) {
-      reply = `You can easily share your doctor's prescription! Tap here to <a href="https://wa.me/923056091354" target="_blank" style="color:var(--primary); font-weight:700;">Send Photo on WhatsApp (03056091354)</a> or email it to <a href="mailto:SardarMedicalstore@gmail.com" style="color:var(--primary); font-weight:700;">SardarMedicalstore@gmail.com</a>. We will prepare your medicines immediately.`;
-    } else if (lower.includes('owner') || lower.includes('sardar') || lower.includes('ahsan') || lower.includes('ali')) {
-      reply = `Our store is owned and managed by <strong>Sardar Ali Ahsan</strong>. You can reach out directly via call at <a href="tel:03056091354" style="color:var(--primary); font-weight:700;">0305-6091354</a> or email him at <a href="mailto:SardarMedicalstore@gmail.com" style="color:var(--primary); font-weight:700;">SardarMedicalstore@gmail.com</a>.`;
-    } else if (lower.includes('timing') || lower.includes('location') || lower.includes('where') || lower.includes('address')) {
-      reply = `📍 <strong>Location:</strong> Shop No. 05, Girote Ada, Near MCB Bank.<br/>⏰ <strong>Timings:</strong> Open 7 days a week from 8:00 AM to 10:00 PM. Call us at 0305-6091354 for directions!`;
-    } else {
-      reply = `Thank you for your message! Sardar Medical Store is ready to assist you. You can speak to Sardar Ali Ahsan or our pharmacist directly on <a href="https://wa.me/923056091354" target="_blank" style="color:var(--primary); font-weight:700;">WhatsApp (0305-6091354)</a> or call us at <a href="tel:03056091354" style="color:var(--primary); font-weight:700;">0305-6091354</a>.`;
-    }
-
-    appendMessage(reply, false);
-  }, 500);
-}
-
-// ===================== INQUIRY FORM SUBMIT TO GMAIL =====================
-function handleInquiryFormSubmit(e) {
-  e.preventDefault();
-  const name = document.getElementById('form-name').value.trim();
-  const phone = document.getElementById('form-phone').value.trim();
-  const email = document.getElementById('form-email').value.trim();
-  const service = document.getElementById('form-service').value;
-  const message = document.getElementById('form-message').value.trim();
-
-  const subject = encodeURIComponent(`Sardar Medical Store Inquiry from ${name} (${service})`);
-  const body = encodeURIComponent(
-    `Assalam-o-Alaikum Sardar Ali Ahsan Sahab,\n\n` +
-    `Patient/Customer Name: ${name}\n` +
-    `Phone Number: ${phone}\n` +
-    `Email: ${email || 'Not provided'}\n` +
-    `Service/Topic: ${service}\n\n` +
-    `Details/Inquiry:\n${message}\n\n` +
-    `Location: Girote Ada Shop No 05 Near MCB Bank\n`
+  const emailSubject = encodeURIComponent(`Sardar Medical Store Inquiry: ${subject} from ${name}`);
+  const emailBody = encodeURIComponent(
+    `السلام علیکم سردار علی احسن صاحب،\n\n` +
+    `کسٹمر / مریض کا نام: ${name}\n` +
+    `موبائل نمبر: ${phone}\n` +
+    `ای میل: ${email}\n` +
+    `مطلوبہ دوا یا موضوع: ${subject}\n\n` +
+    `پیغام یا نسخہ کی تفصیل:\n${msg}\n\n` +
+    `لوکیشن: سردار میڈیکل سٹور، شاپ نمبر 05 نزد ایم سی بی بینک گروٹ اڈا، خوشاب\n`
   );
 
-  window.location.href = `mailto:SardarMedicalstore@gmail.com?subject=${subject}&body=${body}`;
+  window.location.href = `mailto:SardarMedicalstore@gmail.com?subject=${emailSubject}&body=${emailBody}`;
+}
+
+// ===================== SMART AI PHARMACY CHATBOT =====================
+function toggleChatWindow() {
+  const win = document.getElementById('chat-window');
+  win.classList.toggle('open');
+  if (win.classList.contains('open')) {
+    document.getElementById('chat-input-txt').focus();
+  }
+}
+
+function appendChatMsg(text, isUser = false) {
+  const c = document.getElementById('chat-messages');
+  const b = document.createElement('div');
+  b.className = `chat-bubble ${isUser ? 'cb-user' : 'cb-bot'}`;
+  b.innerHTML = text;
+  c.appendChild(b);
+  c.scrollTop = c.scrollHeight;
+}
+
+function sendChatPredefined(text) {
+  appendChatMsg(text, true);
+  processSmartBotKnowledge(text);
+}
+
+function handleChatSubmit(e) {
+  e.preventDefault();
+  const inp = document.getElementById('chat-input-txt');
+  const txt = inp.value.trim();
+  if (!txt) return;
+
+  appendChatMsg(txt, true);
+  inp.value = '';
+  processSmartBotKnowledge(txt);
+}
+
+// Comprehensive Medical Knowledge Base for any user question
+function processSmartBotKnowledge(query) {
+  const q = query.toLowerCase();
+
+  setTimeout(() => {
+    let ans = '';
+
+    // 1. Fever / Bukhar / Panadol / Paracetamol
+    if (q.includes('بخار') || q.includes('bukhar') || q.includes('fever') || q.includes('panadol') || q.includes('پیناڈول') || q.includes('paracetamol') || q.includes('calpol')) {
+      ans = `🌡️ <strong>بخار اور درد کی ادویات:</strong><br/>
+ہمارے پاس پیناڈول (Panadol 500mg, Panadol Extra, Panadol CF)، پیراسیٹامول اور بچوں کے لیے Calpol سیرپ مکمل دستیاب ہیں۔<br/>
+💡 <strong>رہنمائی:</strong> بخار تیز ہو تو ٹھنڈی پٹیاں کریں اور ہر 6 سے 8 گھنٹے بعد ڈاکٹر کے مشورے سے گولی لیں۔ نسخہ منگوانے کے لیے <a href="https://wa.me/923056091354?text=Fever%20Medicine%20Inquiry" target="_blank" style="color:#00b359;font-weight:bold;">واٹس ایپ (03056091354)</a> کریں۔`;
+    }
+    // 2. Stomach / Maida / Acidity / Gas / Risek / Flagyl
+    else if (q.includes('معدہ') || q.includes('maida') || q.includes('stomach') || q.includes('تیزابیت') || q.includes('acidity') || q.includes('گیس') || q.includes('gas') || q.includes('risek') || q.includes('flagyl') || q.includes('پیٹ')) {
+      ans = `🔥 <strong>معدے کی جلن، گیس اور پیٹ درد:</strong><br/>
+معدے کی تیزابیت کے لیے Risek 20mg/40mg (Omeprazole)، Gaviscon سیرپ، Digas اور موشن یا پیٹ خرابی کے لیے Flagyl 400mg اور ORS سردار میڈیکل سٹور پر فوری دستیاب ہیں۔<br/>
+💡 <strong>مشورہ:</strong> تیز مرچ مصالحے سے پرہیز کریں اور پانی زیادہ پیئیں۔ فوری دوا کے لیے <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">0305-6091354 پر کال کریں</a>۔`;
+    }
+    // 3. Flu / Cold / Nazla / Zukam / Allergy / Arinac / Softin
+    else if (q.includes('نزلہ') || q.includes('زکام') || q.includes('nazla') || q.includes('zukam') || q.includes('cold') || q.includes('flu') || q.includes('arinac') || q.includes('allergy') || q.includes('softin')) {
+      ans = `🤧 <strong>نزلہ، زکام اور الرجی:</strong><br/>
+چھینکوں، ناک بند ہونے اور زکام کے لیے Arinac (ارینیک)، Sancos، Softin، اور اینٹی الرجی ادویات دستیاب ہیں۔ گرم قہوہ، بھاپ اور آرام مفید ہے۔ کسی بھی دوا کے لیے آنر سردار علی احسن سے <a href="https://wa.me/923056091354" target="_blank" style="color:#00b359;font-weight:bold;">واٹس ایپ پر رابطہ کریں</a>۔`;
+    }
+    // 4. Cough / Khansi / کھانسی
+    else if (q.includes('کھانسی') || q.includes('khansi') || q.includes('cough') || q.includes('hydryllin') || q.includes('acefyl')) {
+      ans = `🫁 <strong>کھانسی کی ادویات:</strong><br/>
+خشک یا بلغم والی کھانسی کے لیے Acefyl سیرپ، Hydryllin، Pulmonol اور ہربل شربت (جیسے جوشاندہ یا توت سیاہ) دستیاب ہیں۔ گرم پانی اور نمک کے غرارے بھی مفید ہیں۔`;
+    }
+    // 5. Blood Pressure / BP / بی پی
+    else if (q.includes('بی پی') || q.includes('بلڈ پریشر') || q.includes('blood pressure') || q.includes('bp')) {
+      ans = `🩸 <strong>بلڈ پریشر کی معلومات و مفت ٹیسٹ:</strong><br/>
+سردار میڈیکل سٹور گروٹ اڈا پر <strong>مفت ڈیجیٹل بلڈ پریشر چیک اپ</strong> کی سہولت موجود ہے۔ نارمل بلڈ پریشر 120/80 ہوتا ہے۔ اگر بی پی ہائی یا لو رہتا ہو تو روزانہ چیک کروائیں۔ دکان نزد ایم سی بی بینک واقع ہے۔`;
+    }
+    // 6. Sugar / Diabetes / شوگر
+    else if (q.includes('شوگر') || q.includes('sugar') || q.includes('diabetes') || q.includes('insulin') || q.includes('انسولین')) {
+      ans = `🩺 <strong>شوگر ٹیسٹ و ادویات:</strong><br/>
+سٹور پر فوری شوگر (بلڈ گلوکوز) ٹیسٹ کیا جاتا ہے۔ شوگر کی گولیاں (Glucophage، Getryl، Diamecron وغیرہ) اور تمام اقسام کی انسولین جو فریج میں درست درجہ حرارت پر رکھی جاتی ہیں، دستیاب ہیں۔`;
+    }
+    // 7. Pain / Dard / Brufen / Ponstan / درد
+    else if (q.includes('درد') || q.includes('dard') || q.includes('pain') || q.includes('brufen') || q.includes('ponstan') || q.includes('disprin')) {
+      ans = `⚡ <strong>جسم اور جوڑوں کا درد:</strong><br/>
+سر درد، دانت کے درد، پٹھوں کے کھچاؤ اور جوڑوں کے درد کے لیے Brufen، Ponstan، Disprin اور اینٹی انفلیمیٹری گولیاں اور درد کی جیل دستیاب ہیں۔ شدید درد کی صورت میں فوری کال کریں: <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">0305-6091354</a>۔`;
+    }
+    // 8. Location / Address / کہاں ہے / کدر ہے / خوشاب
+    else if (q.includes('پتہ') || q.includes('location') || q.includes('address') || q.includes('کہاں') || q.includes('kidhar') || q.includes('kahan') || q.includes('khushab') || q.includes('girote') || q.includes('گروٹ')) {
+      ans = `📍 <strong>درست لوکیشن (Exact Location):</strong><br/>
+<strong>سردار میڈیکل سٹور</strong><br/>
+شاپ نمبر 05، گروٹ اڈا، نزد ایم سی بی بینک (MCB Bank)، ضلع خوشاب، پنجاب۔<br/>
+👉 <a href="https://www.google.com/maps/search/?api=1&query=MCB+Bank+Girote+Khushab+Punjab" target="_blank" style="color:#00b359;font-weight:bold;">گوگل میپس پر راستہ دیکھیں</a> یا آنر سردار علی احسن کو کال کریں: <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">0305-6091354</a>۔`;
+    }
+    // 9. Timings / وقت / کھلا ہے / بند
+    else if (q.includes('ٹائم') || q.includes('time') || q.includes('timing') || q.includes('open') || q.includes('بند') || q.includes('کھلا')) {
+      ans = `⏰ <strong>سٹور کے اوقات (Timings):</strong><br/>
+سردار میڈیکل سٹور ہفتے کے 7 دن صبح <strong>8:00 بجے سے رات 10:00 بجے تک</strong> باقاعدگی سے کھلا رہتا ہے۔ ہنگامی صورتحال میں رابطہ نمبر: <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">0305-6091354</a>۔`;
+    }
+    // 10. Owner / Sardar Ali Ahsan / مالک
+    else if (q.includes('آنر') || q.includes('owner') || q.includes('مالک') || q.includes('sardar') || q.includes('سردار') || q.includes('ahsan') || q.includes('احسن')) {
+      ans = `👨‍⚕️ <strong>سٹور آنر (Store Owner):</strong><br/>
+سردار میڈیکل سٹور کے مالک اور بانی <strong>سردار علی احسن (Sardar Ali Ahsan)</strong> ہیں۔<br/>
+📞 موبائل نمبر: <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">0305-6091354</a><br/>
+💬 واٹس ایپ: <a href="https://wa.me/923056091354" target="_blank" style="color:#00b359;font-weight:bold;">0305-6091354</a><br/>
+📧 ای میل: <a href="mailto:SardarMedicalstore@gmail.com" style="color:#00b359;font-weight:bold;">SardarMedicalstore@gmail.com</a>`;
+    }
+    // 11. Prescription / نسخہ / آرڈر
+    else if (q.includes('نسخہ') || q.includes('prescription') || q.includes('order') || q.includes('آرڈر') || q.includes('delivery')) {
+      ans = `📋 <strong>ڈاکٹر کا نسخہ منگوانا:</strong><br/>
+آپ اپنے ڈاکٹر کے نسخے کی صاف تصویر ہمارے واٹس ایپ نمبر پر بھیجیں:<br/>
+👉 <a href="https://wa.me/923056091354?text=Assalam-o-Alaikum%20Yeh%20Mera%20Doctor%20Prescription%20Hai" target="_blank" style="color:#25D366;font-weight:bold;">واٹس ایپ پر تصویر بھیجیں (0305-6091354)</a><br/>
+ہم فوری آپ کی ادویات تیار کر دیں گے۔`;
+    }
+    // 12. Default intelligent medical response
+    else {
+      ans = `معزز کسٹمر، آپ کا سوال موصول ہو چکا ہے۔ سردار میڈیکل سٹور (گروٹ اڈا، خوشاب) پر ہر قسم کی اصلی اور معیاری ادویات موجود ہیں۔<br/>
+اس بارے میں فوری تصدیق اور قیمت معلوم کرنے کے لیے آنر سردار علی احسن صاحب سے براہ راست رابطہ کریں:<br/>
+📞 <a href="tel:03056091354" style="color:#00b359;font-weight:bold;">فون کال: 0305-6091354</a><br/>
+💬 <a href="https://wa.me/923056091354?text=${encodeURIComponent(query)}" target="_blank" style="color:#25D366;font-weight:bold;">واٹس ایپ پر براہِ راست پوچھیں</a>`;
+    }
+
+    appendChatMsg(ans, false);
+  }, 450);
 }
 </script>
 
